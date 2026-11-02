@@ -89,8 +89,8 @@ myigv 默认**每个分面独立 group autoscale**。可在轨道右键 → Grou
 
 ## 10. 一键安装包（GitHub Actions）
 
-`.github/workflows/build-installers.yml` 在 push 到 `main`、打 `v*` 标签或手动触发时，分别在
-`windows-latest` / `macos-latest` 上构建 `jpackage` 安装包（自带 Java 运行时 + 离线注释包）：
+`.github/workflows/build-installers.yml` 在**打 `v*` 标签**或**手动触发**时（日常 push 只跑编译检查，不打包），
+分别在 `windows-latest` / `macos-latest` 上构建 `jpackage` 安装包（自带 Java 运行时 + 离线注释包）：
 
 - Windows：`.exe` 安装器（WiX）；
 - macOS：`.dmg`（未签名，首次打开需「右键 → 打开」）。
