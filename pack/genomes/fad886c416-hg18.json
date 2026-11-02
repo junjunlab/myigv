@@ -1,0 +1,50 @@
+{
+  "id": "hg18",
+  "name": "Human (hg18)",
+  "twoBitURL": "https://hgdownload.soe.ucsc.edu/goldenPath/hg18/bigZips/hg18.2bit",
+  "wholeGenomeView": true,
+  "cytobandURL": "https://hgdownload.soe.ucsc.edu/goldenPath/hg18/database/cytoBandIdeo.txt.gz",
+  "chromosomeOrder": [
+    "chr1",
+    "chr2",
+    "chr3",
+    "chr4",
+    "chr5",
+    "chr6",
+    "chr7",
+    "chr8",
+    "chr9",
+    "chr10",
+    "chr11",
+    "chr12",
+    "chr13",
+    "chr14",
+    "chr15",
+    "chr16",
+    "chr17",
+    "chr18",
+    "chr19",
+    "chr20",
+    "chr21",
+    "chr22",
+    "chrX",
+    "chrY"
+  ],
+  "chromSizesURL": "https://hgdownload.soe.ucsc.edu/goldenPath/hg18/bigZips/hg18.chrom.sizes",
+  "tracks": [
+    {
+      "id": "refGene",
+      "name": "RefSeq Genes",
+      "url": "https://hgdownload.soe.ucsc.edu/goldenPath/hg18/database/refGene.txt.gz",
+      "indexed": false,
+      "format": "refgene",
+      "html": "https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg18&g=refGene",
+      "order": 100000
+    }
+  ],
+  "hubs": [
+    "https://igv.org/genomes/hubs/hg18/hub.txt",
+    "https://igv.org/genomes/hubs/hg18/tumorscape/hub.txt",
+    "https://igv.org/genomes/hubs/hg18/gbm/hub.txt"
+  ]
+}

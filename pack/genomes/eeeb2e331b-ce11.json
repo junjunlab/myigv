@@ -1,0 +1,34 @@
+{
+  "id": "ce11",
+  "name": "C. elegans (ce11)",
+  "fastaURL": "https://igv.org/genomes/data/ce11/ce11.fa",
+  "indexURL": "https://igv.org/genomes/data/ce11/ce11.fa.fai",
+  "twoBitURL": "https://hgdownload.soe.ucsc.edu/goldenPath/ce11/bigZips/ce11.2bit",
+  "wholeGenomeView": true,
+  "cytobandURL": "https://hgdownload.soe.ucsc.edu/goldenPath/ce11/database/cytoBandIdeo.txt.gz",
+  "aliasURL": "https://hgdownload.soe.ucsc.edu/goldenPath/ce11/bigZips/ce11.chromAlias.txt",
+  "chromosomeOrder": [
+    "chrI",
+    "chrII",
+    "chrIII",
+    "chrIV",
+    "chrV",
+    "chrX"
+  ],
+  "chromSizesURL": "https://hgdownload.soe.ucsc.edu/goldenPath/ce11/bigZips/ce11.chrom.sizes",
+  "tracks": [
+    {
+      "id": "refseqCurated",
+      "name": "Refseq Curated",
+      "url": "https://hgdownload.soe.ucsc.edu/goldenPath/ce11/database/ncbiRefSeqCurated.txt.gz",
+      "indexed": false,
+      "format": "refgene",
+      "html": "https://www.ncbi.nlm.nih.gov/refseq/refseq_select/",
+      "order": 100000
+    }
+  ],
+  "hubs": [
+    "https://igv.org/genomes/hubs/ce11/hub.txt",
+    "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/002/985/GCF_000002985.6/hub.txt"
+  ]
+}

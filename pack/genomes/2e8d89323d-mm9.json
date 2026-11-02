@@ -1,0 +1,40 @@
+{
+  "id": "mm9",
+  "name": "Mouse (NCBI37/mm9)",
+  "twoBitURL": "https://hgdownload.soe.ucsc.edu/goldenPath/mm9/bigZips/mm9.2bit",
+  "wholeGenomeView": true,
+  "cytobandURL": "https://s3.amazonaws.com/igv.org.genomes/mm9/cytoBandIdeo.txt.gz",
+  "chromosomeOrder": [
+    "chr1",
+    "chr2",
+    "chr3",
+    "chr4",
+    "chr5",
+    "chr6",
+    "chr7",
+    "chr8",
+    "chr9",
+    "chr10",
+    "chr11",
+    "chr12",
+    "chr13",
+    "chr14",
+    "chr15",
+    "chr16",
+    "chr17",
+    "chr18",
+    "chr19",
+    "chrX",
+    "chrY"
+  ],
+  "chromSizesURL": "https://hgdownload.soe.ucsc.edu/goldenPath/mm9/bigZips/mm9.chrom.sizes",
+  "tracks": [
+    {
+      "name": "Refseq Genes",
+      "url": "https://hgdownload.soe.ucsc.edu/goldenPath/mm9/database/refGene.txt.gz",
+      "format": "refgene",
+      "indexed": false,
+      "order": 100000
+    }
+  ]
+}

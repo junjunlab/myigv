@@ -1,0 +1,36 @@
+track knownGene
+shortLabel Known Genes
+longLabel UCSC Known Genes
+group genes
+type refgene
+bigDataUrl https://hgdownload.soe.ucsc.edu/goldenPath/hg18/database/knownGene.txt.gz
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg18&g=knownGene
+
+track refGene
+shortLabel RefSeq Genes
+longLabel RefSeq Genes
+group genes
+type refgene
+bigDataUrl https://hgdownload.soe.ucsc.edu/goldenPath/hg18/database/refGene.txt.gz
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg18&g=refGene
+
+track ensGene
+shortLabel Ensembl Genes
+longLabel Ensembl Genes
+group genes
+type refgene
+bigDataUrl https://hgdownload.soe.ucsc.edu/goldenPath/hg18/database/ensGene.txt.gz
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg18&g=ensGene
+
+track geneReviews
+shortLabel GeneReviews
+type bigBed 9 +
+longLabel GeneReviews
+mouseOver $name disease(s): $diseases
+visibility hide
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg18&g=geneReviews
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg18/geneReviews/geneReviews.bb
+color 0,80,0
+noScoreFilter on
+url https://www.ncbi.nlm.nih.gov/books/NBK1116/?term=$$

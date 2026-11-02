@@ -1,0 +1,444 @@
+hub GCF_000146045.2 genome assembly
+shortLabel baker's yeast S288C (2014)
+longLabel baker's yeast S288C (2014)/Saccharomyces cerevisiae S288C/GCF_000146045.2_R64 genome assembly
+useOneFile on
+email genome-www@soe.ucsc.edu
+descriptionUrl html/GCF_000146045.2_R64.description.html
+
+genome GCF_000146045.2
+taxId 559292
+groups groups.txt
+description baker's yeast S288C (2014)
+twoBitPath GCF_000146045.2.2bit
+twoBitBptUrl GCF_000146045.2.2bit.bpt
+chromSizes GCF_000146045.2.chrom.sizes.txt
+chromAliasBb GCF_000146045.2.chromAlias.bb
+chromAuthority ucsc
+organism R64 Dec. 2014
+defaultPos NC_001136.10:510644-520644
+scientificName Saccharomyces cerevisiae S288C
+htmlPath html/GCF_000146045.2_R64.description.html
+blat dynablat-01.soe.ucsc.edu 4040 dynamic GCF/000/146/045/GCF_000146045.2
+transBlat dynablat-01.soe.ucsc.edu 4040 dynamic GCF/000/146/045/GCF_000146045.2
+isPcr dynablat-01.soe.ucsc.edu 4040 dynamic GCF/000/146/045/GCF_000146045.2
+liftOver.GCF_000002945.1 liftOver/GCF_000146045.2ToGCF_000002945.1.over.chain.gz
+
+track assembly
+longLabel Assembly
+shortLabel Assembly
+visibility hide
+colorByStrand 150,100,30 230,170,40
+color 150,100,30
+altColor 230,170,40
+bigDataUrl bbi/GCF_000146045.2_R64.assembly.bb
+type bigBed 6
+html html/GCF_000146045.2_R64.assembly
+searchIndex name
+searchTrix ixIxx/GCF_000146045.2_R64.assembly.ix
+url https://www.ncbi.nlm.nih.gov/nuccore/$$
+urlLabel NCBI Nucleotide database:
+group map
+
+track cytoBandIdeo
+shortLabel Chromosome Band (Ideogram)
+longLabel Ideogram for Orientation
+group map
+visibility dense
+type bigBed 4 +
+bigDataUrl bbi/GCF_000146045.2_R64.cytoBand.bb
+
+track gc5Base
+shortLabel GC Percent
+longLabel GC Percent in 5-Base Windows
+group map
+visibility dense
+autoScale Off
+maxHeightPixels 128:36:16
+graphTypeDefault Bar
+gridDefault OFF
+windowingFunction Mean
+color 0,0,0
+altColor 128,128,128
+viewLimits 30:70
+type bigWig 0 100
+bigDataUrl bbi/GCF_000146045.2_R64.gc5Base.bw
+html html/GCF_000146045.2_R64.gc5Base
+
+track tanDups
+shortLabel Tandem Dups
+longLabel Paired identical sequences
+compositeTrack on
+visibility hide
+type bigBed 12
+group map
+html html/GCF_000146045.2_R64.tanDups
+
+    track tandemDups
+    parent tanDups on
+    shortLabel Tandem Dups
+    longLabel Paired exactly identical sequence survey over entire genome assembly
+    bigDataUrl bbi/GCF_000146045.2_R64.tandemDups.bb
+    type bigBed 12
+
+track repeatMasker
+compositeTrack on
+shortLabel RepeatMasker
+longLabel Repeating Elements by RepeatMasker
+group varRep
+visibility dense
+type bigBed 6 +
+colorByStrand 50,50,150 150,50,50
+maxWindowToDraw 10000000
+spectrum on
+html html/GCF_000146045.2_R64.repeatMasker
+
+    track repeatMaskerLTR
+    parent repeatMasker
+    shortLabel LTR
+    longLabel LTR Repeating Elements by RepeatMasker
+    type bigBed 6 +
+    priority 3
+    bigDataUrl bbi/GCF_000146045.2_R64.rmsk.LTR.bb
+
+    track repeatMaskerSimple
+    parent repeatMasker
+    shortLabel Simple
+    longLabel Simple Repeating Elements by RepeatMasker
+    type bigBed 6 +
+    priority 5
+    bigDataUrl bbi/GCF_000146045.2_R64.rmsk.Simple.bb
+
+    track repeatMaskerLowComplexity
+    parent repeatMasker
+    shortLabel Low Complexity
+    longLabel Low Complexity Repeating Elements by RepeatMasker
+    type bigBed 6 +
+    priority 6
+    bigDataUrl bbi/GCF_000146045.2_R64.rmsk.Low_complexity.bb
+
+    track repeatMaskerRNA
+    parent repeatMasker
+    shortLabel RNA
+    longLabel RNA Repeating Elements by RepeatMasker
+    type bigBed 6 +
+    priority 8
+    bigDataUrl bbi/GCF_000146045.2_R64.rmsk.RNA.bb
+
+    track repeatMaskerOther
+    parent repeatMasker
+    shortLabel Other
+    longLabel Other Repeating Elements by RepeatMasker
+    type bigBed 6 +
+    priority 9
+    bigDataUrl bbi/GCF_000146045.2_R64.rmsk.Other.bb
+
+track repeatModeler
+shortLabel RepeatModeler
+longLabel RepeatModeler Repetitive Elements
+type bigRmsk 9 +
+visibility hide
+group varRep
+bigDataUrl bbi/GCF_000146045.2_R64.rModel.bb
+xrefDataUrl bbi/GCF_000146045.2_R64.rModel.align.bb
+maxWindowToDraw 5000000
+html html/GCF_000146045.2_R64.repeatModeler
+
+track simpleRepeat
+shortLabel Simple Repeats
+longLabel Simple Tandem Repeats by TRF
+group varRep
+visibility dense
+type bigBed 4 +
+bigDataUrl bbi/GCF_000146045.2_R64.simpleRepeat.bb
+html html/GCF_000146045.2_R64.simpleRepeat
+
+track refSeqComposite
+compositeTrack on
+shortLabel NCBI RefSeq
+longLabel RefSeq gene predictions from NCBI
+group genes
+visibility pack
+type bigBed
+dragAndDrop subTracks
+allButtonPair on
+dataVersion SGD R64-5-1 (2025-03-09)
+html html/GCF_000146045.2_R64.refSeqComposite
+priority 2
+
+        track ncbiRefSeq
+        parent refSeqComposite on
+        color 12,12,120
+        shortLabel RefSeq All
+        type bigGenePred
+        urls name2="https://www.ncbi.nlm.nih.gov/gene/?term=$$" geneName="https://www.ncbi.nlm.nih.gov/gene/$$" geneName2="https://www.ncbi.nlm.nih.gov/nuccore/$$"
+        labelFields name2,geneName,geneName2
+        defaultLabelFields name2
+        searchIndex name
+        searchTrix ixIxx/GCF_000146045.2_R64.ncbiRefSeq.ix
+        bigDataUrl bbi/GCF_000146045.2_R64.ncbiRefSeq.bb
+        longLabel NCBI RefSeq genes, curated and predicted sets (NM_*, XM_*, NR_*, XR_*, NP_* or YP_*)
+        idXref ncbiRefSeqLink mrnaAcc name
+        baseColorUseCds given
+        baseColorDefault genomicCodons
+        priority 1
+
+        track ncbiRefSeqCurated
+        color 12,12,120
+        parent refSeqComposite on
+        shortLabel RefSeq Curated
+        longLabel NCBI RefSeq genes, curated subset (NM_*, NR_*, NP_* or YP_*)
+        type bigGenePred
+        urls name2="https://www.ncbi.nlm.nih.gov/gene/?term=$$" geneName="https://www.ncbi.nlm.nih.gov/gene/$$" geneName2="https://www.ncbi.nlm.nih.gov/nuccore/$$"
+        labelFields name2,geneName,geneName2
+        defaultLabelFields name2
+        searchIndex name
+        searchTrix ixIxx/GCF_000146045.2_R64.ncbiRefSeqCurated.ix
+        idXref ncbiRefSeqLink mrnaAcc name
+        bigDataUrl bbi/GCF_000146045.2_R64.ncbiRefSeqCurated.bb
+        baseColorUseCds given
+        baseColorDefault genomicCodons
+        priority 2
+
+        track ncbiRefSeqOther
+        color 32,32,32
+        parent refSeqComposite on
+        shortLabel RefSeq Other
+        longLabel NCBI RefSeq other annotations (not NM_*, NR_*, XM_*, XR_*, NP_* or YP_*)
+        priority 4
+        searchIndex name
+        searchTrix ixIxx/GCF_000146045.2_R64.ncbiRefSeqOther.ix
+        bigDataUrl bbi/GCF_000146045.2_R64.ncbiRefSeqOther.bb
+        type bigBed 12 +
+        labelFields name
+        skipEmptyFields on
+        urls GeneID="https://www.ncbi.nlm.nih.gov/gene/$$" MIM="https://www.ncbi.nlm.nih.gov/omim/$$" HGNC="http://www.genenames.org/cgi-bin/gene_symbol_report?hgnc_id=$$" FlyBase="http://flybase.org/reports/$$" WormBase="http://www.wormbase.org/db/gene/gene?name=$$" RGD="https://rgd.mcw.edu/rgdweb/search/search.html?term=$$" SGD="https://www.yeastgenome.org/locus/$$" miRBase="http://www.mirbase.org/cgi-bin/mirna_entry.pl?acc=$$" ZFIN="https://zfin.org/$$" MGI="http://www.informatics.jax.org/marker/$$"
+
+        track ncbiRefSeqPsl
+        priority 5
+        parent refSeqComposite off
+        shortLabel RefSeq Alignments
+        longLabel RefSeq Alignments of RNAs
+        type bigPsl
+        searchIndex name
+        bigDataUrl bbi/GCF_000146045.2_R64.bigPsl.bb
+        indelDoubleInsert on
+        indelQueryInsert on
+        showDiffBasesAllScales .
+        showDiffBasesMaxZoom 10000.0
+        showCdsMaxZoom 10000.0
+        showCdsAllScales .
+        baseColorDefault diffCodons
+        pslSequence no
+        baseColorUseSequence lfExtra
+        baseColorUseCds table given
+        color 0,0,0
+
+track cpgIslands
+compositeTrack on
+shortLabel CpG Islands
+longLabel CpG Islands (Islands < 300 Bases are Light Green)
+group regulation
+visibility dense
+type bigBed 4 +
+html html/GCF_000146045.2_R64.cpgIslands
+
+    track cpgIslandExt
+    parent cpgIslands off
+    shortLabel CpG Islands
+    longLabel CpG Islands (Islands < 300 Bases are Light Green)
+    type bigBed 4 +
+    priority 1
+    bigDataUrl bbi/GCF_000146045.2_R64.cpgIslandExt.bb
+
+    track cpgIslandExtUnmasked
+    parent cpgIslands on
+    shortLabel Unmasked CpG
+    longLabel CpG Islands on All Sequence (Islands < 300 Bases are Light Green)
+    type bigBed 4 +
+    priority 2
+    bigDataUrl bbi/GCF_000146045.2_R64.cpgIslandExtUnmasked.bb
+
+track windowMasker
+shortLabel WM + SDust
+longLabel Genomic Intervals Masked by WindowMasker + SDust
+group varRep
+visibility dense
+type bigBed 3
+bigDataUrl bbi/GCF_000146045.2_R64.windowMasker.bb
+html html/GCF_000146045.2_R64.windowMasker
+
+track augustus
+shortLabel Augustus
+longLabel Augustus Gene Predictions
+group genes
+visibility dense
+color 180,0,0
+type bigGenePred
+bigDataUrl bbi/GCF_000146045.2_R64.augustus.bb
+html html/GCF_000146045.2_R64.augustus
+
+track xenoRefGene
+shortLabel RefSeq mRNAs
+longLabel RefSeq mRNAs mapped to this assembly
+group rna
+visibility pack
+color 180,0,0
+type bigGenePred
+bigDataUrl bbi/GCF_000146045.2_R64.xenoRefGene.bb
+url https://www.ncbi.nlm.nih.gov/nuccore/$$
+urlLabel NCBI Nucleotide database:
+labelFields name,geneName,geneName2
+defaultLabelFields geneName
+searchIndex name
+searchTrix ixIxx/GCF_000146045.2_R64.xenoRefGene.ix
+html html/GCF_000146045.2_R64.xenoRefGene
+
+track ensGene
+shortLabel Ensembl genes
+longLabel Ensembl genes version 103/Feb. 2021
+group genes
+priority 40
+visibility pack
+color 150,0,0
+itemRgb on
+type bigBed 12 .
+bigDataUrl bbi/GCF_000146045.2_R64.ensGene.bb
+searchIndex name
+baseColorUseCds given
+baseColorDefault genomicCodons
+html html/GCF_000146045.2_R64.ensGene
+
+##############################################################################
+# GCF_000002945.1 - brewer's yeast - Saccharomyces cerevisiae S288C - taxId: 559292
+##############################################################################
+track chainNetGCF_000002945.1
+compositeTrack on
+shortLabel brewer's yeast Chain/Net
+longLabel brewer's yeast (2014-12-17), Chain and Net Alignments
+subGroup1 view Views chain=Chain net=Net
+dragAndDrop subTracks
+visibility hide
+group compGeno
+priority 100.1
+color 0,0,0
+altColor 100,50,0
+type bed 3
+sortOrder view=+
+otherDb GCF_000002945.1
+html html/GCF_000146045.2_R64.chainNet
+
+    track chainNetGCF_000002945.1Viewchain
+    shortLabel Chain
+    view chain
+    visibility pack
+    parent chainNetGCF_000002945.1
+    spectrum on
+
+        track chainGCF_000002945.1
+        parent chainNetGCF_000002945.1Viewchain
+        subGroups view=chain
+        shortLabel brewer's yeast Chain
+        longLabel brewer's yeast (2014-12-17) Chained Alignments
+        type bigChain GCF_000002945.1
+        bigDataUrl bbi/GCF_000146045.2_R64.chainGCF_000002945.1.bb
+        linkDataUrl bbi/GCF_000146045.2_R64.chainGCF_000002945.1Link.bb
+        priority 1
+
+        track chainSynGCF_000002945.1
+        parent chainNetGCF_000002945.1Viewchain
+        subGroups view=chain
+        shortLabel brewer's yeast synChain
+        longLabel brewer's yeast (2014-12-17) Syntenic Chained Alignments
+        type bigChain GCF_000002945.1
+        bigDataUrl bbi/GCF_000146045.2_R64.chainSynGCF_000002945.1.bb
+        linkDataUrl bbi/GCF_000146045.2_R64.chainSynGCF_000002945.1Link.bb
+        priority 2
+
+        track chainRBestGCF_000002945.1
+        parent chainNetGCF_000002945.1Viewchain
+        subGroups view=chain
+        shortLabel brewer's yeast rbChain
+        longLabel brewer's yeast (2014-12-17) Reciprocal Best Chained Alignments
+        type bigChain GCF_000002945.1
+        bigDataUrl bbi/GCF_000146045.2_R64.chainRBestGCF_000002945.1.bb
+        linkDataUrl bbi/GCF_000146045.2_R64.chainRBestGCF_000002945.1Link.bb
+        priority 3
+
+    track mafNetGCF_000002945.1Viewnet
+    shortLabel Net
+    view net
+    visibility full
+    parent chainNetGCF_000002945.1
+
+        track netGCF_000002945.1
+        parent mafNetGCF_000002945.1Viewnet
+        subGroups view=net
+        shortLabel brewer's yeast net
+        longLabel brewer's yeast (2014-12-17) Net Alignment
+        type bigMaf
+        bigDataUrl bbi/GCF_000146045.2_R64.GCF_000002945.1.net.bb
+        summary bbi/GCF_000146045.2_R64.GCF_000002945.1.net.summary.bb
+        speciesOrder GCF_000002945.1
+        priority 4
+
+        track synNetGCF_000002945.1
+        parent mafNetGCF_000002945.1Viewnet
+        subGroups view=net
+        shortLabel brewer's yeast synNet
+        longLabel brewer's yeast (2014-12-17) Syntenic Net Alignment
+        type bigMaf
+        bigDataUrl bbi/GCF_000146045.2_R64.GCF_000002945.1.synNet.bb
+        summary bbi/GCF_000146045.2_R64.GCF_000002945.1.synNet.summary.bb
+        speciesOrder GCF_000002945.1
+        priority 5
+
+        track rbestNetGCF_000002945.1
+        parent mafNetGCF_000002945.1Viewnet
+        subGroups view=net
+        shortLabel brewer's yeast rbestNet
+        longLabel brewer's yeast (2014-12-17) Reciprocal Best Net Alignment
+        type bigMaf
+        bigDataUrl bbi/GCF_000146045.2_R64.GCF_000002945.1.rbestNet.bb
+        summary bbi/GCF_000146045.2_R64.GCF_000002945.1.rbestNet.summary.bb
+        speciesOrder GCF_000002945.1
+        priority 6
+
+
+# BEGIN genark contrib: VEuPathDB
+track VEuPathDBGeneModels
+shortLabel VEuPathDB Genes
+longLabel Gene Models mirrored from VEuPathDB
+group genes
+type bigBed 12 .
+visibility pack
+labelFields name
+searchIndex name
+bigDataUrl contrib/VEuPathDB/veupathGenes.bb
+colorByStrand 0,0,122 157,60,32
+dataVersion VEuPathDB release 68
+html contrib/VEuPathDB/VEuPathDB
+# END genark contrib: VEuPathDB
+
+# BEGIN genark contrib: evaSnp8
+track evaSnp8
+shortLabel EVA SNP Release 8
+longLabel Short Genetic Variants from European Variant Archive Release 8
+type bigBed 9 +
+visibility dense
+group varRep
+itemRgb on
+bigDataUrl contrib/evaSnp8/evaSnp8.bb
+url https://www.ebi.ac.uk/eva/?variant&accessionID=$$
+searchIndex name
+mouseOver <b>Ref/Alt allele(s)</b>: $ref>$alt<br> <b>Var type</b>: $ucscClass<br> <b>AA change</b>: $aaChange
+filterValues.varClass SNV|SNV,deletion|Deletion,indel|Indel,insertion|Insertion,MNV|MNV,sequence_alteration|Sequence alteration
+filterLabel.varClass Variant class from EVA SO term
+filterLabel.ucscClass Functional effect per UCSC Variant Annotation
+filterValues.ucscClass downstream_gene_variant|Downstream gene variant,upstream_gene_variant|Upstream gene variant,intron_variant|Intron variant,NMD_transcript_variant|Nonsense-mediated mRNA decay (NMD) variant,5_prime_UTR_variant|5 prime UTR variant,3_prime_UTR_variant|3 prime UTR variant,missense_variant|Missense variant,synonymous_variant|Synonymous variant,non_coding_transcript_exon_variant|Non-coding transcript exon variant,no_sequence_alteration|No sequence alteration,splice_region_variant|Splice region variant,frameshift_variant|Frameshift variant,stop_gained|Stop gained,splice_acceptor_variant|Splice acceptor variant,inframe_deletion|Inframe deletion,inframe_insertion|Inframe insertion,splice_donor_variant|Splice donor variant,coding_sequence_variant|Coding sequence variant,initiator_codon_variant|Initiator codon variant,stop_lost|Stop lost,stop_retained_variant|Stop retained variant,intergenic_variant|Intergenic variant
+filterType.ucscClass multipleListOnlyOr
+filterValues.itemRgb 255,,0,,0|Protein-altering and splice variants,0,,128,,0|Synonymous variants,0,,0,,255|Non-coding transcripts or UTR variants,0,,0,,0|Intergenic and intronic variants
+filterLabel.itemRgb General variant types by color grouping
+maxWindowCoverage 250000
+maxItems 1000000
+html contrib/evaSnp8/description
+# END genark contrib: evaSnp8

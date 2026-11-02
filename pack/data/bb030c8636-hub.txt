@@ -1,0 +1,462 @@
+hub GCF_000001215.4 genome assembly
+shortLabel fly D.melanogaster
+longLabel fly D.melanogaster/Drosophila melanogaster/GCF_000001215.4_Release_6_plus_ISO1_MT genome assembly
+useOneFile on
+email genome-www@soe.ucsc.edu
+descriptionUrl html/GCF_000001215.4_Release_6_plus_ISO1_MT.description.html
+
+genome GCF_000001215.4
+taxId 7227
+groups groups.txt
+description fly D.melanogaster
+twoBitPath GCF_000001215.4.2bit
+twoBitBptUrl GCF_000001215.4.2bit.bpt
+chromSizes GCF_000001215.4.chrom.sizes.txt
+chromAliasBb GCF_000001215.4.chromAlias.bb
+chromAuthority ucsc
+organism Release_6_plus_ISO1_MT Aug. 2014
+defaultPos NT_033777.3:10693110-10703110
+scientificName Drosophila melanogaster
+htmlPath html/GCF_000001215.4_Release_6_plus_ISO1_MT.description.html
+blat dynablat-01.soe.ucsc.edu 4040 dynamic GCF/000/001/215/GCF_000001215.4
+transBlat dynablat-01.soe.ucsc.edu 4040 dynamic GCF/000/001/215/GCF_000001215.4
+isPcr dynablat-01.soe.ucsc.edu 4040 dynamic GCF/000/001/215/GCF_000001215.4
+liftOver.GCF_000002335.3 liftOver/GCF_000001215.4ToGCF_000002335.3.over.chain.gz
+liftOver.dm6 liftOver/GCF_000001215.4ToDm6.over.chain.gz
+
+track assembly
+longLabel Assembly
+shortLabel Assembly
+visibility hide
+colorByStrand 150,100,30 230,170,40
+color 150,100,30
+altColor 230,170,40
+bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.assembly.bb
+type bigBed 6
+html html/GCF_000001215.4_Release_6_plus_ISO1_MT.assembly
+searchIndex name
+searchTrix ixIxx/GCF_000001215.4_Release_6_plus_ISO1_MT.assembly.ix
+url https://www.ncbi.nlm.nih.gov/nuccore/$$
+urlLabel NCBI Nucleotide database:
+group map
+
+track cytoBandIdeo
+shortLabel Chromosome Band (Ideogram)
+longLabel Ideogram for Orientation
+group map
+visibility dense
+type bigBed 4 +
+bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.cytoBand.bb
+
+track gc5Base
+shortLabel GC Percent
+longLabel GC Percent in 5-Base Windows
+group map
+visibility dense
+autoScale Off
+maxHeightPixels 128:36:16
+graphTypeDefault Bar
+gridDefault OFF
+windowingFunction Mean
+color 0,0,0
+altColor 128,128,128
+viewLimits 30:70
+type bigWig 0 100
+bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.gc5Base.bw
+html html/GCF_000001215.4_Release_6_plus_ISO1_MT.gc5Base
+
+track tanDups
+shortLabel Tandem Dups
+longLabel Paired identical sequences
+compositeTrack on
+visibility hide
+type bigBed 12
+group map
+html html/GCF_000001215.4_Release_6_plus_ISO1_MT.tanDups
+
+    track gapOverlap
+    parent tanDups on
+    shortLabel Gap Overlaps
+    longLabel Paired exactly identical sequence on each side of a gap
+    bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.gapOverlap.bb
+    type bigBed 12
+
+    track tandemDups
+    parent tanDups on
+    shortLabel Tandem Dups
+    longLabel Paired exactly identical sequence survey over entire genome assembly
+    bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.tandemDups.bb
+    type bigBed 12
+
+track repeatMasker
+shortLabel RepeatMasker
+longLabel RepeatMasker Repetitive Elements
+type bigRmsk 9 +
+visibility pack
+group varRep
+bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.rmsk.bb
+maxWindowToDraw 5000000
+html html/GCF_000001215.4_Release_6_plus_ISO1_MT.repeatMasker
+
+track simpleRepeat
+shortLabel Simple Repeats
+longLabel Simple Tandem Repeats by TRF
+group varRep
+visibility dense
+type bigBed 4 +
+bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.simpleRepeat.bb
+html html/GCF_000001215.4_Release_6_plus_ISO1_MT.simpleRepeat
+
+track refSeqComposite
+compositeTrack on
+shortLabel NCBI RefSeq
+longLabel RefSeq gene predictions from NCBI
+group genes
+visibility pack
+type bigBed
+dragAndDrop subTracks
+allButtonPair on
+dataVersion FlyBase Release 6.54 (2023-12-27)
+html html/GCF_000001215.4_Release_6_plus_ISO1_MT.refSeqComposite
+priority 2
+
+        track ncbiRefSeq
+        parent refSeqComposite on
+        color 12,12,120
+        shortLabel RefSeq All
+        type bigGenePred
+        urls name2="https://www.ncbi.nlm.nih.gov/gene/?term=$$" geneName="https://www.ncbi.nlm.nih.gov/gene/$$" geneName2="https://www.ncbi.nlm.nih.gov/nuccore/$$"
+        labelFields name2,geneName,geneName2
+        defaultLabelFields name2
+        searchIndex name
+        searchTrix ixIxx/GCF_000001215.4_Release_6_plus_ISO1_MT.ncbiRefSeq.ix
+        bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.ncbiRefSeq.bb
+        longLabel NCBI RefSeq genes, curated and predicted sets (NM_*, XM_*, NR_*, XR_*, NP_* or YP_*)
+        idXref ncbiRefSeqLink mrnaAcc name
+        baseColorUseCds given
+        baseColorDefault genomicCodons
+        priority 1
+
+        track ncbiRefSeqCurated
+        color 12,12,120
+        parent refSeqComposite on
+        shortLabel RefSeq Curated
+        longLabel NCBI RefSeq genes, curated subset (NM_*, NR_*, NP_* or YP_*)
+        type bigGenePred
+        urls name2="https://www.ncbi.nlm.nih.gov/gene/?term=$$" geneName="https://www.ncbi.nlm.nih.gov/gene/$$" geneName2="https://www.ncbi.nlm.nih.gov/nuccore/$$"
+        labelFields name2,geneName,geneName2
+        defaultLabelFields name2
+        searchIndex name
+        searchTrix ixIxx/GCF_000001215.4_Release_6_plus_ISO1_MT.ncbiRefSeqCurated.ix
+        idXref ncbiRefSeqLink mrnaAcc name
+        bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.ncbiRefSeqCurated.bb
+        baseColorUseCds given
+        baseColorDefault genomicCodons
+        priority 2
+
+        track ncbiRefSeqOther
+        color 32,32,32
+        parent refSeqComposite on
+        shortLabel RefSeq Other
+        longLabel NCBI RefSeq other annotations (not NM_*, NR_*, XM_*, XR_*, NP_* or YP_*)
+        priority 4
+        searchIndex name
+        searchTrix ixIxx/GCF_000001215.4_Release_6_plus_ISO1_MT.ncbiRefSeqOther.ix
+        bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.ncbiRefSeqOther.bb
+        type bigBed 12 +
+        labelFields name
+        skipEmptyFields on
+        urls GeneID="https://www.ncbi.nlm.nih.gov/gene/$$" MIM="https://www.ncbi.nlm.nih.gov/omim/$$" HGNC="http://www.genenames.org/cgi-bin/gene_symbol_report?hgnc_id=$$" FlyBase="http://flybase.org/reports/$$" WormBase="http://www.wormbase.org/db/gene/gene?name=$$" RGD="https://rgd.mcw.edu/rgdweb/search/search.html?term=$$" SGD="https://www.yeastgenome.org/locus/$$" miRBase="http://www.mirbase.org/cgi-bin/mirna_entry.pl?acc=$$" ZFIN="https://zfin.org/$$" MGI="http://www.informatics.jax.org/marker/$$"
+
+        track ncbiRefSeqPsl
+        priority 5
+        parent refSeqComposite off
+        shortLabel RefSeq Alignments
+        longLabel RefSeq Alignments of RNAs
+        type bigPsl
+        searchIndex name
+        bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.bigPsl.bb
+        indelDoubleInsert on
+        indelQueryInsert on
+        showDiffBasesAllScales .
+        showDiffBasesMaxZoom 10000.0
+        showCdsMaxZoom 10000.0
+        showCdsAllScales .
+        baseColorDefault diffCodons
+        pslSequence no
+        baseColorUseSequence lfExtra
+        baseColorUseCds table given
+        color 0,0,0
+
+track cpgIslands
+compositeTrack on
+shortLabel CpG Islands
+longLabel CpG Islands (Islands < 300 Bases are Light Green)
+group regulation
+visibility dense
+type bigBed 4 +
+html html/GCF_000001215.4_Release_6_plus_ISO1_MT.cpgIslands
+
+    track cpgIslandExt
+    parent cpgIslands off
+    shortLabel CpG Islands
+    longLabel CpG Islands (Islands < 300 Bases are Light Green)
+    type bigBed 4 +
+    priority 1
+    bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.cpgIslandExt.bb
+
+    track cpgIslandExtUnmasked
+    parent cpgIslands on
+    shortLabel Unmasked CpG
+    longLabel CpG Islands on All Sequence (Islands < 300 Bases are Light Green)
+    type bigBed 4 +
+    priority 2
+    bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.cpgIslandExtUnmasked.bb
+
+track windowMasker
+shortLabel WM + SDust
+longLabel Genomic Intervals Masked by WindowMasker + SDust
+group varRep
+visibility dense
+type bigBed 3
+bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.windowMasker.bb
+html html/GCF_000001215.4_Release_6_plus_ISO1_MT.windowMasker
+
+track allGaps
+shortLabel All Gaps
+longLabel All gaps of unknown nucleotides (N's), including AGP annotated gaps
+group map
+visibility hide
+type bigBed 3
+bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.allGaps.bb
+html html/GCF_000001215.4_Release_6_plus_ISO1_MT.allGaps
+
+track augustus
+shortLabel Augustus
+longLabel Augustus Gene Predictions
+group genes
+visibility dense
+color 180,0,0
+type bigGenePred
+bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.augustus.bb
+html html/GCF_000001215.4_Release_6_plus_ISO1_MT.augustus
+
+track xenoRefGene
+shortLabel RefSeq mRNAs
+longLabel RefSeq mRNAs mapped to this assembly
+group rna
+visibility pack
+color 180,0,0
+type bigGenePred
+bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.xenoRefGene.bb
+url https://www.ncbi.nlm.nih.gov/nuccore/$$
+urlLabel NCBI Nucleotide database:
+labelFields name,geneName,geneName2
+defaultLabelFields geneName
+searchIndex name
+searchTrix ixIxx/GCF_000001215.4_Release_6_plus_ISO1_MT.xenoRefGene.ix
+html html/GCF_000001215.4_Release_6_plus_ISO1_MT.xenoRefGene
+
+track ensGene
+shortLabel Ensembl genes
+longLabel Ensembl genes 2020_08
+group genes
+priority 40
+visibility pack
+color 150,0,0
+itemRgb on
+type bigGenePred
+bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.ensGene.bb
+searchTrix ixIxx/GCF_000001215.4_Release_6_plus_ISO1_MT.ensGene.ix
+searchIndex name
+labelFields name,name2
+defaultLabelFields name2
+baseColorUseCds given
+baseColorDefault genomicCodons
+labelSeparator " "
+html html/GCF_000001215.4_Release_6_plus_ISO1_MT.ensGene
+
+track GCF_000001215.4_Release_6_plus_ISO1_MTChainNet
+compositeTrack on
+shortLabel Chain/Net
+longLabel Chain alignments to target sequence: GCF_000001215.4_Release_6_plus_ISO1_MT
+subGroup1 view Views chain=Chains synten=Syntenic rbest=Reciprocal_best liftover=Lift_over align=Alignment
+subGroup2 species Assembly s000=dm6 s001=GCF_000002335.3
+subGroup3 chainType chain_type c00=chain c01=syntenic c02=reciprocal_best c03=lift_over c04=chain_align c05=syntenic_align c06=reciprocal_align c07=lift_over_align
+dragAndDrop subTracks
+visibility hide
+group compGeno
+color 0,0,0
+altColor 255,255,0
+type bed 3
+chainLinearGap loose
+chainMinScore 5000
+dimensions dimensionX=chainType dimensionY=species
+sortOrder species=+ view=+ chainType=+
+configurable on
+html html/GCF_000001215.4_Release_6_plus_ISO1_MT.chainNet
+
+    track GCF_000001215.4_Release_6_plus_ISO1_MTChainNetViewchain
+    shortLabel Chains
+    view chain
+    visibility dense
+    parent GCF_000001215.4_Release_6_plus_ISO1_MTChainNet
+    spectrum on
+
+        track chainDm6
+        parent GCF_000001215.4_Release_6_plus_ISO1_MTChainNetViewchain on
+        subGroups view=chain species=s000 chainType=c00
+        shortLabel dm6 Chain
+        longLabel dm6/dm6 () Chained Alignments
+        type bigChain dm6
+        bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.chainDm6.bb
+        linkDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.chainDm6Link.bb
+        otherDb dm6
+        html html/GCF_000001215.4_Release_6_plus_ISO1_MT.chainNet
+        priority 0.821
+
+        track chainGCF_000002335.3
+        parent GCF_000001215.4_Release_6_plus_ISO1_MTChainNetViewchain off
+        subGroups view=chain species=s001 chainType=c00
+        shortLabel GCF_000002335.3 Chain
+        longLabel GCF_000002335.3/GCF_000002335.3_Tcas5.2 (2016-03-10) Chained Alignments
+        type bigChain GCF_000002335.3
+        bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.chainGCF_000002335.3.bb
+        linkDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.chainGCF_000002335.3Link.bb
+        otherDb GCF_000002335.3
+        html html/GCF_000001215.4_Release_6_plus_ISO1_MT.chainNet
+        priority 93.873
+
+    track GCF_000001215.4_Release_6_plus_ISO1_MTChainNetViewSynTen
+    shortLabel Syntenic
+    view synten
+    visibility hide
+    parent GCF_000001215.4_Release_6_plus_ISO1_MTChainNet
+    spectrum on
+
+        track chainSynDm6
+        parent GCF_000001215.4_Release_6_plus_ISO1_MTChainNetViewSynTen off
+        subGroups view=synten species=s000 chainType=c01
+        shortLabel dm6 synChain
+        longLabel dm6/dm6_Tcas5.2 () Chained Alignments
+        type bigChain dm6
+        bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.chainSynDm6.bb
+        linkDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.chainSynDm6Link.bb
+        otherDb dm6
+        html html/GCF_000001215.4_Release_6_plus_ISO1_MT.chainNet
+        priority 0.821
+
+    track GCF_000001215.4_Release_6_plus_ISO1_MTChainNetViewRBest
+    shortLabel Reciprocal best
+    view rbest
+    visibility hide
+    parent GCF_000001215.4_Release_6_plus_ISO1_MTChainNet
+    spectrum on
+
+        track chainRBestDm6
+        parent GCF_000001215.4_Release_6_plus_ISO1_MTChainNetViewRBest off
+        subGroups view=rbest species=s000 chainType=c02
+        shortLabel dm6 rbChain
+        longLabel dm6/dm6_Tcas5.2 () Chained Alignments
+        type bigChain dm6
+        bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.chainRBestDm6.bb
+        linkDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.chainRBestDm6Link.bb
+        otherDb dm6
+        html html/GCF_000001215.4_Release_6_plus_ISO1_MT.chainNet
+        priority 0.821
+
+    track GCF_000001215.4_Release_6_plus_ISO1_MTChainNetViewLiftOver
+    shortLabel Lift over
+    view liftover
+    visibility hide
+    parent GCF_000001215.4_Release_6_plus_ISO1_MTChainNet
+    spectrum on
+
+        track chainLiftOverDm6
+        parent GCF_000001215.4_Release_6_plus_ISO1_MTChainNetViewLiftOver off
+        subGroups view=liftover species=s000 chainType=c03
+        shortLabel dm6 loChain
+        longLabel dm6/dm6_Tcas5.2 () Chained Alignments
+        type bigChain dm6
+        bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.chainLiftOverDm6.bb
+        linkDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.chainLiftOverDm6Link.bb
+        otherDb dm6
+        html html/GCF_000001215.4_Release_6_plus_ISO1_MT.chainNet
+        priority 0.821
+
+        track chainLiftOverGCF_000002335.3
+        parent GCF_000001215.4_Release_6_plus_ISO1_MTChainNetViewLiftOver off
+        subGroups view=liftover species=s001 chainType=c03
+        shortLabel GCF_000002335.3 loChain
+        longLabel GCF_000002335.3/GCF_000002335.3_Tcas5.2 (2016-03-10) Chained Alignments
+        type bigChain GCF_000002335.3
+        bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.chainLiftOverGCF_000002335.3.bb
+        linkDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.chainLiftOverGCF_000002335.3Link.bb
+        otherDb GCF_000002335.3
+        html html/GCF_000001215.4_Release_6_plus_ISO1_MT.chainNet
+        priority 93.873
+
+    track GCF_000001215.4_Release_6_plus_ISO1_MTMafNetViewnet
+    shortLabel Nets
+    view align
+    visibility hide
+    parent GCF_000001215.4_Release_6_plus_ISO1_MTChainNet
+
+        track netDm6
+        parent GCF_000001215.4_Release_6_plus_ISO1_MTMafNetViewnet off
+        subGroups view=align species=s000 chainType=c04
+        shortLabel dm6 mafNet
+        longLabel dm6/dm6 () Chained Alignments
+        type bigMaf
+        bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.dm6.net.bb
+        summary bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.dm6.net.summary.bb
+        speciesOrder dm6
+        html html/GCF_000001215.4_Release_6_plus_ISO1_MT.chainNet
+        priority 0.821
+
+        track synNetDm6
+        parent GCF_000001215.4_Release_6_plus_ISO1_MTMafNetViewnet off
+        subGroups view=align species=s000 chainType=c05
+        shortLabel dm6 synNet
+        longLabel dm6/dm6 () Chained Alignments
+        type bigMaf
+        bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.dm6.synNet.bb
+        summary bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.dm6.synNet.summary.bb
+        speciesOrder dm6
+        html html/GCF_000001215.4_Release_6_plus_ISO1_MT.chainNet
+        priority 0.821
+
+        track rbestNetDm6
+        parent GCF_000001215.4_Release_6_plus_ISO1_MTMafNetViewnet off
+        subGroups view=align species=s000 chainType=c06
+        shortLabel dm6 rbestNet
+        longLabel dm6/dm6 () Chained Alignments
+        type bigMaf
+        bigDataUrl bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.dm6.rbestNet.bb
+        summary bbi/GCF_000001215.4_Release_6_plus_ISO1_MT.dm6.rbestNet.summary.bb
+        speciesOrder dm6
+        html html/GCF_000001215.4_Release_6_plus_ISO1_MT.chainNet
+        priority 0.821
+
+
+track evaSnp8
+shortLabel EVA SNP Release 8
+longLabel Short Genetic Variants from European Variant Archive Release 8
+type bigBed 9 +
+visibility dense
+group varRep
+itemRgb on
+bigDataUrl contrib/evaSnp8/evaSnp8.bb
+url https://www.ebi.ac.uk/eva/?variant&accessionID=$$
+searchIndex name
+mouseOver <b>Ref/Alt allele(s)</b>: $ref>$alt<br> <b>Var type</b>: $ucscClass<br> <b>AA change</b>: $aaChange
+filterValues.varClass SNV|SNV,deletion|Deletion,indel|Indel,insertion|Insertion,MNV|MNV,sequence_alteration|Sequence alteration
+filterLabel.varClass Variant class from EVA SO term
+filterLabel.ucscClass Functional effect per UCSC Variant Annotation
+filterValues.ucscClass downstream_gene_variant|Downstream gene variant,upstream_gene_variant|Upstream gene variant,intron_variant|Intron variant,NMD_transcript_variant|Nonsense-mediated mRNA decay (NMD) variant,5_prime_UTR_variant|5 prime UTR variant,3_prime_UTR_variant|3 prime UTR variant,missense_variant|Missense variant,synonymous_variant|Synonymous variant,non_coding_transcript_exon_variant|Non-coding transcript exon variant,no_sequence_alteration|No sequence alteration,splice_region_variant|Splice region variant,frameshift_variant|Frameshift variant,stop_gained|Stop gained,splice_acceptor_variant|Splice acceptor variant,inframe_deletion|Inframe deletion,inframe_insertion|Inframe insertion,splice_donor_variant|Splice donor variant,coding_sequence_variant|Coding sequence variant,initiator_codon_variant|Initiator codon variant,stop_lost|Stop lost,stop_retained_variant|Stop retained variant,intergenic_variant|Intergenic variant
+filterType.ucscClass multipleListOnlyOr
+filterValues.itemRgb 255,,0,,0|Protein-altering and splice variants,0,,128,,0|Synonymous variants,0,,0,,255|Non-coding transcripts or UTR variants,0,,0,,0|Intergenic and intronic variants
+filterLabel.itemRgb General variant types by color grouping
+maxWindowCoverage 250000
+maxItems 1000000
+html contrib/evaSnp8/description

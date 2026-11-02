@@ -1,0 +1,9 @@
+<Server-Side Genome List>
+E. coli K-12 (NC_000913.3)	https://igv.org/genomes/gbk/NC_000913.3.gbk	NC_000913.3
+Francisella tularensis (NC_008601)	https://igv.org/genomes/gbk/NC_008601.gbk	NC_008601
+Human Mito (NC_012920)	https://igv.org/genomes/gbk/NC_012920.1.gbk	NC_012920
+Human hg18	https://igv.org/genomes/legacy/genome/genomes/hg18.genome	hg18
+Human hg19	https://igv.org/genomes/legacy/genome/hg19.genome	hg19
+Human hg38	https://igv.org/genomes/legacy/genome/hg38.genome	hg38
+Human hg38 (1kg/GATK)	https://igv.org/genomes/legacy/genome/hg38/hg38_1kg.genome	hg38_1kg
+Mouse mm10	https://igv.org/genomes/legacy/genome/mm10.genome	mm10

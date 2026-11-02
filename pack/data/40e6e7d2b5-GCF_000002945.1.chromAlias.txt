@@ -1,0 +1,5 @@
+# refseq	assembly	genbank	ncbi	ucsc
+NC_001326.1	MT	X54421.1	MT	chrM
+NC_003421.2	III	CU329672.1	III	chrIII
+NC_003423.3	II	CU329671.1	II	chrII
+NC_003424.3	I	CU329670.1	I	chrI

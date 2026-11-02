@@ -1,0 +1,4 @@
+chr1	test	gene	5000	6000	.	+	.	gene_id "MYG4"; gene_name "MYGENE4";
+chr1	test	gene	11874	14409	.	+	.	gene_id "MYG1"; gene_name "MYGENE1";
+chr2	test	gene	100000	105000	.	-	.	gene_id "MYG3"; gene_name "MYGENE3";
+chr1	test	gene	69090	70108	.	+	.	gene_id "MYG2"; gene_name "MYGENE2";

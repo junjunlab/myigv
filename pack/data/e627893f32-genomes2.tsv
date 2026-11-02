@@ -1,0 +1,34 @@
+# Hosted genomes list.  Tab delimited file with 3 columns  Name (for menu),  url to .genome or .json file,  and genome ID. 
+A. thaliana (TAIR 10)	https://igv.org/genomes/json/tair10.json	tair10
+C. elegans (ce11)	https://igv.org/genomes/json/ce11.json	ce11
+C. elegans (ce10)	https://igv.org/genomes/legacy/json/ce10.json	ce10
+Chicken (GRCg6a / galGal6)	https://igv.org/genomes/json/galGal6.json	galGal6
+Chimp (panTro4)	https://igv.org/genomes/json/panTro4.json	panTro4
+Cow (bosTau8)	https://igv.org/genomes/json/bosTau8.json	bosTau8
+Cow (bosTau9)	https://igv.org/genomes/json/bosTau9.json	bosTau9
+D. melanogaster (dm6)	https://igv.org/genomes/json/dm6.json	dm6
+D. melanogaster (dm3)	https://igv.org/genomes/json/dm3.json	dm3
+Dog (canFam3)	https://igv.org/genomes/json/canFam3.json	canFam3
+Dog (UU_Cfam_GSD_1.0/canFam4)	https://igv.org/genomes/json/canFam4.json	canFam4
+Dog (canFam5)	https://igv.org/genomes/json/canFam5.json	canFam5
+Human (T2T CHM13-v2.0/hs1)	https://igv.org/genomes/json/hs1.json	hs1
+Human (hg18)	https://igv.org/genomes/json/hg18.json	hg18
+Human (hg19)	https://igv.org/genomes/json/hg19.json	hg19
+Human (hg38)	https://igv.org/genomes/json/hg38.json	hg38
+Human (hg38 1kg/GATK)	https://igv.org/genomes/json/hg38_1kg.json	hg38_1kg
+Mouse mm10	https://igv.org/genomes/json/mm10.json	mm10
+Mouse mm9	https://igv.org/genomes/json/mm9.json	mm9
+Mouse mm39	https://igv.org/genomes/json/mm39.json	mm39
+Rat (rn6)	https://igv.org/genomes/json/rn6.json	rn6
+Rat (rn7)	https://igv.org/genomes/json/rn7.json	rn7
+S. cerevisiae (sacCer3)	https://igv.org/genomes/json/sacCer3.json	sacCer3
+Zebrafish (GRCz10/danRer10)	https://igv.org/genomes/json/danRer10.json	danRer10
+Zebrafish (GRCz11/danRer11)	https://igv.org/genomes/json/danRer11.json	danRer11
+SARS-CoV-2	https://igv.org/genomes/json/ASM985889v3.json	ASM985889v3
+S. pombe (ASM294v2)	https://igv.org/genomes/json/ASM294v2.json	ASM294v2
+Gorilla (gorGor4)	https://igv.org/genomes/json/gorGor4.json	gorGor4
+Gorilla (gorGor6)	https://igv.org/genomes/json/gorGor6.json	gorGor6
+Bonobo (MPI-EVA panpan1.1/panPan2)	https://igv.org/genomes/json/panPan2.json	panPan2
+E. coli K-12 (NC_000913.3)	https://igv.org/genomes/gbk/NC_000913.3.gbk	NC_000913.3
+Francisella tularensis (NC_008601)	https://igv.org/genomes/gbk/NC_008601.gbk	NC_008601
+Human Mito (NC_012920)	https://igv.org/genomes/gbk/NC_012920.1.gbk	NC_012920

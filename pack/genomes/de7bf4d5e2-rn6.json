@@ -1,0 +1,30 @@
+{
+  "id": "rn6",
+  "name": "Rat (RGCS 6.0/rn6)",
+  "twoBitURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/895/GCF_000001895.5/GCF_000001895.5.2bit",
+  "twoBitBptURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/895/GCF_000001895.5/GCF_000001895.5.2bit.bpt",
+  "nameSet": "ucsc",
+  "wholeGenomeView": true,
+  "description": "Norway rat Rnor6.0\nRattus norvegicus/GCF_000001895.5_Rnor_6.0 genome assembly",
+  "chromAliasBbURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/895/GCF_000001895.5/GCF_000001895.5.chromAlias.bb",
+  "cytobandURL": "https://hgdownload.soe.ucsc.edu/goldenPath/rn6/database/cytoBandIdeo.txt.gz",
+  "chromSizesURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/895/GCF_000001895.5/GCF_000001895.5.chrom.sizes.txt",
+  "tracks": [
+    {
+      "id": "ncbiRefSeq",
+      "name": "RefSeq All",
+      "url": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/895/GCF_000001895.5/bbi/GCF_000001895.5_Rnor_6.0.ncbiRefSeq.bb",
+      "trixURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/895/GCF_000001895.5/ixIxx/GCF_000001895.5_Rnor_6.0.ncbiRefSeq.ix",
+      "format": "biggenepred",
+      "displayMode": "EXPANDED",
+      "color": "rgb(12,12,120)",
+      "searchIndex": "name",
+      "html": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/895/GCF_000001895.5/html/GCF_000001895.5_Rnor_6.0.refSeqComposite",
+      "labelField": "geneName2",
+      "order": 100000
+    }
+  ],
+  "hubs": [
+    "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/895/GCF_000001895.5/hub.txt"
+  ]
+}

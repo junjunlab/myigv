@@ -1,0 +1,48 @@
+{
+  "id": "sacCer3",
+  "name": "S. cerevisiae (sacCer3)",
+  "fastaURL": "https://igv.org/genomes/data/sacCer3/sacCer3.fa",
+  "indexURL": "https://igv.org/genomes/data/sacCer3/sacCer3.fa.fai",
+  "twoBitURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/146/045/GCF_000146045.2/GCF_000146045.2.2bit",
+  "twoBitBptURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/146/045/GCF_000146045.2/GCF_000146045.2.2bit.bpt",
+  "nameSet": "ucsc",
+  "wholeGenomeView": true,
+  "description": "baker's yeast S288C (2014)\nSaccharomyces cerevisiae S288C/GCF_000146045.2_R64 genome assembly",
+  "chromAliasBbURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/146/045/GCF_000146045.2/GCF_000146045.2.chromAlias.bb",
+  "cytobandBbURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/146/045/GCF_000146045.2/bbi/GCF_000146045.2_R64.cytoBand.bb",
+  "chromosomeOrder": [
+    "chrI",
+    "chrII",
+    "chrIII",
+    "chrIV",
+    "chrV",
+    "chrVI",
+    "chrVII",
+    "chrVIII",
+    "chrIX",
+    "chrX",
+    "chrXI",
+    "chrXII",
+    "chrXIII",
+    "chrXIV",
+    "chrXV",
+    "chrXVI"
+  ],
+  "chromSizesURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/146/045/GCF_000146045.2/GCF_000146045.2.chrom.sizes.txt",
+  "tracks": [
+    {
+      "id": "refseqAll",
+      "name": "Refseq All",
+      "url": "https://hgdownload.soe.ucsc.edu/goldenPath/sacCer3/database/ncbiRefSeq.txt.gz",
+      "indexed": false,
+      "format": "refgene",
+      "displayMode": "COLLAPSED",
+      "html": "https://www.ncbi.nlm.nih.gov/refseq/refseq_select/",
+      "order": 100000
+    }
+  ],
+  "hubs": [
+    "https://igv.org/genomes/hubs/sacCer3/hub.txt",
+    "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/146/045/GCF_000146045.2/hub.txt"
+  ]
+}

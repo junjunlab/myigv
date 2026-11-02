@@ -1,0 +1,119 @@
+# genomes
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/genomes.json	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/legacy/genomes.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/genomes.json	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/legacy/genomes.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/genomes.tsv	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/legacy/genomes.tsv
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/genomes.txt	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/legacy/genomes.txt
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/genomes.tsv	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/legacy/genomes.tsv
+https://s3.us-east-1.amazonaws.com/igv.broadinstitute.org/genomes/genomes.txt	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/legacy/genomes.txt
+https://igv.org/genomes/data/hg38/hg38_alias.tab	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/hg38/hg38_alias.tab
+https://igv.org/genomes/data/hg19/hg19_alias.tab	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/hg19/hg19_alias.tab
+
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/ce11.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/ce11.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/danRer10.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/danRer10.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/danRer11.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/danRer11.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/dm3.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/dm3.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/dm6.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/dm6.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/hg18.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/hg18.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/hg19.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/hg19.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/hg38.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/hg38.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/hg38/hg38.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/hg38.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/hg38_1kg.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/hg38_1kg.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/hs1.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/hs1.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/mm10.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/mm10.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/mm9.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/mm9.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/mm39.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/mm39.json
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/sacCer3.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/sacCer3.json
+https://s3.us-east-1.amazonaws.com/igv.broadinstitute.org/genomes/NC_012920.1.gbk	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/gbk/NC_012920.1.gbk
+https://s3.amazonaws.com/igv.broadinstitute.org/genomes/NC_012920.1.gbk	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/gbk/NC_012920.1.gbk
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg19/hg19.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/hg19.json
+
+#hg38
+https://raw.githubusercontent.com/igvteam/igv-genomes/refs/heads/main/json/hg38.json	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/hg38.json
+https://s3.us-east-1.amazonaws.com/igv.broadinstitute.org/annotations/hg38/hg38_alias.tab	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/hg38/hg38_alias.tab
+https://s3.us-east-1.amazonaws.com/igv.broadinstitute.org/annotations/hg38/cytoBandIdeo.txt	https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/cytoBandIdeo.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.broadinstitute.org/annotations/hg38/genes/refGene_hg38_collapsed.refgene.gz	https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeq.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/hg38_1kg.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/hg38_1kg.json
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/hg38.json	 https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/genomes/json/hg38.json
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/hg38_alias.tab	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/hg38/hg38_alias.tab
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/clinvarMain.bb	https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/clinvar/clinvarMain.bb
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/mane.1.0.bb	https://ftp.ncbi.nlm.nih.gov/refseq/MANE/trackhub/data/release_1.0/MANE.GRCh38.v1.0.refseq.bb
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/Homo_sapiens.GRCh38.94.chr.gff3.gz	https://ftp.ensembl.org/pub/release-94/gff3/homo_sapiens/Homo_sapiens.GRCh38.94.chr.gff3.gz
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/ncbiRefSeq.sorted.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeq.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/ncbiRefSeq.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeq.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/refGene.sorted.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeq.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/refGene.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeq.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/annotations/gc5Base.bw	https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/gc5BaseBw/gc5Base.bw
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/annotations/snp150Common.txt.gz	https://hgdownload.soe.ucsc.edu/gbdb/hg38/snp/dbSnp155Common.bb
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/annotations/snp150Common.txt.gz	https://hgdownload.soe.ucsc.edu/gbdb/hg38/snp/dbSnp155Common.bb
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg38/annotations/cytoBandIdeo.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/cytoBandIdeo.txt.gz
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/hg38/gencode.v44.basic.annotation.gff3.gz	https://hgdownload.soe.ucsc.edu/gbdb/hg38/gencode/gencodeV44.bb
+https://igv-genepattern-org.s3.us-east-1.amazonaws.com/genomes/hg38/ncbiRefSeq.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeq.txt.gz
+
+#hg19
+https://s3.us-east-1.amazonaws.com/igv.broadinstitute.org/data/hg19/1kg/ALL.phase3_shapeit2_mvncall_integrated_v1b.20130502.genotypes.vcf.list	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/hg19/ALL.phase3_shapeit2_mvncall_integrated_v1b.20130502.genotypes.vcf.list
+https://s3.us-east-1.amazonaws.com/igv.broadinstitute.org/data/hg19/1kg/integrated_call_samples_v3.20130502.ALL.panel	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/hg19/integrated_call_samples_v3.20130502.ALL.panel
+https://s3.us-east-1.amazonaws.com/igv.broadinstitute.org/annotations/hg19/genes/refFlat.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/refFlat.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.broadinstitute.org/annotations/hg19/genes/refGene_hg19.bed	https://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/refGene.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.broadinstitute.org/annotations/hg19/genes/refGene.hg19.bed.gz	https://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/refGene.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.broadinstitute.org/annotations/hg19/genes/ensGene.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/ensGene.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg19/ensGene.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/ensGene.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg19/ncbiRefSeq.sorted.txt.gz	https://igv.org/genomes/data/hg19/ncbiRefSeq.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg19/hg19_alias.tab	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/hg19/hg19_alias.tab
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/hg19/refGene.sorted.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/refGene.txt.gz
+
+#mm10 -- gs bucket
+https://s3.us-east-1.amazonaws.com/igv.broadinstitute.org/annotations/mm10/cytoBandIdeo.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/mm10/database/cytoBandIdeo.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.broadinstitute.org/annotations/mm10/refGene.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/mm10/database/refGene.txt.gz
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/mm10/ncbiRefSeq.sorted.txt.gz	https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/bbi/GCF_000001635.26_GRCm38.p6.ncbiRefSeq.bb
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/mm10/gc5Base.bw	https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/bbi/GCF_000001635.26_GRCm38.p6.gc5Base.bw
+# https://s3.us-east-1.amazonaws.com/igv.org.genomes/mm10/rmsk/mm10_rmsk_LTR.bed.gz	https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/bbi/GCF_000001635.26_GRCm38.p6.rmsk.LTR.bb
+# https://s3.us-east-1.amazonaws.com/igv.org.genomes/mm10/rmsk/mm10_rmsk_LINE.bed.gz	https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/bbi/GCF_000001635.26_GRCm38.p6.rmsk.LINE.bb
+# https://s3.us-east-1.amazonaws.com/igv.org.genomes/mm10/rmsk/mm10_rmsk_SINE.bed.gz	https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/bbi/GCF_000001635.26_GRCm38.p6.rmsk.SINE.bb
+# https://s3.us-east-1.amazonaws.com/igv.org.genomes/mm10/rmsk/mm10_rmsk_Simple_repeat.bed.gz	https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/bbi/GCF_000001635.26_GRCm38.p6.rmsk.Simple.bb
+# https://s3.us-east-1.amazonaws.com/igv.org.genomes/mm10/rmsk/mm10_rmsk_Low_complexity.bed.gz	https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/bbi/GCF_000001635.26_GRCm38.p6.rmsk.Low_complexity.bb
+# https://s3.us-east-1.amazonaws.com/igv.org.genomes/mm10/rmsk/mm10_rmsk_DNA.bed.gz	https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/bbi/GCF_000001635.26_GRCm38.p6.rmsk.DNA.bb
+# https://s3.us-east-1.amazonaws.com/igv.org.genomes/mm10/rmsk/mm10_rmsk_Satellite.bed.gz	https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/bbi/GCF_000001635.26_GRCm38.p6.rmsk.Satellite.bb
+# https://s3.us-east-1.amazonaws.com/igv.org.genomes/mm10/rmsk/mm10_rmsk_Other.bed.gz	https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/bbi/GCF_000001635.26_GRCm38.p6.rmsk.Other.bb
+# https://s3.us-east-1.amazonaws.com/igv.org.genomes/mm10/rmsk/mm10_rmsk_RNA.bed.gz	https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/bbi/GCF_000001635.26_GRCm38.p6.rmsk.RNA.bb
+
+#mm9
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/mm9/refGene.sorted.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/mm9/database/refGene.txt.gz
+
+#mm39
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/mm39/ncbiRefSeq.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/mm39/database/ncbiRefSeq.txt.gz
+
+#t2t-chm13-v1.1
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/t2t-chm13-v1.1/CHM13.combined.v4.bb	http://t2t.gi.ucsc.edu/chm13/hub/t2t-chm13-v1.0/CAT_V3/consensus_gene_set/CHM13.combined.v4.bb
+
+#danRer11
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/danRer11/ncbiRefSeq.sorted.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/danRer11/database/ncbiRefSeq.txt.gz
+
+#canFam3
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/canFam3/ncbiRefSeq.sorted.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/canFam3/database/refGene.txt.gz
+
+#bosTau9
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/bosTau9/ncbiRefSeq.sorted.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/bosTau9/database/ncbiRefSeq.txt.gz
+
+#dm6
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/dm6/ncbiRefSeq.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/dm6/database/ncbiRefSeq.txt.gz
+
+#ce11
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/ce11/refGene.sorted.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/ce11/database/ncbiRefSeq.txt.gz
+
+#bosTau8
+https://s3.us-east-1.amazonaws.com/igv.org.genomes/bosTau8/refGene.sorted.txt.gz	https://hgdownload.soe.ucsc.edu/goldenPath/bosTau8/database/refGene.txt.gz
+
+#igv.js paper
+https://s3.amazonaws.com/igv.org.demo/gm12878_loops.bedpe	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/demo/gm12878_loops.bedpe
+https://storage.googleapis.com/storage/v1/b/genomics-public-data/o/platinum-genomes%2Fbam%2FNA12878_S1.bam&alt=media	https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/NA12878/NIST_NA12878_HG001_HiSeq_300x/NHGRI_Illumina300X_novoalign_bams/HG001.hs37d5.300x.bam,
+https://storage.googleapis.com/storage/v1/b/genomics-public-data/o/platinum-genomes%2Fbam%2FNA12878_S1.bam.bai&alt=media	https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/NA12878/NIST_NA12878_HG001_HiSeq_300x/NHGRI_Illumina300X_novoalign_bams/HG001.hs37d5.300x.bam.bai
+gs://genomics-public-data/platinum-genomes/bam/NA12878_S1.bam	https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/NA12878/NIST_NA12878_HG001_HiSeq_300x/NHGRI_Illumina300X_novoalign_bams/HG001.hs37d5.300x.bam
+gs://genomics-public-data/platinum-genomes/bam/NA12878_S1.bam.bai	https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/NA12878/NIST_NA12878_HG001_HiSeq_300x/NHGRI_Illumina300X_novoalign_bams/HG001.hs37d5.300x.bam.bai
+https://s3.amazonaws.com/igv.org.demo/heart_slc25a3.bam	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/tutorials/rna/heart_slc25a3.bam
+https://s3.amazonaws.com/igv.org.demo/heart_slc25a3.bam.bai	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/tutorials/rna/heart_slc25a3.bam.bai
+https://s3.amazonaws.com/igv.org.demo/liver_slc25a3.bam	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/tutorials/rna/liver_slc25a3.bam
+https://s3.amazonaws.com/igv.org.demo/liver_slc25a3.bam.bai	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/tutorials/rna/liver_slc25a3.bam.bai
+https://s3.amazonaws.com/igv.org.demo/gwas_sample.tsv.gz	https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/demo/gwas_sample.tsv.gz
+
+#general
+https://s3.us-east-1.amazonaws.com/igv.org.app/desktop_google	https://igv.org/services/desktop_google

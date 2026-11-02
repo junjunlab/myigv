@@ -1,0 +1,3419 @@
+######## Genes
+
+track refseqSelect
+type refgene
+shortLabel Refseq Select
+longLabel Refseq Select
+group genes
+bigDataUrl https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeqSelect.txt.gz
+html https://www.ncbi.nlm.nih.gov/refseq/refseq_select/
+
+track refseqCurated
+type refgene
+shortLabel Refseq Curated
+longLabel Refseq Curated
+group genes
+bigDataUrl https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeqCurated.txt.gz
+html https://www.ncbi.nlm.nih.gov/refseq/
+
+track refseqAll
+type refgene
+shortLabel Refseq All
+longLabel Refseq All
+group genes
+bigDataUrl https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeq.txt.gz
+html https://www.ncbi.nlm.nih.gov/refseq/
+
+track maneRefseq
+type bigBed
+shortLabel MANE v1.0 - Refseq
+longLabel MANE v1.0 transcripts with RefSeq labels
+group genes
+bigDataUrl https://ftp.ncbi.nlm.nih.gov/refseq/MANE/trackhub/data/release_1.0/MANE.GRCh38.v1.0.refseq.bb
+labelFields nucAcc
+html https://www.ncbi.nlm.nih.gov/refseq/MANE/
+
+track maneRefseq
+type bigBed
+shortLabel MANE v1.0 - Ensembl
+longLabel MANE v1.0 transcripts with Ensembl labels
+group genes
+bigDataUrl https://ftp.ncbi.nlm.nih.gov/refseq/MANE/trackhub/data/release_1.0/MANE.GRCh38.v1.0.ensembl.bb
+labelFields nucAcc
+html https://www.ncbi.nlm.nih.gov/refseq/MANE/
+
+track gencode
+compositeTrack on
+shortLabel GENCODE
+group genes
+
+track knownGene
+shortLabel GENCODE V47
+type bigGenePred
+group genes
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=knownGene
+searchIndex name
+labelFields geneName,name,geneName2,name2
+itemRgb on
+priority 1
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gencode/gencodeV47.bb
+defaultLabelFields geneName
+parent gencode
+
+track knownGeneV36
+shortLabel GENCODE V36
+type bigGenePred
+group genes
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=knownGeneV36
+searchIndex name
+labelFields geneName,name,geneName2,name2
+itemRgb on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gencode/gencodeV36.bb
+defaultLabelFields geneName
+parent gencode
+
+track knownGeneV38
+shortLabel GENCODE V38
+type bigGenePred
+longLabel GENCODE V38
+parent gencode
+group genes
+searchIndex name
+labelFields geneName,name,geneName2,name2
+itemRgb on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gencode/gencodeV38.bb
+
+track knownGeneV39
+shortLabel GENCODE V39
+type bigGenePred
+parent gencode
+group genes
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=knownGeneV39
+searchIndex name
+labelFields geneName,name,geneName2,name2
+itemRgb on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gencode/gencodeV39.bb
+
+track knownGeneV43
+shortLabel GENCODE V43
+type bigGenePred
+parent gencode
+group genes
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=knownGeneV43
+searchIndex name
+labelFields geneName,name,geneName2,name2
+itemRgb on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gencode/gencodeV43.bb
+
+track knownGeneV44
+shortLabel GENCODE V44
+type bigGenePred
+parent gencode
+group genes
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=knownGeneV44
+searchIndex name
+labelFields geneName,name,geneName2,name2
+itemRgb on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gencode/gencodeV44.bb
+
+track knownGeneV45
+shortLabel GENCODE V45
+type bigGenePred
+longLabel GENCODE V45
+group genes
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=knownGeneV45
+searchIndex name
+labelFields geneName,name,geneName2,name2
+itemRgb on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gencode/gencodeV45.bb
+parent gencode
+
+track knownGeneV46
+shortLabel GENCODE V46
+type bigGenePred
+parent gencode
+group genes
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=knownGeneV46
+searchIndex name
+labelFields geneName,name,geneName2,name2
+itemRgb on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gencode/gencodeV46.bb
+
+
+track uniprot
+compositeContainer TRUE
+shortLabel UniProt
+type bigBed 12 +
+longLabel UniProt SwissProt/TrEMBL Protein Annotations
+visibility hide
+hideEmptySubtracks off
+group genes
+allButtonPair on
+compositeTrack on
+itemRgb on
+exonNumbers off
+dataVersion /gbdb/$D/uniprot/version.txt
+mouseOverField comments
+urls uniProtId="https://www.uniprot.org/uniprot/$$#section_features" pmids="https://www.ncbi.nlm.nih.gov/pubmed/$$"
+
+    track unipConflict
+    shortLabel Seq. Conflicts
+    type bigBed 12 +
+    longLabel UniProt Sequence Conflicts
+    parent uniprot off
+    filterValues.status Manually reviewed (Swiss-Prot),Unreviewed (TrEMBL)
+    visibility dense
+    priority 13
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipConflict.bb
+    urls uniProtId="https://www.uniprot.org/uniprot/$$#Sequence_conflict_section" pmids="https://www.ncbi.nlm.nih.gov/pubmed/$$"
+
+    track unipRepeat
+    shortLabel Repeats
+    type bigBed 12 +
+    longLabel UniProt Repeats
+    parent uniprot
+    filterValues.status Manually reviewed (Swiss-Prot),Unreviewed (TrEMBL)
+    visibility dense
+    priority 12
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipRepeat.bb
+    urls uniProtId="https://www.uniprot.org/uniprot/$$#family_and_domains" pmids="https://www.ncbi.nlm.nih.gov/pubmed/$$"
+
+    track unipStruct
+    shortLabel Structure
+    type bigBed 12 +
+    longLabel UniProt Protein Primary/Secondary Structure Annotations
+    parent uniprot
+    filterValues.status Manually reviewed (Swiss-Prot),Unreviewed (TrEMBL)
+    visibility hide
+    group genes
+    priority 11
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipStruct.bb
+    urls uniProtId="https://www.uniprot.org/uniprot/$$#structure" pmids="https://www.ncbi.nlm.nih.gov/pubmed/$$"
+
+    track unipOther
+    shortLabel Other Annot.
+    type bigBed 12 +
+    longLabel UniProt Other Annotations
+    parent uniprot
+    filterValues.status Manually reviewed (Swiss-Prot),Unreviewed (TrEMBL)
+    visibility dense
+    priority 11
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipOther.bb
+    urls uniProtId="https://www.uniprot.org/uniprot/$$#family_and_domains" pmids="https://www.ncbi.nlm.nih.gov/pubmed/$$"
+
+    track unipMut
+    shortLabel Mutations
+    type bigBed 12 +
+    longLabel UniProt Amino Acid Mutations
+    parent uniprot
+    visibility dense
+    priority 10
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipMut.bb
+    urls uniProtId="https://www.uniprot.org/uniprot/$$#pathology_and_biotech" pmids="https://www.ncbi.nlm.nih.gov/pubmed/$$" variationId="https://www.uniprot.org/uniprot/$$"
+
+    track unipModif
+    shortLabel AA Modifications
+    type bigBed 12 +
+    longLabel UniProt Amino Acid Modifications
+    parent uniprot
+    filterValues.status Manually reviewed (Swiss-Prot),Unreviewed (TrEMBL)
+    visibility dense
+    priority 9
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipModif.bb
+    urls uniProtId="https://www.uniprot.org/uniprot/$$#aaMod_section" pmids="https://www.ncbi.nlm.nih.gov/pubmed/$$"
+
+    track unipDomain
+    shortLabel Domains
+    type bigBed 12 +
+    longLabel UniProt Domains
+    parent uniprot
+    filterValues.status Manually reviewed (Swiss-Prot),Unreviewed (TrEMBL)
+    visibility dense
+    priority 8
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipDomain.bb
+    urls uniProtId="https://www.uniprot.org/uniprot/$$#family_and_domains" pmids="https://www.ncbi.nlm.nih.gov/pubmed/$$"
+
+    track unipDisulfBond
+    shortLabel Disulf. Bonds
+    type bigBed 12 +
+    longLabel UniProt Disulfide Bonds
+    parent uniprot
+    filterValues.status Manually reviewed (Swiss-Prot),Unreviewed (TrEMBL)
+    visibility dense
+    priority 8
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipDisulfBond.bb
+
+    track unipChain
+    shortLabel Chains
+    type bigBed 12 +
+    longLabel UniProt Mature Protein Products (Polypeptide Chains)
+    parent uniprot
+    filterValues.status Manually reviewed (Swiss-Prot),Unreviewed (TrEMBL)
+    visibility dense
+    priority 7
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipChain.bb
+    urls uniProtId="https://www.uniprot.org/uniprot/$$#ptm_processing" pmids="https://www.ncbi.nlm.nih.gov/pubmed/$$"
+
+    track unipLocCytopl
+    shortLabel Cytoplasmic
+    type bigBed 12 +
+    longLabel UniProt Cytoplasmic Domains
+    parent uniprot
+    filterValues.status Manually reviewed (Swiss-Prot),Unreviewed (TrEMBL)
+    visibility dense
+    itemRgb off
+    priority 6
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipLocCytopl.bb
+    color 255,150,0
+
+    track unipLocTransMemb
+    shortLabel Transmembrane
+    type bigBed 12 +
+    longLabel UniProt Transmembrane Domains
+    parent uniprot
+    filterValues.status Manually reviewed (Swiss-Prot),Unreviewed (TrEMBL)
+    visibility dense
+    itemRgb off
+    priority 5
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipLocTransMemb.bb
+    color 0,150,0
+
+    track unipInterest
+    shortLabel Interest
+    type bigBed 12 +
+    longLabel UniProt Regions of Interest
+    parent uniprot
+    filterValues.status Manually reviewed (Swiss-Prot),Unreviewed (TrEMBL)
+    visibility dense
+    itemRgb off
+    priority 4
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipInterest.bb
+
+    track unipLocExtra
+    shortLabel Extracellular
+    type bigBed 12 +
+    longLabel UniProt Extracellular Domain
+    parent uniprot
+    filterValues.status Manually reviewed (Swiss-Prot),Unreviewed (TrEMBL)
+    visibility dense
+    itemRgb off
+    priority 4
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipLocExtra.bb
+    color 0,150,255
+
+    track unipLocSignal
+    shortLabel Signal Peptide
+    type bigBed 12 +
+    longLabel UniProt Signal Peptides
+    parent uniprot
+    filterValues.status Manually reviewed (Swiss-Prot),Unreviewed (TrEMBL)
+    visibility dense
+    itemRgb off
+    priority 3
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipLocSignal.bb
+    color 255,0,150
+
+    track unipAliTrembl
+    shortLabel TrEMBL Aln.
+    type bigPsl
+    longLabel UCSC alignment of TrEMBL proteins to genome
+    parent uniprot off
+    baseColorUseCds given
+    skipFields isMain
+    indelDoubleInsert on
+    visibility hide
+    searchIndex name,acc
+    labelFields name,acc,uniprotName,geneName,hgncSym,refSeq,refSeqProt,ensProt
+    indelQueryInsert on
+    baseColorTickColor contrastingColor
+    itemRgb on
+    priority 2
+    showDiffBasesAllScales on
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipAliTrembl.bb
+    baseColorDefault genomicCodons
+    mouseOverField protFullNames
+    urls acc="https://www.uniprot.org/uniprot/$$" hgncId="https://www.genenames.org/cgi-bin/gene_symbol_report?hgnc_id=$$" refseq="https://www.ncbi.nlm.nih.gov/nuccore/$$" refSeqProt="https://www.ncbi.nlm.nih.gov/protein/$$" ncbiGene="https://www.ncbi.nlm.nih.gov/gene/$$" entrezGene="https://www.ncbi.nlm.nih.gov/gene/$$" ensGene="https://www.ensembl.org/Gene/Summary?g=$$"
+
+    track unipAliSwissprot
+    shortLabel SwissProt Aln.
+    type bigPsl
+    longLabel UCSC alignment of SwissProt proteins to genome (dark blue: main isoform, light blue: alternative isoforms)
+    parent uniprot
+    baseColorUseCds given
+    skipFields isMain
+    indelDoubleInsert on
+    visibility pack
+    searchIndex name,acc
+    labelFields name,acc,uniprotName,geneName,hgncSym,refSeq,refSeqProt,ensProt
+    indelQueryInsert on
+    baseColorTickColor contrastingColor
+    itemRgb on
+    priority 1
+    showDiffBasesAllScales on
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipAliSwissprot.bb
+    baseColorDefault genomicCodons
+    mouseOverField protFullNames
+    urls acc="https://www.uniprot.org/uniprot/$$" hgncId="https://www.genenames.org/cgi-bin/gene_symbol_report?hgnc_id=$$" refSeq="https://www.ncbi.nlm.nih.gov/nuccore/$$" refSeqProt="https://www.ncbi.nlm.nih.gov/protein/$$" ncbiGene="https://www.ncbi.nlm.nih.gov/gene/$$" entrezGene="https://www.ncbi.nlm.nih.gov/gene/$$" ensGene="https://www.ensembl.org/Gene/Summary?g=$$"
+
+########## Mapping
+
+track gc5Base
+shortLabel GC Percent
+longLabel GC Percent in 5-Base Windows
+group map
+visibility dense
+autoScale Off
+maxHeightPixels 128:36:16
+graphTypeDefault Bar
+gridDefault OFF
+windowingFunction Mean
+color 0,0,0
+altColor 128,128,128
+viewLimits 30:70
+type bigWig 0 100
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/gc5BaseBw/gc5Base.bw
+
+
+track highlyReproducible
+compositeContainer TRUE
+shortLabel Highly Reproducible Regions
+type bed 3
+longLabel Highly Reproducible genomic regions and variants
+parent problematicSuper
+subGroup1 view Views beds=Regions vcfs=Variants
+visibility hide
+group map
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=problematic
+compositeTrack on
+priority 2
+superTrack on
+
+        track hr_na12878Vcf
+        shortLabel HR_NA12878 Variants
+        type vcfTabix
+        longLabel HR_NA12878 Variants
+        parent highlyReproducible
+        subGroups view=vcfs
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/highRepro/HR_NA12878.sort.vcf.gz
+
+        track hr_na12249Vcf
+        shortLabel HR_NA12249 Variants
+        type vcfTabix
+        longLabel HR_NA12249 Variants
+        parent highlyReproducible
+        subGroups view=vcfs
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/highRepro/HR_NA12249.sort.vcf.gz
+
+        track hr_na12248Vcf
+        shortLabel HR_NA12248 Variants
+        type vcfTabix
+        longLabel HR_NA12248 Variants
+        parent highlyReproducible
+        subGroups view=vcfs
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/highRepro/HR_NA12248.sort.vcf.gz
+
+        track hr_na10835Vcf
+        shortLabel HR_NA10835 Variants
+        type vcfTabix
+        longLabel HR_NA10835 Variants
+        parent highlyReproducible
+        subGroups view=vcfs
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/highRepro/HR_NA10835.sort.vcf.gz
+
+        track cq8Vcf
+        shortLabel CQ-8 Variants
+        type vcfTabix
+        longLabel CQ-8 Variants
+        parent highlyReproducible
+        subGroups view=vcfs
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/highRepro/CQ-8.sort.vcf.gz
+
+        track cq7Vcf
+        shortLabel CQ-7 Variants
+        type vcfTabix
+        longLabel CQ-7 Variants
+        parent highlyReproducible
+        subGroups view=vcfs
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/highRepro/CQ-7.sort.vcf.gz
+
+        track cq56Vcf
+        shortLabel CQ-56 Variants
+        type vcfTabix
+        longLabel CQ-56 Variants
+        parent highlyReproducible
+        subGroups view=vcfs
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/highRepro/CQ-56.sort.vcf.gz
+
+        track highReproRegions
+        shortLabel Highly Reproducible Regions
+        type bigBed 9 +
+        longLabel Highly Reproducible Regions
+        parent highlyReproducible
+        filterType.sampleNames multipleListOr
+        subGroups view=beds
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/highRepro/highRepro.bb
+        filterValues.sampleNames CQ-56,CQ-7,CQ-8,HR_NA10835,HR_NA12248,HR_NA12249,HR_NA12878
+
+track problematic
+compositeContainer TRUE
+shortLabel Problematic Regions
+type bigBed 3 +
+longLabel Problematic/special genomic regions for sequencing or very variable regions
+parent problematicSuper
+visibility pack
+hideEmptySubtracks off
+group map
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=problematic
+compositeTrack on
+priority 1
+superTrack on
+
+    track grcExclusions
+    shortLabel GRC Exclusions
+    type bigBed 4
+    longLabel GRC Exclusion list: contaminations or false duplications
+    parent problematic
+    parentParent problematicSuper
+    visibility dense
+    priority 3
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/grcExclusions.bb
+
+    track encBlacklist
+    shortLabel ENCODE Blacklist V2
+    type bigBed 4
+    longLabel ENCODE Blacklist V2
+    parent problematic
+    parentParent problematicSuper
+    visibility dense
+    priority 2
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/encBlacklist.bb
+
+    track comments
+    shortLabel UCSC Unusual Regions
+    type bigBed 9 +
+    longLabel UCSC unusual regions on assembly structure (manually annotated)
+    parent problematic
+    parentParent problematicSuper
+    visibility dense
+    searchIndex name
+    priority 1
+    searchTrix https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/notes.ix
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/comments.bb
+    noScoreFilter on
+    mouseOverField note
+
+track problematicGIAB
+compositeContainer TRUE
+shortLabel GIAB Problematic Regions
+type bigBed 3
+longLabel Difficult regions from GIAB via NCBI
+parent problematicSuper
+visibility dense
+hideEmptySubtracks off
+pennantIcon New red ../goldenPath/newsarch.html#110424 "November 4, 2024"
+group map
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=problematic
+compositeTrack on
+priority 3
+superTrack on
+
+    track notinalllowmapandsegdupregions
+    shortLabel Not lowMap+SegDup
+    type bigBed 3
+    longLabel Genome In a Bottle: not lowMap+SegDup mapping regions
+    parent problematicGIAB on
+    parentParent problematicSuper
+    visibility dense
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/GIAB/notinalllowmapandsegdupregions.bb
+
+    track notinalldifficultregions
+    shortLabel Not difficult regions
+    type bigBed 3
+    longLabel Genome In a Bottle: not difficult regions
+    parent problematicGIAB on
+    parentParent problematicSuper
+    visibility dense
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/GIAB/notinalldifficultregions.bb
+
+    track alllowmapandsegdupregions
+    shortLabel LowMap+SegDup
+    type bigBed 3
+    longLabel Genome In a Bottle: lowMap+SegDup regions
+    parent problematicGIAB on
+    parentParent problematicSuper
+    visibility dense
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/GIAB/alllowmapandsegdupregions.bb
+
+    track alldifficultregions
+    shortLabel All difficult regions
+    type bigBed 3
+    longLabel Genome In a Bottle: all difficult regions
+    parent problematicGIAB on
+    parentParent problematicSuper
+    visibility dense
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/problematic/GIAB/alldifficultregions.bb
+
+track recomb1000GAvg
+shortLabel Recomb. 1k Genomes
+type bigWig
+longLabel Recombination rate: 1000 Genomes, lifted from hg19 (PR Loh)
+parent recombRate2
+visibility full
+maxHeightPixels 128:60:8
+group map
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=recombRate2
+viewLimitsMax 0:150000
+priority 6
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/recombRate/recomb1000GAvg.bw
+color 0,130,0
+viewLimits 0.0:100
+
+track recombAvg
+shortLabel Recomb. deCODE Avg
+type bigWig
+longLabel Recombination rate: deCODE Genetics, average from paternal and maternal (mat for chrX)
+parent recombRate2
+visibility full
+maxHeightPixels 128:60:8
+group map
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=recombRate2
+viewLimitsMax 0:150000
+priority 1
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/recombRate/recombAvg.bw
+color 0,130,0
+viewLimits 0.0:100
+
+track recombDnm
+shortLabel Recomb. deCODE Dmn
+type bigBed 4 +
+longLabel Recombination rate: De-novo mutations found in deCODE samples
+parent recombRate2
+visibility hide
+group map
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=recombRate2
+priority 5
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/recombRate/recombDenovo.bb
+color 0,130,0
+
+track recombEvents
+shortLabel Recomb. deCODE Evts
+type bigBed 4 +
+longLabel Recombination events in deCODE Genetic Map (zoom to < 10kbp to see the events)
+parent recombRate2
+visibility hide
+group map
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=recombRate2
+priority 4
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/recombRate/events.bb
+color 0,130,0
+
+track recombMat
+shortLabel Recomb. deCODE Mat
+type bigWig
+longLabel Recombination rate: deCODE Genetics, maternal
+parent recombRate2
+visibility full
+maxHeightPixels 128:60:8
+group map
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=recombRate2
+viewLimitsMax 0:150000
+priority 3
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/recombRate/recombMat.bw
+color 0,130,0
+viewLimits 0.0:100
+
+track recombPat
+shortLabel Recomb. deCODE Pat
+type bigWig
+longLabel Recombination rate: deCODE Genetics, paternal
+parent recombRate2
+visibility full
+maxHeightPixels 128:60:8
+group map
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=recombRate2
+viewLimitsMax 0:150000
+priority 2
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/recombRate/recombPat.bw
+color 0,130,0
+viewLimits 0.0:100
+
+track umap
+compositeContainer TRUE
+shortLabel Umap
+type bigWig
+longLabel Single-read and multi-read mappability by Umap
+parent mappability
+subGroup1 view Views SR=Single-read MR=Multi-read
+visibility full
+group map
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=mappability
+compositeTrack on
+superTrack on
+
+        track umap100Quantitative
+        shortLabel Umap M100
+        type bigWig 0.01 1.0
+        longLabel Multi-read mappability with 100-mers
+        parent umap
+        visibility hide
+        priority 8
+        subGroups view=MR
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hoffmanMappability/k100.Umap.MultiTrackMappability.bw
+        color 80,170,240
+
+        track umap50Quantitative
+        shortLabel Umap M50
+        type bigWig 0.02 1.0
+        longLabel Multi-read mappability with 50-mers
+        parent umap
+        visibility hide
+        priority 7
+        subGroups view=MR
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hoffmanMappability/k50.Umap.MultiTrackMappability.bw
+        color 80,120,240
+
+        track umap36Quantitative
+        shortLabel Umap M36
+        type bigWig 0.027778 1.0
+        longLabel Multi-read mappability with 36-mers
+        parent umap
+        visibility hide
+        priority 6
+        subGroups view=MR
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hoffmanMappability/k36.Umap.MultiTrackMappability.bw
+        color 80,70,240
+
+        track umap24Quantitative
+        shortLabel Umap M24
+        type bigWig 0.041667 1.0
+        longLabel Multi-read mappability with 24-mers
+        parent umap
+        priority 5
+        subGroups view=MR
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hoffmanMappability/k24.Umap.MultiTrackMappability.bw
+        color 80,20,240
+
+        track umap100
+        shortLabel Umap S100
+        type bigBed 6
+        longLabel Single-read mappability with 100-mers
+        parent umap
+        visibility hide
+        priority 4
+        subGroups view=SR
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hoffmanMappability/k100.Unique.Mappability.bb
+        color 80,170,240
+
+        track umap50
+        shortLabel Umap S50
+        type bigBed 6
+        longLabel Single-read mappability with 50-mers
+        parent umap
+        visibility hide
+        priority 3
+        subGroups view=SR
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hoffmanMappability/k50.Unique.Mappability.bb
+        color 80,120,240
+
+        track umap36
+        shortLabel Umap S36
+        type bigBed 6
+        longLabel Single-read mappability with 36-mers
+        parent umap
+        visibility hide
+        priority 2
+        subGroups view=SR
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hoffmanMappability/k36.Unique.Mappability.bb
+        color 80,70,240
+
+        track umap24
+        shortLabel Umap S24
+        type bigBed 6
+        longLabel Single-read mappability with 24-mers
+        parent umap
+        priority 1
+        subGroups view=SR
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hoffmanMappability/k24.Unique.Mappability.bb
+        color 80,20,240
+
+#### phenDis
+
+track abSplice
+shortLabel AbSplice Scores
+type bigBed 9 +
+longLabel Aberrant Splicing Prediction Scores
+parent spliceImpactSuper on
+mouseOver change: $name <br> gene: $ENSGid <br> max score: $spliceABscore <br> $maxScore
+visibility dense
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=abSplice
+filterLabel.maxScore Tissues
+filter.spliceABscore 0.01
+itemRgb on
+filterLabel.spliceABscore Filter by minimum AbSplice score
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/abSplice/AbSplice.bb
+cartVersion 8
+noScoreFilter on
+filterText.maxScore *
+filterLimits.spliceABscore 0.01:1
+
+track alphaMissense
+compositeContainer TRUE
+shortLabel AlphaMissense
+type bigWig
+longLabel AlphaMissense Score for all possible single-basepair mutations (zoom in for scores)
+visibility hide
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=alphaMissense
+compositeTrack on
+maxWindowToDraw 10000000
+mouseOverFunction noAverage
+color 100,130,160
+
+    track alphaMissense_T
+    shortLabel Mutation: T
+    type bigWig
+    longLabel AlphaMissense Score: Mutation is T
+    parent alphaMissense on
+    visibility dense
+    maxHeightPixels 128:20:8
+    setColorWith https://hgdownload.soe.ucsc.edu/gbdb/hg38/alphaMissense/t.color.bb
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/alphaMissense/t.bw
+    viewLimits 0:1
+
+    track alphaMissense_G
+    shortLabel Mutation: G
+    type bigWig
+    longLabel AlphaMissense Score: Mutation is G
+    parent alphaMissense on
+    visibility dense
+    maxHeightPixels 128:20:8
+    setColorWith https://hgdownload.soe.ucsc.edu/gbdb/hg38/alphaMissense/g.color.bb
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/alphaMissense/g.bw
+    viewLimits 0:1
+
+    track alphaMissense_C
+    shortLabel Mutation: C
+    type bigWig
+    longLabel AlphaMissense Score: Mutation is C
+    parent alphaMissense on
+    visibility dense
+    maxHeightPixels 128:20:8
+    setColorWith https://hgdownload.soe.ucsc.edu/gbdb/hg38/alphaMissense/c.color.bb
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/alphaMissense/c.bw
+    viewLimits 0:1
+
+    track alphaMissense_A
+    shortLabel Mutation: A
+    type bigWig
+    longLabel AlphaMissense Score: Mutation is A
+    parent alphaMissense on
+    visibility dense
+    maxHeightPixels 128:20:8
+    setColorWith https://hgdownload.soe.ucsc.edu/gbdb/hg38/alphaMissense/a.color.bb
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/alphaMissense/a.bw
+    viewLimits 0:1
+
+track avada
+shortLabel Avada Variants
+type bigBed 9 +
+longLabel Avada Variants extracted from full text publications
+parent varsInPubs pack
+visibility dense
+group phenDis
+exonNumbers off
+superTrack on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/avada.bb
+noScoreFilter on
+dataVersion release 1
+mouseOverField _mouseOver
+urls pmid="https://www.ncbi.nlm.nih.gov/pubmed/$$" doi="https://doi.org/$$" ensId="https://grch37.ensembl.org/Homo_sapiens/Gene/Summary?g=$$" entrezs="https://www.ncbi.nlm.nih.gov/gene/$$" refSeq="https://www.ncbi.nlm.nih.gov/nuccore/$$"
+
+track cadd
+compositeContainer TRUE
+shortLabel CADD 1.6
+type bigWig
+longLabel CADD 1.6 Score for all possible single-basepair mutations (zoom in for scores)
+parent caddSuper
+visibility dense
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=caddSuper
+compositeTrack on
+maxWindowToDraw 10000000
+mouseOverFunction noAverage
+superTrack on hide
+color 100,130,160
+
+    track caddT
+    shortLabel Mutation: T
+    type bigWig
+    longLabel CADD 1.6 Score: Mutation is T
+    parent cadd on
+    parentParent caddSuper
+    visibility dense
+    maxHeightPixels 128:20:8
+    viewLimitsMax 0:100
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd/t.bw
+    viewLimits 10:50
+
+    track caddG
+    shortLabel Mutation: G
+    type bigWig
+    longLabel CADD 1.6 Score: Mutation is G
+    parent cadd on
+    parentParent caddSuper
+    visibility dense
+    maxHeightPixels 128:20:8
+    viewLimitsMax 0:100
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd/g.bw
+    viewLimits 10:50
+
+    track caddC
+    shortLabel Mutation: C
+    type bigWig
+    longLabel CADD 1.6 Score: Mutation is C
+    parent cadd on
+    parentParent caddSuper
+    visibility dense
+    maxHeightPixels 128:20:8
+    viewLimitsMax 0:100
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd/c.bw
+    viewLimits 10:50
+
+    track caddA
+    shortLabel Mutation: A
+    type bigWig
+    longLabel CADD 1.6 Score: Mutation is A
+    parent cadd on
+    parentParent caddSuper
+    visibility dense
+    maxHeightPixels 128:20:8
+    viewLimitsMax 0:100
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd/a.bw
+    viewLimits 10:50
+
+track cadd1_7
+compositeContainer TRUE
+shortLabel CADD 1.7
+type bigWig
+longLabel CADD 1.7 Score for all possible single-basepair mutations (zoom in for scores)
+parent caddSuper1_7
+visibility dense
+group phenDis
+pennantIcon New red ../goldenPath/newsarch.html#100924 "October 9, 2024"
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=caddSuper1_7
+compositeTrack on
+maxWindowToDraw 10000000
+mouseOverFunction noAverage
+superTrack on hide
+color 100,130,160
+
+    track cadd1_7_T
+    shortLabel Mutation: T
+    type bigWig
+    longLabel CADD 1.7 Score: Mutation is T
+    parent cadd1_7 on
+    parentParent caddSuper1_7
+    visibility dense
+    maxHeightPixels 128:20:8
+    setColorWith https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd1.7/t.color.bb
+    viewLimitsMax 0:100
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd1.7/t.bw
+    viewLimits 10:50
+
+    track cadd1_7_G
+    shortLabel Mutation: G
+    type bigWig
+    longLabel CADD 1.7 Score: Mutation is G
+    parent cadd1_7 on
+    parentParent caddSuper1_7
+    visibility dense
+    maxHeightPixels 128:20:8
+    setColorWith https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd1.7/g.color.bb
+    viewLimitsMax 0:100
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd1.7/g.bw
+    viewLimits 10:50
+
+    track cadd1_7_C
+    shortLabel Mutation: C
+    type bigWig
+    longLabel CADD 1.7 Score: Mutation is C
+    parent cadd1_7 on
+    parentParent caddSuper1_7
+    visibility dense
+    maxHeightPixels 128:20:8
+    setColorWith https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd1.7/c.color.bb
+    viewLimitsMax 0:100
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd1.7/c.bw
+    viewLimits 10:50
+
+    track cadd1_7_A
+    shortLabel Mutation: A
+    type bigWig
+    longLabel CADD 1.7 Score: Mutation is A
+    parent cadd1_7 on
+    parentParent caddSuper1_7
+    visibility dense
+    maxHeightPixels 128:20:8
+    setColorWith https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd1.7/a.color.bb
+    viewLimitsMax 0:100
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd1.7/a.bw
+    viewLimits 10:50
+
+track cadd1_7_Del
+shortLabel CADD 1.7 Del
+type bigBed 9 +
+longLabel CADD 1.7 Score: Deletions - label is length of deletion
+parent caddSuper1_7 on
+mouseOver Mutation: $change CADD Phred score: $phred
+filterByRange.score on
+filterLabel.score Show only items with PHRED scale score of
+visibility dense
+pennantIcon New red ../goldenPath/newsarch.html#100924 "October 9, 2024"
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=caddSuper1_7
+filterLimits.score 0:100
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd1.7/del.bb
+color 100,130,160
+filter.score 10:100
+
+track cadd1_7_Ins
+shortLabel CADD 1.7 Ins
+type bigBed 9 +
+longLabel CADD 1.7 Score: Insertions - label is length of insertion
+parent caddSuper1_7 on
+mouseOver Mutation: $change CADD Phred score: $phred
+filterByRange.score on
+filterLabel.score Show only items with PHRED scale score of
+visibility dense
+pennantIcon New red ../goldenPath/newsarch.html#100924 "October 9, 2024"
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=caddSuper1_7
+filterLimits.score 0:100
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd1.7/ins.bb
+color 100,130,160
+filter.score 10:100
+
+track caddDel
+shortLabel CADD 1.6 Del
+type bigBed 9 +
+longLabel CADD 1.6 Score: Deletions - label is length of deletion
+parent caddSuper
+mouseOver Mutation: $change CADD Phred score: $phred
+filterByRange.score on
+filterLabel.score Show only items with PHRED scale score of
+visibility dense
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=caddSuper
+filterLimits.score 0:100
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd/del.bb
+color 100,130,160
+filter.score 10:100
+
+track caddIns
+shortLabel CADD 1.6 Ins
+type bigBed 9 +
+longLabel CADD 1.6 Score: Insertions - label is length of insertion
+parent caddSuper
+mouseOver Mutation: $change CADD Phred score: $phred
+filterByRange.score on
+filterLabel.score Show only items with PHRED scale score of
+visibility dense
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=caddSuper
+filterLimits.score 0:100
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/cadd/ins.bb
+color 100,130,160
+filter.score 10:100
+
+track civic
+shortLabel CIViC
+type bigBed 12 +
+longLabel CIViC - Expert & crowd-sourced cancer variant interpretation
+group phenDis
+pennantIcon New red ../goldenPath/newsarch.html#021425 "Released Feb. 14, 2025"
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/civic/civic.bb
+mouseOverField mouseOverHTML
+urls origVariant="https://civicdb.org/variants/$$/summary" alleleRegistryId="https://reg.clinicalgenome.org/redmine/projects/registry/genboree_registry/by_canonicalid?canonicalid=$$" clinvarId="https://www.ncbi.nlm.nih.gov/clinvar/variation/$$/" diseaseLink="https://www.disease-ontology.org/?id=DOID:$$"
+
+track clinGenComp
+compositeContainer TRUE
+shortLabel ClinGen
+type bigBed 9 +
+longLabel ClinGen curation activities (Dosage Sensitivity and Gene-Disease Validity)
+visibility hide
+group phenDis
+pennantIcon New red ../goldenPath/newsarch.html#100924 "October 9, 2024"
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=clinGen
+compositeTrack on
+itemRgb on
+noParentConfig on
+
+    track clinGenCspec
+    shortLabel ClinGen VCEP Specifications
+    type bigBed 9 +
+    longLabel Clingen CSpec Variant Interpretation VCEP Specifications
+    parent clinGenComp on
+    mouseOver <b>Disease:</b> $disease <br><b>Panel:</b> $panel <br><b>Status:</b> $status
+    visibility pack
+    pennantIcon New red ../goldenPath/newsarch.html#100924 "October 9, 2024"
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/clinGen/clinGenCspec.bb
+    noScoreFilter on
+
+    track clinGenGeneDisease
+    shortLabel ClinGen Validity
+    type bigBed 9 +
+    longLabel ClinGen Gene-Disease Validity Classification
+    parent clinGenComp on
+    skipFields Mouseover
+    visibility pack
+    searchIndex name,geneSymbol,HGNCid,MONDOid,Classification
+    filterValues.Inheritance Autosomal Dominant,Autosomal Recessive,Semidominant,X-Linked,X-linked recessive,Other
+    filterLabel.SOPversion ClinGen SOP Version Number
+    bedNameLabel Associated Disease
+    filterValues.SOPversion SOP4,SOP5,SOP6,SOP7
+    itemRgb on
+    priority 3
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/clinGen/clinGenGeneDisease.bb
+    sepFields MONDOid,SOPversion
+    filterLabel.Inheritance Inheritance Pattern
+    noScoreFilter on
+    filterLabel.Classification ClinGen Gene-Disease Validity Classification
+    filterValues.Classification Definitive,Strong,Moderate,Limited,Animal Model Only,No Reported Evidence,Disputed,Refuted
+    mouseOverField Mouseover
+    urls geneSymbol="https://search.clinicalgenome.org/kb/genes/$$" ClinGenURL="https://search.clinicalgenome.org/kb/gene-validity/$$" HGNCid="https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/$$" MONDOid="https://monarchinitiative.org/disease/$$"
+
+    track clinGenTriplo
+    shortLabel ClinGen Triplosensitivity
+    type bigBed 9 +
+    longLabel ClinGen Dosage Sensitivity Map - Triplosensitivity
+    parent clinGenComp on
+    visibility pack
+    filterValues.triploScore 0|No evidence available,1|Little evidence for dosage pathogenicity,2|Some evidence for dosage pathogenicity,3|Sufficient evidence for dosage pathogenicity,30|Gene associated with autosomal recessive phenotype,40|Dosage sensitivity unlikely
+    priority 2
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/clinGen/clinGenTriplo.bb
+    filterLabel.triploScore Dosage Sensitivity Score
+    mouseOverField _mouseOver
+    urls url="$$" PMID1="https://pubmed.ncbi.nlm.nih.gov/$$/?from_single_result=$$&expanded_search_query=$$" PMID2="https://pubmed.ncbi.nlm.nih.gov/$$/?from_single_result=$$&expanded_search_query=$$" PMID3="https://pubmed.ncbi.nlm.nih.gov/$$/?from_single_result=$$&expanded_search_query=$$" PMID4="https://pubmed.ncbi.nlm.nih.gov/$$/?from_single_result=$$&expanded_search_query=$$" PMID5="https://pubmed.ncbi.nlm.nih.gov/$$/?from_single_result=$$&expanded_search_query=$$" PMID6="https://pubmed.ncbi.nlm.nih.gov/$$/?from_single_result=$$&expanded_search_query=$$" mondoID="https://monarchinitiative.org/disease/$$"
+
+    track clinGenHaplo
+    shortLabel ClinGen Haploinsufficiency
+    type bigBed 9 +
+    longLabel ClinGen Dosage Sensitivity Map - Haploinsufficiency
+    parent clinGenComp on
+    filterValues.haploScore 0|No evidence available,1|Little evidence for dosage pathogenicity,2|Some evidence for dosage pathogenicity,3|Sufficient evidence for dosage pathogenicity,30|Gene associated with autosomal recessive phenotype,40|Dosage sensitivity unlikely
+    visibility pack
+    showCfg on
+    priority 1
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/clinGen/clinGenHaplo.bb
+    mouseOverField _mouseOver
+    filterLabel.haploScore Dosage Sensitivity Score
+    urls url="$$" PMID1="https://pubmed.ncbi.nlm.nih.gov/$$/?from_single_result=$$&expanded_search_query=$$" PMID2="https://pubmed.ncbi.nlm.nih.gov/$$/?from_single_result=$$&expanded_search_query=$$" PMID3="https://pubmed.ncbi.nlm.nih.gov/$$/?from_single_result=$$&expanded_search_query=$$" PMID4="https://pubmed.ncbi.nlm.nih.gov/$$/?from_single_result=$$&expanded_search_query=$$" PMID5="https://pubmed.ncbi.nlm.nih.gov/$$/?from_single_result=$$&expanded_search_query=$$" PMID6="https://pubmed.ncbi.nlm.nih.gov/$$/?from_single_result=$$&expanded_search_query=$$" mondoID="https://monarchinitiative.org/disease/$$"
+
+track clinvar
+compositeContainer TRUE
+shortLabel ClinVar Variants
+type bed 12 +
+longLabel ClinVar Variants
+visibility hide
+group phenDis
+compositeTrack on
+itemRgb on
+scoreLabel ClinVar Star-Rating (0-4)
+noParentConfig on
+dataVersion https://hgdownload.soe.ucsc.edu/gbdb/$D/bbi/clinvarAlpha/version.txt
+urls rcvAcc="https://www.ncbi.nlm.nih.gov/clinvar/$$/" geneId="https://www.ncbi.nlm.nih.gov/gene/$$" snpId="https://www.ncbi.nlm.nih.gov/snp/$$" nsvId="https://www.ncbi.nlm.nih.gov/dbvar/variants/$$/" origName="https://www.ncbi.nlm.nih.gov/clinvar/variation/$$/"
+
+    track clinvarSubLolly
+    shortLabel ClinVar interp
+    type bigLolly
+    longLabel ClinVar SNVs submitted interpretations and evidence
+    parent clinvar
+    skipFields reviewStatus
+    group phenDis
+    lollyMaxSize 10
+    yAxisLabel.0 0 on 150,150,150 OTH
+    yAxisLabel.1 1 on 150,150,150 B
+    yAxisLabel.2 2 on 150,150,150 LB
+    yAxisLabel.3 3 on 150,150,150 VUS
+    yAxisLabel.4 4 on 150,150,150 LP
+    yAxisLabel.5 5 on 150,150,150 P
+    configurable off
+    lollyNoStems on
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/clinvarSubLolly/clinvarSubLolly.bb
+    xrefDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/clinvarSubLolly/clinvarSub.bb
+    yAxisNumLabels off
+    viewLimits 0:5
+    mouseOverField _mouseOver
+    lollySizeField 10
+    urls rcvAcc="https://www.ncbi.nlm.nih.gov/clinvar/$$/" geneId="https://www.ncbi.nlm.nih.gov/gene/$$" snpId="https://www.ncbi.nlm.nih.gov/snp/$$" nsvId="https://www.ncbi.nlm.nih.gov/dbvar/variants/$$/" origName="https://www.ncbi.nlm.nih.gov/clinvar/variation/$$/"
+
+    track clinvarCnv
+    shortLabel ClinVar CNVs
+    type bigBed 12 +
+    longLabel ClinVar Copy Number Variants >= 50bp
+    parent clinvar
+    filterType._originCode multiple
+    skipFields rcvAcc
+    filterByRange._varLen on
+    visibility hide
+    group phenDis
+    searchIndex _dbVarSsvId
+    filterValues._originCode GERM|germline,SOM|somatic,GERMSOM|germline/somatic,NOVO|de novo,UNK|unknown
+    filterValues._allTypeCode SUBST|single nucleotide variant - SUBST,STRUCT|translocation and fusion - STRUCT,LOSS|deletion and copy loss - LOSS,GAIN|duplication and copy gain - GAIN,INS|indel and insertion - INS,INV|inversion - INV,SEQALT|undetermined - SEQALT,SEQLEN|repeat change - SEQLEN
+    itemRgb on
+    priority 2
+    filterLimits._varLen 50:999999999
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/clinvar/clinvarCnv.bb
+    filterType._clinSignCode multiple
+    filter._varLen 50:999999999
+    filterValues._clinSignCode BN|benign,LB|likely benign,CF|conflicting,PG|pathogenic,LP|likely pathogenic,UC|uncertain,OT|other
+    filterLabel._originCode Alelle Origin
+    noScoreFilter on
+    filterType._allTypeCode multiple
+    mergeSpannedItems on
+    mouseOverField _mouseOver
+    urls rcvAcc="https://www.ncbi.nlm.nih.gov/clinvar/$$/" geneId="https://www.ncbi.nlm.nih.gov/gene/$$" snpId="https://www.ncbi.nlm.nih.gov/snp/$$" nsvId="https://www.ncbi.nlm.nih.gov/dbvar/variants/$$/" origName="https://www.ncbi.nlm.nih.gov/clinvar/variation/$$/"
+
+    track clinvarMain
+    shortLabel ClinVar SNVs
+    type bigBed 12 +
+    longLabel ClinVar Short Variants < 50bp
+    parent clinvar
+    filterType._originCode multiple
+    skipFields rcvAcc
+    filterByRange._varLen on
+    filterValues.molConseq genic downstream transcript variant|genic downstream transcript variant,no sequence alteration|no sequence alteration,inframe indel|inframe indel,stop lost|stop lost,genic upstream transcript variant|genic upstream transcript variant,initiatior codon variant|initiatior codon variant,inframe insertion|inframe insertion,inframe deletion|inframe deletion,splice acceptor variant|splice acceptor variant,splice donor variant|splice donor variant,5 prime UTR variant|5 prime UTR variant,nonsense|nonsense,non-coding transcript variant|non-coding transcript variant,3 prime UTR variant|3 prime UTR variant,frameshift variant|frameshift variant,intron variant|intron variant,synonymous variant|synonymous variant,missense variant|missense variant,|unknown,initiator codon variant|initiator codon variant
+    visibility hide
+    group phenDis
+    searchIndex _dbVarSsvId
+    maxWindowCoverage 10000000
+    filterValues._originCode GERM|germline,SOM|somatic,GERMSOM|germline/somatic,UNK|unknown
+    filterValues._allTypeCode SUBST|single nucleotide variant - SUBST,STRUCT|translocation and fusion - STRUCT,LOSS|deletion and copy loss - LOSS,GAIN|duplication and copy gain - GAIN,INS|indel and insertion - INS,INV|inversion - INV,SEQALT|undetermined - SEQALT,SEQLEN|repeat change - SEQLEN
+    showCfg on
+    itemRgb on
+    priority 1
+    filterLimits._varLen 0:49
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/clinvar/clinvarMain.bb
+    filterType._clinSignCode multiple
+    filter._varLen 0
+    filterValues._clinSignCode BN|benign,LB|likely benign,CF|conflicting,PG|pathogenic,LP|likely pathogenic,RF|risk factor,OT|other,VUS|vus
+    filterLabel._originCode Alelle Origin
+    noScoreFilter on
+    filterType._allTypeCode multiple
+    mouseOverField _mouseOver
+    urls rcvAcc="https://www.ncbi.nlm.nih.gov/clinvar/$$/" geneId="https://www.ncbi.nlm.nih.gov/gene/$$" snpId="https://www.ncbi.nlm.nih.gov/snp/$$" nsvId="https://www.ncbi.nlm.nih.gov/dbvar/variants/$$/" origName="https://www.ncbi.nlm.nih.gov/clinvar/variation/$$/"
+
+track covidHgiGwas
+compositeContainer TRUE
+shortLabel COVID GWAS v3
+type bigLolly 9 +
+longLabel GWAS meta-analyses from the COVID-19 Host Genetics Initiative
+parent covid
+mouseOver $name $ref/$alt effect $effectSize pval $pValue studies $sourceCount
+maxItems 500000
+filter.effectSize -13:21
+maxHeightPixels 48:75:128
+group phenDis
+compositeTrack on
+filterLabel._effectSizeAbs Minimum effect size +-
+filter.sourceCount 1
+bedNameLabel SNP
+filterByRange.effectSize on
+filterLabel.effectSize Effect size range
+lollyField 21
+priority 2.1
+superTrack covid hide
+filter.pValueLog 3
+filterLabel.sourceCount Minimum number of studies
+cartVersion 4
+noScoreFilter on
+autoScale on
+viewLimits -13:21
+chromosomes chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19,chr20,chr21,chr22
+filterLimits.effectSize -13:21
+filter._effectSizeAbs 0
+
+    track covidHgiGwasB2
+    shortLabel Hosp COVID GWAS
+    type bigLolly 9 +
+    longLabel Hospitalized COVID GWAS from the COVID-19 Host Genetics Initiative (3199 cases, 8 studies)
+    parent covidHgiGwas off
+    parentParent covid
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/covidHgiGwas/covidHgiGwasB2.hg38.bb
+
+    track covidHgiGwasC2
+    shortLabel COVID GWAS
+    type bigLolly 9 +
+    longLabel COVID GWAS from the COVID-19 Host Genetics Initiative (6696 cases, 18 studies)
+    parent covidHgiGwas on
+    parentParent covid
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/covidHgiGwas/covidHgiGwasC2.hg38.bb
+
+track covidHgiGwasR4Pval
+compositeContainer TRUE
+shortLabel COVID GWAS v4
+type bigLolly 9 +
+longLabel COVID risk variants from GWAS meta-analyses by the COVID-19 Host Genetics Initiative (Rel 4, Oct 2020)
+parent covid
+mouseOver $name $ref/$alt effect $effectSize pVal $pValue studies $sourceCount
+maxItems 500000
+filter.effectSize -1.6:2.2
+maxHeightPixels 48:75:128
+group phenDis
+compositeTrack on
+filterLabel._effectSizeAbs Minimum effect size +-
+filter.sourceCount 1
+bedNameLabel SNP
+filterByRange.effectSize on
+filterLabel.effectSize Effect size range
+lollyField 13
+priority 2
+superTrack covid pack
+filter.pValueLog 3
+filterLabel.sourceCount Minimum number of studies
+cartVersion 4
+noScoreFilter on
+autoScale on
+viewLimits 0:10
+chromosomes chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19,chr20,chr21,chr22
+filterLimits.effectSize -1.6:2.2
+filter._effectSizeAbs 0
+
+    track covidHgiGwasR4PvalC2
+    shortLabel All COVID vars
+    type bigLolly 9 +
+    longLabel COVID risk variants from the COVID-19 HGI GWAS Analysis C2 (17965 cases, 33 studies, Rel 4: Oct 2020)
+    parent covidHgiGwasR4Pval on
+    parentParent covid
+    priority 4
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/covidHgiGwas/covidHgiGwasR4.C2.hg38.bb
+
+    track covidHgiGwasR4PvalC1
+    shortLabel Tested COVID vars
+    type bigLolly 9 +
+    longLabel Tested COVID risk variants from the COVID-19 HGI GWAS Analyis C1 (11085 cases, 20 studies, Rel 4: Oct 2020)
+    parent covidHgiGwasR4Pval on
+    parentParent covid
+    priority 3
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/covidHgiGwas/covidHgiGwasR4.C1.hg38.bb
+
+    track covidHgiGwasR4PvalB2
+    shortLabel Hosp COVID vars
+    type bigLolly 9 +
+    longLabel Hospitalized COVID risk variants from the COVID-19 HGI GWAS Analysis B2 (7885 cases, 21 studies, Rel 4: Oct 2020)
+    parent covidHgiGwasR4Pval on
+    parentParent covid
+    priority 2
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/covidHgiGwas/covidHgiGwasR4.B2.hg38.bb
+
+    track covidHgiGwasR4PvalA2
+    shortLabel Severe COVID vars
+    type bigLolly 9 +
+    longLabel Severe respiratory COVID risk variants from the COVID-19 HGI GWAS Analysis A2 (4336 cases, 12 studies, Rel 4: Oct 2020)
+    parent covidHgiGwasR4Pval on
+    parentParent covid
+    priority 1
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/covidHgiGwas/covidHgiGwasR4.A2.hg38.bb
+
+track covidMuts
+shortLabel COVID Rare Harmful Var
+type bigBed 12 +
+longLabel Rare variants underlying COVID-19 severity and susceptibility from the COVID Human Genetics Effort
+parent covid
+mouseOver $gene $name $rsId Genotype: $genotype; Zygosity: $zygo ; Inheritance: $inhMode
+group phenDis
+labelFields gene, name
+priority 2.2
+superTrack covid pack
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/covidMuts/covidMuts.bb
+color 179,0,0
+cartVersion 4
+noScoreFilter on
+defaultLabelFields gene, name
+multiRegionsBedUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/covidMuts/covidMuts.regions.bed
+
+track gdcCancer
+compositeContainer TRUE
+shortLabel TCGA Pan-Cancer
+type bigLolly 12 +
+longLabel TCGA Pan-Cancer mutations: 33 TCGA Cancer Projects Summary (Pan-Can 33)
+maxItems 500000
+visibility hide
+group phenDis
+project_idFilterValues TCGA-LAML|Acute Myeloid Leukemia,TCGA-ACC|Adrenocortical carcinoma,TCGA-BLCA|Bladder Urothelial Carcinoma,TCGA-LGG|Brain Lower Grade Glioma,TCGA-BRCA|Breast invasive carcinoma,TCGA-CESC|Cervical squamous cell carcinoma and endocervical adenocarcinoma,TCGA-CHOL|Cholangiocarcinoma,TCGA-LCML|Chronic Myelogenous Leukemia,TCGA-COAD|Colon adenocarcinoma,TCGA-CNTL|Controls,TCGA-ESCA|Esophageal carcinoma,TCGA-FPPP|FFPE Pilot Phase II,TCGA-GBM|Glioblastoma multiforme,TCGA-HNSC|Head and Neck squamous cell carcinoma,TCGA-KICH|Kidney Chromophobe,TCGA-KIRC|Kidney renal clear cell carcinoma,TCGA-KIRP|Kidney renal papillary cell carcinoma,TCGA-LIHC|Liver hepatocellular carcinoma,TCGA-LUAD|Lung adenocarcinoma,TCGA-LUSC|Lung squamous cell carcinoma,TCGA-DLBC|Lymphoid Neoplasm Diffuse Large B-cell Lymphoma,TCGA-MESO|Mesothelioma,TCGA-MISC|Miscellaneous,TCGA-OV|Ovarian serous cystadenocarcinoma,TCGA-PAAD|Pancreatic adenocarcinoma,TCGA-PCPG|Pheochromocytoma and Paraganglioma,TCGA-PRAD|Prostate adenocarcinoma,TCGA-READ|Rectum adenocarcinoma,TCGA-SARC|Sarcoma,TCGA-SKCM|Skin Cutaneous Melanoma,TCGA-STAD|Stomach adenocarcinoma,TCGA-TGCT|Testicular Germ Cell Tumors,TCGA-THYM|Thymoma,TCGA-THCA|Thyroid carcinoma,TCGA-UCS|Uterine Carcinosarcoma,TCGA-UCEC|Uterine Corpus Endometrial Carcinoma,TCGA-UVM|Uveal Melanoma
+compositeTrack on
+genderFilterValues male,female
+genderFilterType multipleListOr
+project_idFilterType multipleListOr
+
+    track KICH
+    shortLabel KICH
+    type bigLolly 12 +
+    longLabel Kidney Chromophobe
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/KICH.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track UVM
+    shortLabel UVM
+    type bigLolly 12 +
+    longLabel Uveal Melanoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 34
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/UVM.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track UCS
+    shortLabel UCS
+    type bigLolly 12 +
+    longLabel Uterine Carcinosarcoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 33
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/UCS.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track UCEC
+    shortLabel UCEC
+    type bigLolly 12 +
+    longLabel Uterine Corpus Endometrial Carcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 32
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/UCEC.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track THYM
+    shortLabel THYM
+    type bigLolly 12 +
+    longLabel Thymoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 31
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/THYM.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track THCA
+    shortLabel THCA
+    type bigLolly 12 +
+    longLabel Thyroid carcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 30
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/THCA.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track TGCT
+    shortLabel TGCT
+    type bigLolly 12 +
+    longLabel Testicular Germ Cell Tumors
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 29
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/TGCT.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track STAD
+    shortLabel STAD
+    type bigLolly 12 +
+    longLabel Stomach adenocarcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 28
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/STAD.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track SKCM
+    shortLabel SKCM
+    type bigLolly 12 +
+    longLabel Skin Cutaneous Melanoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 27
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/SKCM.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track SARC
+    shortLabel SARC
+    type bigLolly 12 +
+    longLabel Sarcoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 26
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/SARC.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track READ
+    shortLabel READ
+    type bigLolly 12 +
+    longLabel Rectum adenocarcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 25
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/READ.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track PRAD
+    shortLabel PRAD
+    type bigLolly 12 +
+    longLabel Prostate adenocarcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 24
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/PRAD.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track PCPG
+    shortLabel PCPG
+    type bigLolly 12 +
+    longLabel Pheochromocytoma and Paraganglioma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 23
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/PCPG.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track PAAD
+    shortLabel PAAD
+    type bigLolly 12 +
+    longLabel Pancreatic adenocarcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 22
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/PAAD.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track OV
+    shortLabel OV
+    type bigLolly 12 +
+    longLabel Ovarian serous cystadenocarcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 21
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/OV.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track MESO
+    shortLabel MESO
+    type bigLolly 12 +
+    longLabel Mesothelioma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 20
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/MESO.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track LUSC
+    shortLabel LUSC
+    type bigLolly 12 +
+    longLabel Lung squamous cell carcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 19
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/LUSC.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track LUAD
+    shortLabel LUAD
+    type bigLolly 12 +
+    longLabel Lung adenocarcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 18
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/LUAD.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track LIHC
+    shortLabel LIHC
+    type bigLolly 12 +
+    longLabel Liver hepatocellular carcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 17
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/LIHC.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track LGG
+    shortLabel LGG
+    type bigLolly 12 +
+    longLabel Brain Lower Grade Glioma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 16
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/LGG.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track LAML
+    shortLabel LAML
+    type bigLolly 12 +
+    longLabel Acute Myeloid Leukemia
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 15
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/LAML.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track KIRP
+    shortLabel KIRP
+    type bigLolly 12 +
+    longLabel Kidney renal papillary cell carcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 14
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/KIRP.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track KIRC
+    shortLabel KIRC
+    type bigLolly 12 +
+    longLabel Kidney renal clear cell carcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 13
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/KIRC.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track HNSC
+    shortLabel HNSC
+    type bigLolly 12 +
+    longLabel Head and Neck squamous cell carcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 11
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/HNSC.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track GBM
+    shortLabel GBM
+    type bigLolly 12 +
+    longLabel Glioblastoma multiforme
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 10
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/GBM.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track ESCA
+    shortLabel ESCA
+    type bigLolly 12 +
+    longLabel Esophageal carcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 9
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/ESCA.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track DLBC
+    shortLabel DLBC
+    type bigLolly 12 +
+    longLabel Lymphoid Neoplasm Diffuse Large B-cell Lymphoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 8
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/DLBC.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track COAD
+    shortLabel COAD
+    type bigLolly 12 +
+    longLabel Colon adenocarcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 7
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/COAD.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track CHOL
+    shortLabel CHOL
+    type bigLolly 12 +
+    longLabel Cholangiocarcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 6
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/CHOL.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track CESC
+    shortLabel CESC
+    type bigLolly 12 +
+    longLabel Cervical squamous cell carcinoma and endocervical adenocarcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 5
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/CESC.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track BRCA
+    shortLabel BRCA
+    type bigLolly 12 +
+    longLabel Breast invasive carcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 4
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/BRCA.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track BLCA
+    shortLabel BLCA
+    type bigLolly 12 +
+    longLabel Bladder Urothelial Carcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 3
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/BLCA.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track ACC
+    shortLabel ACC
+    type bigLolly 12 +
+    longLabel Adrenocortical carcinoma
+    parent gdcCancer off
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 2
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/ACC.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/193294
+
+    track allCancer
+    shortLabel All Cancers
+    type bigLolly 12 +
+    longLabel All TCGA Pan-Cancer mutations: 33 TCGA Cancer Projects Summary (Pan-Can 33)
+    parent gdcCancer on
+    group phenDis
+    lollyField 13
+    configurable off
+    priority 1
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gdcCancer/gdcCancer.bb
+    autoScale on
+    urls case_id=https://portal.gdc.cancer.gov/cases/$$
+
+track genCC
+shortLabel GenCC
+type bigBed 9 + 33
+longLabel GenCC: The Gene Curation Coalition Annotations
+mouseOver $disease_title - $classification_title - $moi_title
+group phenDis
+filterLabel.classification_title evidence classification
+filterValues.classification_title Supportive,Strong,Definitive,Limited,Moderate,No Known Disease Relationship,Disputed Evidence,Refuted Evidence
+itemRgb on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/genCC.bb
+urlLabel Link to GenCC Gene page
+url https://search.thegencc.org/genes/$<gene_curie>
+urls ensTranscript="https://useast.ensembl.org/Multi/Search/Results?q=$$;site=ensembl_all" ensGene="https://useast.ensembl.org/Multi/Search/Results?q=$$;site=ensembl_all" refSeqAccession="https://www.ncbi.nlm.nih.gov/clinvar/?term=$$" uuid="https://search.thegencc.org/submissions/$$" gene_curie="https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/$$" gene_symbol="https://www.genecards.org/cgi-bin/carddisp.pl?gene=$$" disease_curie="https://www.pombase.org/term/$$" moi_curie="https://hpo.jax.org/app/browse/term/$$"
+
+track geneReviews
+shortLabel GeneReviews
+type bigBed 9 +
+longLabel GeneReviews
+mouseOver $name disease(s): $diseases
+visibility hide
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=geneReviews
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/geneReviews/geneReviews.bb
+color 0,80,0
+noScoreFilter on
+url https://www.ncbi.nlm.nih.gov/books/NBK1116/?term=$$
+
+track hmc
+shortLabel HMC
+type bigWig
+longLabel HMC - Homologous Missense Constraint Score on PFAM domains
+parent constraintSuper
+yLineMark 0.8
+visibility full
+yLineOnOff on
+maxHeightPixels 128:40:8
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=constraintSuper
+viewLimitsMax 0:2
+maxWindowToDraw 10000000
+mouseOverFunction noAverage
+priority 2
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hmc/hmc.bw
+color 0,130,0
+viewLimits 0:2
+
+track interactions
+shortLabel Gene Interactions
+type bigBed 9
+longLabel Protein Interactions from Curated Databases and Text-Mining
+labelOnFeature on
+visibility hide
+group phenDis
+linkIdInName on
+hgsid on
+itemRgb on
+exonNumbers off
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/interactions.bb
+noScoreFilter on
+
+track jarvis
+shortLabel JARVIS
+type bigWig
+longLabel JARVIS: score to prioritize non-coding regions for disease relevance
+parent constraintSuper
+yLineMark 0.73
+visibility dense
+yLineOnOff on
+maxHeightPixels 8:40:128
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=constraintSuper
+maxWindowToDraw 10000000
+mouseOverFunction noAverage
+priority 1
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/jarvis/jarvis.bw
+color 150,130,160
+viewLimits 0.0:1.0
+
+track mastermind
+shortLabel Mastermind Variants
+type bigBed 9 +
+longLabel Genomenon Mastermind Variants extracted from full text publications
+parent varsInPubs pack
+maxItems 1000000
+visibility dense
+group phenDis
+maxWindowCoverage 40000
+itemRgb on
+exonNumbers off
+superTrack on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/mastermind.bb
+noScoreFilter on
+dataVersion https://hgdownload.soe.ucsc.edu/gbdb/$D/bbi/mastermindRelease.txt
+mouseOverField _mouseOver
+filter.mmcnt1 0
+filter.mmcnt2 0
+filter.mmcnt3 0
+urls url=$$
+
+track mitoMap
+compositeContainer TRUE
+shortLabel MITOMAP
+type bigBed 9 +
+longLabel MITOMAP: A human mitochondrial genome database
+visibility hide
+group phenDis
+pennantIcon New red ../goldenPath/newsarch.html#030625 "Released Mar. 6, 2025"
+compositeTrack on
+noScoreFilter on
+chromosomes chrM,chrMT
+dataVersion https://hgdownload.soe.ucsc.edu/gbdb/$D/bbi/mitoMapVersion.txt
+
+    track mitoMapDiseaseMuts
+    shortLabel MITOMAP Disease Muts
+    type bigBed 9 + 14
+    longLabel MITOMAP Disease Mutations
+    parent mitoMap on
+    group phenDis
+    priority 2
+    exonNumbers off
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/mitoMapDiseaseMuts.bb
+    urlLabel MITOMAP link
+    url https://www.mitomap.org/foswiki/bin/view/MITOMAP/$<_mutsCodingOrRNA>
+    mouseOverField _mouseOver
+
+    track mitoMapVars
+    shortLabel MITOMAP Variants
+    type bigBed 9 + 11
+    longLabel MITOMAP Control and Coding Variants
+    parent mitoMap on
+    group phenDis
+    priority 1
+    exonNumbers off
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/mitoMapVars.bb
+    urlLabel MITOMAP link
+    url https://www.mitomap.org/foswiki/bin/view/MITOMAP/$<_varType>
+    mouseOverField _mouseOver
+
+track orphadata
+shortLabel Orphanet
+type bigBed 9 +
+longLabel Orphadata: Aggregated Data From Orphanet
+mouseOver Gene: $geneSymbol, Disorder: $disorder, Inheritance(s): $inheritance, Onset: $onsetList
+skipFields name,score,itemRgb
+group phenDis
+bedNameLabel OrphaCode
+filterValues.onsetList Adolescent,Adult,All ages,Antenatal,Childhood,Elderly,Infancy,Neonatal,No data available
+itemRgb on
+filterValues.inheritance Autosomal dominant,Autosomal recessive,Mitochondrial inheritance,Multigenic/multifactorial,No data available,Not applicable,Oligogenic,Semi-dominant,Unknown,X-linked dominant,X-linked recessive,Y-linked
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/orphanet/orphadata.bb
+urlLabel OrphaNet Phenotype Link:
+url https://www.orpha.net/consor/cgi-bin/OC_Exp.php?lng=en&Expert=$$
+skipEmptyFields on
+filterValues.assnType Biomarker tested in,Candidate gene tested in,Disease-causing germline mutation(s) (gain of function) in,Disease-causing germline mutation(s) (loss of function) in,Disease-causing germline mutation(s) in,Disease-causing somatic mutation(s) in,Major susceptibility factor in,Modifying germline mutation in,Part of a fusion gene in,Role in the phenotype of
+urls ensemblID="https://ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=$$" pmid="https://pubmed.ncbi.nlm.nih.gov/$$" orphaCode="https://www.orpha.net/consor/cgi-bin/OC_Exp.php?lng=en&Expert=$$" omim="https://www.omim.org/entry/$$?search=$$&highlight=$$" hgnc="https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:$$"
+
+track panelApp
+compositeContainer TRUE
+shortLabel PanelApp
+type bigBed 9 +
+longLabel Genomics England PanelApp Diagnostics
+visibility hide
+group phenDis
+compositeTrack on
+
+    track panelAppTandRep
+    shortLabel PanelApp STRs
+    type bigBed 9 +
+    longLabel Genomics England PanelApp Short Tandem Repeats
+    parent panelApp on
+    skipFields chrom,chromStart,blockStarts,blockSizes,mouseOverField
+    visibility pack
+    labelFields hgncSymbol
+    filterValues.confidenceLevel 3,2,1,0
+    itemRgb on
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/panelApp/tandRep.bb
+    skipEmptyFields on
+    mouseOverField mouseOverField
+    urls omimGene="https://www.omim.org/entry/$$" ensemblID="https://ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=$$" hgncID="https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:$$" panelID="https://panelapp.genomicsengland.co.uk/panels/$$/" geneSymbol="https://panelapp.genomicsengland.co.uk/panels/entities/$$"
+
+    track panelAppGenes
+    shortLabel PanelApp Genes
+    type bigBed 9 +
+    longLabel Genomics England PanelApp Genes
+    parent panelApp on
+    skipFields chrom,chromStart,blockStarts,blockSizes,entityName,tags,status,mouseOverField
+    visibility pack
+    labelFields geneSymbol
+    filterValues.confidenceLevel 3,2,1,0
+    itemRgb on
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/panelApp/genes.bb
+    urlLabel Link to PanelApp
+    url https://panelapp.genomicsengland.co.uk/panels/$<panelID>/gene/$<geneSymbol>/
+    skipEmptyFields on
+    mouseOverField mouseOverField
+    urls omimGene="https://www.omim.org/entry/$$" ensemblGenes="https://ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=$$" hgncID="https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:$$" panelID="https://panelapp.genomicsengland.co.uk/panels/$$/" geneSymbol="https://panelapp.genomicsengland.co.uk/panels/entities/$$"
+
+    track panelAppCNVs
+    shortLabel PanelApp CNVs
+    type bigBed 9 +
+    longLabel Genomics England PanelApp CNV Regions
+    parent panelApp on
+    skipFields chrom,chromStart,blockStarts,blockSizes
+    visibility pack
+    labelFields entityName
+    filterValues.confidenceLevel 3,2,1,0
+    itemRgb on
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/panelApp/cnv.bb
+    skipEmptyFields on
+    urls omimGene="https://www.omim.org/entry/$$" panelID="https://panelapp.genomicsengland.co.uk/panels/$$/" entityName="https://panelapp.genomicsengland.co.uk/panels/entities/$$"
+
+track revel
+compositeContainer TRUE
+shortLabel REVEL Scores
+type bigWig
+longLabel REVEL Pathogenicity Score for single-base coding mutations (zoom for exact score)
+visibility hide
+group phenDis
+pennantIcon 19.jpg ../goldenPath/help/liftOver.html "lifted from hg19"
+origAssembly hg19
+compositeTrack on
+color 150,80,200
+dataVersion https://hgdownload.soe.ucsc.edu/gbdb/$D/revel/version.txt
+
+    track revelOverlaps
+    shortLabel REVEL overlaps
+    type bigBed 9 +
+    longLabel REVEL: Positions with >1 score due to overlapping transcripts (mouseover for details)
+    parent revel on
+    visibility dense
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/revel/overlap.bb
+    extraTableFields _jsonTable|Title
+    mouseOverField _mouseOver
+
+    track revelT
+    shortLabel Mutation: T
+    type bigWig
+    longLabel REVEL: Mutation is T
+    parent revel on
+    visibility dense
+    maxHeightPixels 128:20:8
+    setColorWith https://hgdownload.soe.ucsc.edu/gbdb/hg38/revel/t.color.bb
+    viewLimitsMax 0:1.0
+    maxWindowToDraw 10000000
+    mouseOverFunction noAverage
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/revel/t.bw
+    viewLimits 0:1.0
+    maxWindowToQuery 500000
+
+    track revelG
+    shortLabel Mutation: G
+    type bigWig
+    longLabel REVEL: Mutation is G
+    parent revel on
+    visibility dense
+    maxHeightPixels 128:20:8
+    setColorWith https://hgdownload.soe.ucsc.edu/gbdb/hg38/revel/g.color.bb
+    viewLimitsMax 0:1.0
+    maxWindowToDraw 10000000
+    mouseOverFunction noAverage
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/revel/g.bw
+    viewLimits 0:1.0
+    maxWindowToQuery 500000
+
+    track revelC
+    shortLabel Mutation: C
+    type bigWig
+    longLabel REVEL: Mutation is C
+    parent revel on
+    visibility dense
+    maxHeightPixels 128:20:8
+    setColorWith https://hgdownload.soe.ucsc.edu/gbdb/hg38/revel/c.color.bb
+    viewLimitsMax 0:1.0
+    maxWindowToDraw 10000000
+    mouseOverFunction noAverage
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/revel/c.bw
+    viewLimits 0:1.0
+    maxWindowToQuery 500000
+
+    track revelA
+    shortLabel Mutation: A
+    type bigWig
+    longLabel REVEL: Mutation is A
+    parent revel on
+    visibility dense
+    maxHeightPixels 128:20:8
+    setColorWith https://hgdownload.soe.ucsc.edu/gbdb/hg38/revel/a.color.bb
+    viewLimitsMax 0:1.0
+    maxWindowToDraw 10000000
+    mouseOverFunction noAverage
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/revel/a.bw
+    viewLimits 0:1.0
+    maxWindowToQuery 500000
+
+track snpedia
+compositeContainer TRUE
+shortLabel SNPedia
+type bed 4
+longLabel SNPedia
+visibility hide
+group phenDis
+compositeTrack on
+color 50,0,100
+
+    track snpediaAll
+    shortLabel SNPedia all
+    type bigBed 9 +
+    longLabel SNPedia all SNPs (including empty pages)
+    parent snpedia
+    searchIndex name
+    itemRgb on
+    exonNumbers off
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/snpediaAll.bb
+    color 50,0,100
+    urlLabel Link to SNPedia page:
+    url https://www.snpedia.com/index.php/$$
+    mouseOverField note
+
+track spMut
+shortLabel UniProt Variants
+type bigBed 12 +
+longLabel UniProt/SwissProt Amino Acid Substitutions
+visibility hide
+group phenDis
+maxWindowCoverage 10000000
+itemRgb on
+exonNumbers off
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/uniprot/unipMut.bb
+noScoreFilter on
+mouseOverField comments
+urls variationId="https://www.uniprot.org/uniprot/$$" uniProtId="https://www.uniprot.org/uniprot/$$" pmids="https://www.ncbi.nlm.nih.gov/pubmed/$$"
+
+track spliceVarDb
+shortLabel SpliceVarDB
+type bigLolly
+longLabel SpliceVarDB: Experimentally validated splicing variants
+parent spliceImpactSuper on
+skipFields lollySize
+visibility full
+group phenDis
+lollyMaxSize 5
+pennantIcon New red ../goldenPath/newsarch.html#030525 "Released Mar. 5, 2025"
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=spliceImpactSuper
+yAxisLabel.0 0 on 140,140,140 Conflicting
+yAxisLabel.1 1 on 140,140,140 Normal
+yAxisLabel.2 2 on 140,140,140 Low
+yAxisLabel.3 3 on 140,140,140 Splice
+itemRgb on
+lollyNoStems on
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/splicevardb/SVDB.bb
+cartVersion 8
+yAxisNumLabels off
+urlLabel Go to SpliceVarDB
+viewLimits 0:3
+url https://compbio.ccia.org.au/splicevardb/
+dataVersion Nov 2024
+lollySizeField lollySize
+
+track tcgaGeneExpr
+shortLabel Cancer Gene Expr
+type bigBarChart
+longLabel Gene Expression in 33 TCGA Cancer Tissues (GENCODE v23)
+parent cancerExpr
+visibility pack
+barChartColors \#8FBC8F #8FBC8F #CDB79E #EEEE00 #EEEE00 #00CDCD #EED5D2 \#CDB79E #CDB79E #CDB79E #CDB79E #CDB79E #CDB79E #9ACD32 #9ACD32 #9ACD32 \#FFB6C1 #CD9B1D #D9D9D9 #1E90FF #CDB79E #FFD39B #A6A6A6 #008B45 #008B45 \#EED5D2 #EED5D2 #ff0000 #ff8d00 #ffdb00 #00d619 #009fff
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=tcgaExpr
+labelFields name2, name
+barChartSampleUrl https://hgdownload.soe.ucsc.edu/gbdb/hgFixed/human/expMatrix/tcgaLargeSamples.tab
+barChartUnit GPM
+barChartMetric median
+barChartMatrixUrl https://hgdownload.soe.ucsc.edu/gbdb/hgFixed/human/expMatrix/tcgaGeneMatrix.tab
+barChartBars Adrenocortical_carcinoma Bladder_Urothelial_Carcinoma Brain_Lower_Grade_Glioma Breast_invasive_carcinoma Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma Colon_adenocarcinoma Glioblastoma_multiforme Kidney_Chromophobe Kidney_renal_clear_cell_carcinoma Kidney_renal_papillary_cell_carcinoma Liver_hepatocellular_carcinoma Lung_adenocarcinoma Lung_squamous_cell_carcinoma Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma Mesothelioma Ovarian_serous_cystadenocarcinoma Pancreatic_adenocarcinoma Pheochromocytoma_and_Paraganglioma Prostate_adenocarcinoma Rectum_adenocarcinoma Skin_Cutaneous_Melanoma Stomach_adenocarcinoma Testicular_Germ_Cell_Tumors Thymoma Thyroid_carcinoma Uterine_Carcinosarcoma Uterine_Corpus_Endometrioid_Carcinoma Cholangiocarcinoma Esophageal_carcinoma Head_and_Neck_squamous_cell_carcinoma Sarcoma Uveal_Melanoma
+superTrack on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/tcga/tcgaGeneExpr.bb
+defaultLabelFields name2
+barChartLabel Cancer types
+maxLimit 8000
+
+track tcgaTranscExpr
+shortLabel Cancer Transc Expr
+type bigBarChart
+longLabel Transcript-level Expression in 33 TCGA Cancer Tissues (GENCODE v23)
+parent cancerExpr
+visibility pack
+barChartColors \#8FBC8F #8FBC8F #CDB79E #EEEE00 #EEEE00 #00CDCD #EED5D2 \#CDB79E #CDB79E #CDB79E #CDB79E #CDB79E #CDB79E #9ACD32 #9ACD32 #9ACD32 \#FFB6C1 #CD9B1D #D9D9D9 #1E90FF #CDB79E #FFD39B #A6A6A6 #008B45 #008B45 \#EED5D2 #EED5D2 #ff0000 #ff8d00 #ffdb00 #00d619 #009fff
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=tcgaExpr
+labelFields name2, name
+barChartSampleUrl https://hgdownload.soe.ucsc.edu/gbdb/hgFixed/human/expMatrix/tcgaLargeSamples.tab
+barChartUnit TPM
+barChartMetric median
+barChartMatrixUrl https://hgdownload.soe.ucsc.edu/gbdb/hgFixed/human/expMatrix/tcgaMatrix.tab
+barChartBars Adrenocortical_carcinoma Bladder_Urothelial_Carcinoma Brain_Lower_Grade_Glioma Breast_invasive_carcinoma Cervical_squamous_cell_carcinoma_and_endocervical_adenocarcinoma Colon_adenocarcinoma Glioblastoma_multiforme Kidney_Chromophobe Kidney_renal_clear_cell_carcinoma Kidney_renal_papillary_cell_carcinoma Liver_hepatocellular_carcinoma Lung_adenocarcinoma Lung_squamous_cell_carcinoma Lymphoid_Neoplasm_Diffuse_Large_B-cell_Lymphoma Mesothelioma Ovarian_serous_cystadenocarcinoma Pancreatic_adenocarcinoma Pheochromocytoma_and_Paraganglioma Prostate_adenocarcinoma Rectum_adenocarcinoma Skin_Cutaneous_Melanoma Stomach_adenocarcinoma Testicular_Germ_Cell_Tumors Thymoma Thyroid_carcinoma Uterine_Carcinosarcoma Uterine_Corpus_Endometrioid_Carcinoma Cholangiocarcinoma Esophageal_carcinoma Head_and_Neck_squamous_cell_carcinoma Sarcoma Uveal_Melanoma
+superTrack on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/tcga/tcgaTranscExpr.bb
+defaultLabelFields name2
+barChartLabel Cancer types
+maxLimit 8000
+
+track ukbDepletion
+shortLabel UKB Depl. Rank Score
+type bigWig 0.0 1.0
+longLabel UK Biobank / deCODE Genetics Depletion Rank Score
+parent constraintSuper
+visibility dense
+maxHeightPixels 128:40:8
+group phenDis
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=constraintSuper
+viewLimitsMax 0:1.0
+priority 10.5
+superTrack on hide
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/ukbDepletion/ukbDepletion.bw
+viewLimits 0.0:1.0
+
+track varChat
+shortLabel enGenome VarChat
+type bigBed 9 + 4
+longLabel enGenome VarChat: Literature match and variant's summary
+parent varsInPubs pack
+skipFields Variant,VariantUrl,score
+maxItems 1000000
+visibility dense
+pennantIcon New red ../goldenPath/newsarch.html#022425 "Released Feb. 24, 2025"
+group phenDis
+maxWindowCoverage 40000
+bedNameLabel Nucleotide Change
+exonNumbers off
+superTrack on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/varChat.bb
+detailsDynamicTable VariantDetails|Variant Details
+noScoreFilter on
+urlLabel Open Variant on VarChat
+url https://varchat.engenome.com/search?source=ucsc&text=$<VariantUrl>
+dataVersion https://hgdownload.soe.ucsc.edu/gbdb/$D/bbi/varChatVersion.txt
+mouseOverField _mouseOver
+
+####### Expression
+
+
+track epdNew
+compositeContainer TRUE
+shortLabel EPDnew Promoters
+type bigBed 8
+longLabel Promoters from EPDnew
+visibility hide
+group expression
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=../../epdNewPromoter
+compositeTrack on
+bedNameLabel Promoter ID
+exonArrows on
+urlLabel EPDnew link:
+
+    track epdNewPromoterNonCoding
+    shortLabel EPDnew NC v1
+    type bigBed 8
+    longLabel ncRNA promoters from EPDnewNC human version 001
+    parent epdNew on
+    priority 2
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/epdNewHumanNc001.hg38.bb
+    color 180,0,134
+    url https://epd.epfl.ch/cgi-bin/get_doc?db=hsNCEpdNew&format=genome&entry=$$
+    dataVersion EPDNewNC Human Version 001 (April 2019)
+
+    track epdNewPromoter
+    shortLabel EPDnew v6
+    type bigBed 8
+    longLabel Promoters from EPDnew human version 006
+    parent epdNew on
+    priority 1
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/epdNewHuman006.hg38.bb
+    color 50,50,200
+    url https://epd.epfl.ch/cgi-bin/get_doc?db=hgEpdNew&format=genome&entry=$$
+    dataVersion EPDNew Human Version 006 (May 2018)
+
+track gtexCov
+compositeContainer TRUE
+shortLabel GTEx RNA-Seq Coverage
+type bigWig
+longLabel GTEx V8 RNA-Seq Read Coverage by Tissue
+maxHeightPixels 100:50:8
+group expression
+compositeTrack on
+priority 10.20
+autoScale group
+
+    track gtexCovWholeBlood
+    shortLabel Whole Blood
+    type bigWig
+    longLabel Whole Blood
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1LG7Z-0005-SM-DKPQ6.Whole_Blood.RNAseq.bw
+    color 255,0,255
+
+    track gtexCovVagina
+    shortLabel Vagina
+    type bigWig
+    longLabel Vagina
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1IDJU-1026-SM-AHZ2U.Vagina.RNAseq.bw
+    color 238,213,210
+
+    track gtexCovUterus
+    shortLabel Uterus
+    type bigWig
+    longLabel Uterus
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1MA7W-1526-SM-DHXKS.Uterus.RNAseq.bw
+    color 238,213,210
+
+    track gtexCovThyroid
+    shortLabel Thyroid
+    type bigWig
+    longLabel Thyroid
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1HSGN-0726-SM-A9G2F.Thyroid.RNAseq.bw
+    color 0,139,69
+
+    track gtexCovTestis
+    shortLabel Testis
+    type bigWig
+    longLabel Testis
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1JKYN-1026-SM-CGQG4.Testis.RNAseq.bw
+    color 166,166,166
+
+    track gtexCovStomach
+    shortLabel Stomach
+    type bigWig
+    longLabel Stomach
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-NFK9-1526-SM-3LK7B.Stomach.RNAseq.bw
+    color 255,211,155
+
+    track gtexCovSpleen
+    shortLabel Spleen
+    type bigWig
+    longLabel Spleen
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-14PKU-0526-SM-6871A.Spleen.RNAseq.bw
+    color 205,183,158
+
+    track gtexCovSmallIntestineTerminalIleum
+    shortLabel Small Intestine
+    type bigWig
+    longLabel Small Intestine Terminal Ileum
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1PIEJ-1526-SM-E6CP8.Small_Intestine_Terminal_Ileum.RNAseq.bw
+    color 205,183,158
+
+    track gtexCovSkinSunExposedLowerleg
+    shortLabel Skin sun exp
+    type bigWig
+    longLabel Skin Sun Exposed Lower leg
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1C475-1826-SM-73KWA.Skin_Sun_Exposed_Lower_leg.RNAseq.bw
+    color 30,144,255
+
+    track gtexCovSkinNotSunExposedSuprapubic
+    shortLabel Skin not sun exp
+    type bigWig
+    longLabel Skin Not Sun Exposed Suprapubic
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1JN76-0626-SM-CKZOQ.Skin_Not_Sun_Exposed_Suprapubic.RNAseq.bw
+    color 58,95,205
+
+    track gtexCovProstate
+    shortLabel Prostate
+    type bigWig
+    longLabel Prostate
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-14DAR-1026-SM-73KV3.Prostate.RNAseq.bw
+    color 217,217,217
+
+    track gtexCovPituitary
+    shortLabel Pituitary
+    type bigWig
+    longLabel Pituitary
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-Y111-2926-SM-4TT25.Pituitary.RNAseq.bw
+    color 180,238,180
+
+    track gtexCovPancreas
+    shortLabel Pancreas
+    type bigWig
+    longLabel Pancreas
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1H1E6-0826-SM-9WG83.Pancreas.RNAseq.bw
+    color 205,155,29
+
+    track gtexCovOvary
+    shortLabel Ovary
+    type bigWig
+    longLabel Ovary
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-ZVT2-0326-SM-5E44G.Ovary.RNAseq.bw
+    color 255,182,193
+
+    track gtexCovNerveTibial
+    shortLabel Nerve Tibial
+    type bigWig
+    longLabel Nerve Tibial
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-TML8-1626-SM-32QOO.Nerve_Tibial.RNAseq.bw
+    color 255,215,0
+
+    track gtexCovMuscleSkeletal
+    shortLabel Muscle Skeletal
+    type bigWig
+    longLabel Muscle Skeletal
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-NFK9-0626-SM-2HMIV.Muscle_Skeletal.RNAseq.bw
+    color 122,103,238
+
+    track gtexCovMinorSalivaryGland
+    shortLabel Minor Saliv Gland
+    type bigWig
+    longLabel Minor Salivary Gland
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-Y5LM-1826-SM-4VDT9.Minor_Salivary_Gland.RNAseq.bw
+    color 205,183,158
+
+    track gtexCovLung
+    shortLabel Lung
+    type bigWig
+    longLabel Lung
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-Y5V5-0826-SM-4VBQD.Lung.RNAseq.bw
+    color 154,205,50
+
+    track gtexCovLiver
+    shortLabel Liver
+    type bigWig
+    longLabel Liver
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-Y5LM-0426-SM-4VBRO.Liver.RNAseq.bw
+    color 205,183,158
+
+    track gtexCovKidneyMedulla
+    shortLabel Kidney Medulla
+    type bigWig
+    longLabel Kidney Medulla
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-T5JC-1626-SM-EZ6KW.Kidney_Medulla.RNAseq.bw
+    color 205,183,158
+
+    track gtexCovKidneyCortex
+    shortLabel Kidney Cortex
+    type bigWig
+    longLabel Kidney Cortex
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-13OVI-1126-SM-5KLZF.Kidney_Cortex.RNAseq.bw
+    color 205,183,158
+
+    track gtexCovHeartLeftVentricle
+    shortLabel Heart Left Ventr
+    type bigWig
+    longLabel Heart Left Ventricle
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-NFK9-0926-SM-2HMJU.Heart_Left_Ventricle.RNAseq.bw
+    color 122,55,139
+
+    track gtexCovHeartAtrialAppendage
+    shortLabel Heart Atr Append
+    type bigWig
+    longLabel Heart Atrial Appendage
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-13S86-0326-SM-5SI6K.Heart_Atrial_Appendage.RNAseq.bw
+    color 180,82,205
+
+    track gtexCovFallopianTube
+    shortLabel Fallopian Tube
+    type bigWig
+    longLabel Fallopian Tube
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-OHPK-2326-SM-3MJH2.Fallopian_Tube.RNAseq.bw
+    color 238,213,210
+
+    track gtexCovEsophagusMuscularis
+    shortLabel Esoph Muscularis
+    type bigWig
+    longLabel Esophagus Muscularis
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1C475-0726-SM-73KVL.Esophagus_Muscularis.RNAseq.bw
+    color 205,170,125
+
+    track gtexCovEsophagusMucosa
+    shortLabel Esoph Mucosa
+    type bigWig
+    longLabel Esophagus Mucosa
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-11NSD-1126-SM-5N9BQ.Esophagus_Mucosa.RNAseq.bw
+    color 139,115,85
+
+    track gtexCovEsophagusGastroesophagealJunction
+    shortLabel Esoph Gastroes Junc
+    type bigWig
+    longLabel Esophagus Gastroesophageal Junction
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1I1GU-1226-SM-A9SKT.Esophagus_Gastroesophageal_Junction.RNAseq.bw
+    color 139,115,85
+
+    track gtexCovColonTransverse
+    shortLabel Colon Transverse
+    type bigWig
+    longLabel Colon Transverse
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1IDJC-1326-SM-CL53H.Colon_Transverse.RNAseq.bw
+    color 238,197,145
+
+    track gtexCovColonSigmoid
+    shortLabel Colon Sigmoid
+    type bigWig
+    longLabel Colon Sigmoid
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1KXAM-1926-SM-D3LAG.Colon_Sigmoid.RNAseq.bw
+    color 205,183,158
+
+    track gtexCovCervixEndocervix
+    shortLabel Cervix Endocerv
+    type bigWig
+    longLabel Cervix Endocervix
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-ZPIC-1326-SM-DO91Y.Cervix_Endocervix.RNAseq.bw
+    color 238,213,210
+
+    track gtexCovCervixEctocervix
+    shortLabel Cervix Ectocerv
+    type bigWig
+    longLabel Cervix Ectocervix
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-S341-1126-SM-4AD6T.Cervix_Ectocervix.RNAseq.bw
+    color 238,213,210
+
+    track gtexCovCellsCulturedfibroblasts
+    shortLabel Cells fibrobl cult
+    type bigWig
+    longLabel Cells Cultured fibroblasts
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-117XS-0008-SM-5Q5DQ.Cells_Cultured_fibroblasts.RNAseq.bw
+    color 154,192,205
+
+    track gtexCovCellsEBV-transformedlymphocytes
+    shortLabel Cells EBV lymphoc
+    type bigWig
+    longLabel Cells EBV-transformed lymphocytes
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1122O-0003-SM-5Q5DL.Cells_EBV-transformed_lymphocytes.RNAseq.bw
+    color 238,130,238
+
+    track gtexCovBreastMammaryTissue
+    shortLabel Breast Mammary
+    type bigWig
+    longLabel Breast Mammary Tissue
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-ZT9W-2026-SM-51MRA.Breast_Mammary_Tissue.RNAseq.bw
+    color 0,205,205
+
+    track gtexCovBrainSubstantianigra
+    shortLabel Brain Subst nigr
+    type bigWig
+    longLabel Brain Substantia nigra
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-Z93S-0011-R2a-SM-4RGNG.Brain_Substantia_nigra.RNAseq.bw
+    color 238,238,0
+
+    track gtexCovBrainSpinalcordcervicalc-1
+    shortLabel Brain Spinal cord cerv
+    type bigWig
+    longLabel Brain Spinal cord cervical c-1
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-YFC4-0011-R9a-SM-4SOK4.Brain_Spinal_cord_cervical_c-1.RNAseq.bw
+    color 238,238,0
+
+    track gtexCovBrainPutamenbasalganglia
+    shortLabel Brain Put bas gang
+    type bigWig
+    longLabel Brain Putamen basal ganglia
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1HFI6-0011-R7b-SM-CM2SS.Brain_Putamen_basal_ganglia.RNAseq.bw
+    color 238,238,0
+
+    track gtexCovBrainNucleusaccumbensbasalganglia
+    shortLabel Brain Nucl acc bas gang
+    type bigWig
+    longLabel Brain Nucleus accumbens basal ganglia
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-14BIN-0011-R6a-SM-5S2RH.Brain_Nucleus_accumbens_basal_ganglia.RNAseq.bw
+    color 238,238,0
+
+    track gtexCovBrainHypothalamus
+    shortLabel Brain Hypothal
+    type bigWig
+    longLabel Brain Hypothalamus
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-T5JC-0011-R8A-SM-32PLM.Brain_Hypothalamus.RNAseq.bw
+    color 238,238,0
+
+    track gtexCovBrainHippocampus
+    shortLabel Brain Hippocamp
+    type bigWig
+    longLabel Brain Hippocampus
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1HSKV-0011-R1b-SM-CMKH7.Brain_Hippocampus.RNAseq.bw
+    color 238,238,0
+
+    track gtexCovBrainFrontalCortexBA9
+    shortLabel Brain Front Cortex
+    type bigWig
+    longLabel Brain Frontal Cortex BA9
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-T5JC-0011-R10A-SM-32PM2.Brain_Frontal_Cortex_BA9.RNAseq.bw
+    color 238,238,0
+
+    track gtexCovBrainCortex
+    shortLabel Brain Cortex
+    type bigWig
+    longLabel Brain Cortex
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-UTHO-3026-SM-3GAFB.Brain_Cortex.RNAseq.bw
+    color 238,238,0
+
+    track gtexCovBrainCerebellarHemisphere
+    shortLabel Brain Cereb Hemisph
+    type bigWig
+    longLabel Brain Cerebellar Hemisphere
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-13X6J-0011-R11a-SM-5P9HE.Brain_Cerebellar_Hemisphere.RNAseq.bw
+    color 238,238,0
+
+    track gtexCovBrainCerebellum
+    shortLabel Brain Cereb
+    type bigWig
+    longLabel Brain Cerebellum
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-145MH-2926-SM-5Q5D2.Brain_Cerebellum.RNAseq.bw
+    color 238,238,0
+
+    track gtexCovBrainCaudatebasalganglia
+    shortLabel Brain Caud bas gangl
+    type bigWig
+    longLabel Brain Caudate basal ganglia
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1HGF4-0011-R5b-SM-CM2ST.Brain_Caudate_basal_ganglia.RNAseq.bw
+    color 238,238,0
+
+    track gtexCovBrainAnteriorcingulatecortexBA24
+    shortLabel Brain Ant cin cort
+    type bigWig
+    longLabel Brain Anterior cingulate cortex BA24
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-14PN4-0011-R3b-SM-686ZU.Brain_Anterior_cingulate_cortex_BA24.RNAseq.bw
+    color 238,238,0
+
+    track gtexCovBrainAmygdala
+    shortLabel Brain Amygd
+    type bigWig
+    longLabel Brain Amygdala
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-T5JC-0011-R4A-SM-32PLT.Brain_Amygdala.RNAseq.bw
+    color 238,238,0
+
+    track gtexCovBladder
+    shortLabel Bladder
+    type bigWig
+    longLabel Bladder
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-S3XE-1226-SM-4AD4L.Bladder.RNAseq.bw
+    color 205,183,158
+
+    track gtexCovArteryTibial
+    shortLabel Artery Tibia
+    type bigWig
+    longLabel Artery Tibial
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-XPT6-2226-SM-4B66R.Artery_Tibial.RNAseq.bw
+    color 255,0,0
+
+    track gtexCovArteryCoronary
+    shortLabel Artery Coron
+    type bigWig
+    longLabel Artery Coronary
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-1GMR3-0626-SM-9WYT3.Artery_Coronary.RNAseq.bw
+    color 238,106,80
+
+    track gtexCovArteryAorta
+    shortLabel Artery Aorta
+    type bigWig
+    longLabel Artery Aorta
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-WYVS-0426-SM-4ONDL.Artery_Aorta.RNAseq.bw
+    color 139,28,98
+
+    track gtexCovAdrenalGland
+    shortLabel Adren Gland
+    type bigWig
+    longLabel Adrenal Gland
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-Y5LM-0126-SM-4VBRL.Adrenal_Gland.RNAseq.bw
+    color 143,188,143
+
+    track gtexCovAdiposeVisceralOmentum
+    shortLabel Adip Visc Om
+    type bigWig
+    longLabel Adipose Visceral Omentum - GTEX-14BMU-0626-SM-73KZ6
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-14BMU-0626-SM-73KZ6.Adipose_Visceral_Omentum.RNAseq.bw
+    color 238,154,0
+
+    track gtexCovAdiposeSubcutaneous
+    shortLabel Adip Subcut
+    type bigWig
+    longLabel Adipose Subcutaneous
+    parent gtexCov
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/cov/GTEX-NFK9-0326-SM-3MJGV.Adipose_Subcutaneous.RNAseq.bw
+    color 255,165,79
+
+track gtexTranscExpr
+shortLabel GTEx Transcript
+type bigBarChart
+longLabel Transcript Expression in 53 tissues from GTEx RNA-seq of 8555 samples/570 donors
+maxItems 300
+barChartColors \#FFA54F #EE9A00 #8FBC8F #8B1C62 #EE6A50 #FF0000 #CDB79E #EEEE00 \#EEEE00 #EEEE00 #EEEE00 #EEEE00 #EEEE00 #EEEE00 #EEEE00 #EEEE00 \#EEEE00 #EEEE00 #EEEE00 #EEEE00 #00CDCD #EE82EE #9AC0CD #EED5D2 \#EED5D2 #CDB79E #EEC591 #8B7355 #8B7355 #CDAA7D #EED5D2 #B452CD \#7A378B #CDB79E #CDB79E #9ACD32 #CDB79E #7A67EE #FFD700 #FFB6C1 \#CD9B1D #B4EEB4 #D9D9D9 #3A5FCD #1E90FF #CDB79E #CDB79E #FFD39B \#A6A6A6 #008B45 #EED5D2 #EED5D2 #FF00FF
+group expression
+labelFields name2, name
+barChartSampleUrl https://hgdownload.soe.ucsc.edu/gbdb/hgFixed/human/expMatrix/cleanGtexSamples.tab
+barChartUnit TPM
+barChartMetric median
+barChartMatrixUrl https://hgdownload.soe.ucsc.edu/gbdb/hgFixed/human/expMatrix/cleanGtexMatrix.tab
+barChartBars Adipose-Subcutaneous Adipose-Visceral_(Omentum) Adrenal_Gland Artery-Aorta Artery-Coronary Artery-Tibial Bladder Brain-Amygdala Brain-Anterior_cingulate_cortex_(BA24) Brain-Caudate_(basal_ganglia) Brain-Cerebellar_Hemisphere Brain-Cerebellum Brain-Cortex Brain-Frontal_Cortex_(BA9) Brain-Hippocampus Brain-Hypothalamus Brain-Nucleus_accumbens_(basal_ganglia) Brain-Putamen_(basal_ganglia) Brain-Spinal_cord_(cervical_c-1) Brain-Substantia_nigra Breast-Mammary_Tissue Cells-EBV-transformed_lymphocytes Cells-Transformed_fibroblasts Cervix-Ectocervix Cervix-Endocervix Colon-Sigmoid Colon-Transverse Esophagus-Gastroesophageal_Junction Esophagus-Mucosa Esophagus-Muscularis Fallopian_Tube Heart-Atrial_Appendage Heart-Left_Ventricle Kidney-Cortex Liver Lung Minor_Salivary_Gland Muscle-Skeletal Nerve-Tibial Ovary Pancreas Pituitary Prostate Skin-Not_Sun_Exposed_(Suprapubic) Skin-Sun_Exposed_(Lower_leg) Small_Intestine-Terminal_Ileum Spleen Stomach Testis Thyroid Uterus Vagina Whole_Blood
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/gtexTranscExpr.bb
+defaultLabelFields name2, name
+barChartLabel Tissue types
+maxLimit 8000
+
+track miRnaAtlas
+compositeContainer TRUE
+shortLabel miRNA Tissue Atlas
+type bigBarChart
+longLabel Tissue-Specific microRNA Expression from Two Individuals
+subGroup1 view View a_A=Sample1 b_B=Sample2
+group expression
+compositeTrack on
+configurable off
+barChartLabel Tissue
+maxLimit 52000
+
+    track miRnaAtlasSample2
+    compositeViewContainer TRUE
+    shortLabel miRNA Tissue Atlas
+    type bigBarChart
+    longLabel Tissue-Specific microRNA Expression from Two Individuals
+    parent miRnaAtlas
+    visibility pack
+    configurable on
+    view b_B
+
+        track miRnaAtlasSample2BarChart
+        shortLabel Sample 2
+        type bigBarChart
+        longLabel miRNA Tissue Atlas microRna Expression
+        parent miRnaAtlasSample2
+        parentParent miRnaAtlas
+        visibility full
+        barChartColors #F7A028 #F73528 #DEBE98 #86BF80 #CDB79E #CDB79E #9ACD32 #7A67AE #9745AC #1E90FF \#CDB79E #FFD39B #A6A6A6 #008B45 #CDB79E #CDB79E #CD9B1D \#CDB79E #CDB79E #CDB79E #AC8F69 #D9D9D9 #BD3487 \#FF00FF #EE82EE #F7E300 #73A585 #B4EEB4 #EEEE00 \#EEEE00 #EEEE00 #EEEE00 #EEEE00 \#EEEE00 #EEEE00 \#EEEE00 #EEEE00
+        group expression
+        html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=miRnaAtlas
+        searchIndex name
+        barChartSampleUrl https://hgdownload.soe.ucsc.edu/gbdb/hgFixed/human/expMatrix/miRnaAtlasSample2.txt
+        barChartUnit Quantile_Norm_Expr
+        url2 https://www.mirbase.org/cgi-bin/query.pl?terms=$$
+        barChartMatrixUrl https://hgdownload.soe.ucsc.edu/gbdb/hgFixed/human/expMatrix/miRnaAtlasSample2Matrix.txt
+        configurable on
+        url2Label miRBase v21 Precursor Accession:
+        barChartBars adipocyte artery colon dura_mater kidney liver lung muscle myocardium skin spleen stomach testis thyroid small_intestine_duodenum small_intestine_jejunum pancreas kidney_glandula_suprarenalis kidney_cortex_renalis kidney_medulla_renalis esophagus prostate bone_marrow vein lymph_node nerve_not_specified pleura brain_pituitary_gland spinal_cord brain_thalamus brain_white_matter brain_nucleus_caudatus brain_gray_matter brain_cerebral_cortex_temporal brain_cerebral_cortex_frontal brain_cerebral_cortex_occipital brain_cerebellum
+        subGroups view=b_B
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/miRnaAtlasSample2.bb
+        barChartLabel Tissue
+        maxLimit 52000
+
+    track miRnaAtlasSample1
+    compositeViewContainer TRUE
+    shortLabel miRNA Tissue Atlas
+    type bigBarChart
+    longLabel Tissue-Specific microRNA Expression from Two Individuals
+    parent miRnaAtlas
+    visibility pack
+    configurable on
+    view a_A
+
+        track miRnaAtlasSample1BarChart
+        shortLabel Sample 1
+        type bigBarChart
+        longLabel miRNA Tissue Atlas microRna Expression
+        parent miRnaAtlasSample1
+        parentParent miRnaAtlas
+        visibility full
+        barChartColors #F7A028 #F73528 #DEBE98 #86BF80 #CDB79E #CDB79E #9ACD32 #7A67AE #9745AC #1E90FF \#CDB79E #FFD39B #A6A6A6 #008B45 #CDB79E #BD34D7 #CDA7FE #4C7CD7 #CBD79E #A6F6A1 \#A6CEA4 #FFD700 #86BF10 #EEEE00
+        group expression
+        html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=miRnaAtlas
+        searchIndex name
+        barChartSampleUrl https://hgdownload.soe.ucsc.edu/gbdb/hgFixed/human/expMatrix/miRnaAtlasSample1.txt
+        barChartUnit Quantile_Normalized_Expression
+        url2 https://www.mirbase.org/cgi-bin/query.pl?terms=$$
+        barChartMatrixUrl https://hgdownload.soe.ucsc.edu/gbdb/hgFixed/human/expMatrix/miRnaAtlasSample1Matrix.txt
+        configurable on
+        url2Label miRBase v21 Precursor Accession:
+        barChartBars adipocyte artery colon dura_mater kidney liver lung muscle myocardium skin spleen stomach testis thyroid small_intestine bone gallbladder fascia bladder epididymis tunica_albuginea nerve_nervus_intercostalis arachnoid_mater brain
+        subGroups view=a_A
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/miRnaAtlasSample1.bb
+        barChartLabel Tissue
+        maxLimit 52000
+
+
+####### Regulation
+
+
+track ReMap
+compositeContainer TRUE
+shortLabel ReMap ChIP-seq
+type bigBed 9 +
+longLabel ReMap Atlas of Regulatory Regions
+visibility hide
+group regulation
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=ReMap
+compositeTrack on
+noScoreFilter on
+noParentConfig on
+
+    track ReMapTFs
+    shortLabel ReMap ChIP-seq
+    type bigBed 9 +
+    longLabel ReMap Atlas of Regulatory Regions
+    parent ReMap on
+    filterText.Biotypes *
+    filterText.TF *
+    maxItems 10000
+    visibility squish
+    html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=ReMap
+    labelFields name, TF, Biotypes
+    maxWindowCoverage 20000
+    filterType.Biotypes multipleListOnlyOr
+    filterLabel.Biotypes Biotypes (cell lines, tissues...)
+    filterValues.Biotypes 12Z,143B,226LDM,22Rv1,402-91,501-mel,697,786-M1A,786-O,81-3,A-137,A139,A-1847,A1A3,A2780,A2780cis,A-375,A-498,A-549,A-673,A-673-clone-Asp114,AB32,AB-LCL,AC16,adipocyte,adrenal-gland,adult-duodenal-cell,AF22,aggregated-lymphoid-nodules,AGS,ALL,ALL-SIL,AMIPS6,AMIPS8,AML,AMLPZ12,anterior-temporal-cortex,aorta,aortic-endothelial-cell,aortic-smooth-muscle-cell,arterial-endothelial-cells,artery,ASC,ascending-aorta,Aska-SS,AsPC-1,astrocyte,BA10,BA40,BC-3,BCBL-1,B-cell,BCP-ALL,BCR-ABL1,BDMC,BE2C,BEAS-2B,BG01V,BG03,BH-LCLs,BICR,BIN-67,BJ,BJ1-hTERT,BJAB,BL41,BLM,blood,BLUE1,bonchial,BPE,BPLER,brain-prefrontal-cortex,breast,breast-cancer,breast-organoid,BT-16,BT-20,BT-474,BT-549,BxPC-3,CA46,Caco-2,CAL-1,Calu-1,Calu-3,cardiac,cardiac-muscle,cardiomyocyte,cartilage,CaSki,CC-LP-1,CCLP1,ccRCC,CCRF-CEM,CD14,CD34,CD34-pos,CD4,CD4-pos,CD8,CFPAC-1,CHL-1,chondrosarcoma,choroid-plexus,CHP-134,CHRF28811,CLB-Ga,CLL,COG-N-415,COLO-205,COLO-320,COLO-741,COLO-800,COLO-829,colon,colorectal-cancer,coronary-artery,cortical-interneuron,CRL-7250,CTV-1,CUTLL1,D283-Med,D341-Med,D54,DAOY,DC,delta-47,dendrite,dermal,dermal-fibroblast,Detroit-562,DKO,DLBCL,DLD-1,DND41,DOHH2,dopaminergic-neuron,DU145,DU528,DUCAP,EDOMIPS2,EM-3,embryonic-kidney,EndoC-betaH2,endoderm,endometrial-epithelial-cells,endometrial-stromal-cell,endometrioid-adenocarcinoma,endometrium,endothelial,EP156T,epididymis,epithelial,erythroblast,erythroid,erythroid-progenitor,ESF,ESO-26,esophagus,esophagus-muscularis-mucosa,esophagus-squamous-epithelium,FaDu,fetal,fibroblast,FLP143HA,FLP76,foregut,foreskin,FT282,G296S,G-401,G523NS,gastric-epithelial-cell,gastrocnemius-medialis,gastroesophageal-sphincter,GBM1A,GEN2-2,GIC,GIST,GIST48,GIST882,GIST-T1,glioblastoma,glioma,GM00011,GM01310,GM04025,GM04604,GM04648,GM06077,GM06170,GM06990,GM08714,GM09236,GM09237,GM10248,GM10266,GM10847,GM12801,GM12864,GM12865,GM12866,GM12867,GM12868,GM12869,GM12870,GM12871,GM12872,GM12873,GM12874,GM12875,GM12878,GM12891,GM12892,GM13976,GM13977,GM15510,GM15850,GM17942,GM18505,GM18526,GM18951,GM19099,GM19193,GM20000,GM23248,GM23338,GP5D,GRANT-A519,GSC,GSC23,GSC8-11,H-1,H69,H9,HaCaT,HAEC,HAP1,HASMC,HBE,HBTEC,HCAEC,HCASMC,HCC1143,HCC1187,HCC1395,HCC1428,HCC1599,HCC1806,HCC1937,HCC1954,HCC2157,HCC2814,HCC70,HCC95,HCCLM3,HCT-116,HCT-15,HDF,heart,HEC-1-A,HEC-1-B,HEE,HEK,HEK293,HEK293-FT,HEK293T,HEL,HeLa,HeLa-B2,HeLa-Kyoto,HeLa-S3,HeLa-Tet-On,HEP,HEP10-01008-LCLs,HEP14-00120-LCLs,HEP14-0079-LCLs,HEP14-0080-LCLs,Hep-3B2-1-7,HepaRG,hepatocellular-carcinoma-cell,hepatocyte,Hep-G2,hESC,hESC-1,HEY-A8,HFF,HFOB,HGrC1,HIES,hiF-T,hippocampus,hiPSC,HKC,HL-60,hMADS,HMEC-1,HMELBRAF,HMLE,HMLER,HMLE-Twist-ER,HMS001,hMSC,hMSC-TERT,hMSC-TERT4,HNPC,HNSC,HPBALL,Hs-352-Sk,HS578T,HSPC,HSPC-CD34,HSPC-CD34pos,HS-SY-2,HT-1080,HT29,hTERT-HME1,HUCCT1,HUDEP-2,HUES-64,HUES-8,HUG1N,Huh-7,HUVEC-C,ID00014,ID00015,ID00016,IM95,IMEC,IMR-5,IMR-90,IMS-M2,induced-endothelial-cell,intestinal-cell,Ishikawa,islet,JD-LCLs,JHU-029,J-Lat,JL-LCLs,JMSU-1,Jurkat,K-562,Karpas-299,Karpas-422,KARPAS422,Karpas-45,Kasumi-1,KATO-III,KB,Kelly,keratinocyte,KerCT,KG-1,KGN,kidney,kidney-cortex,KK-1,KMS-11,KNS-62,KOPN-8,KOPT-K1,KYSE-150,KYSE-70,L1236,L826,LA-N-5,LA-N-6,LAPC-4,LBCL,LCL,LCLGM10861,leiomyoma,leukemia,LHSAR,liver,LK2,LNAR,LNCaP,LNCaP-95,LNCaP-abl,LNCaP-C4-2,LNCaP-C4-2B,LNCaP-clone-FGC,LNCaP-FGC,Loucy,LoVo,LOX-IMVI,LP1,LPS141,LREX,LS174T,LS180,LTAD,Lu-130,lung,LX2,lymphoblast,lymphocyte,macrophage,MALME-3,mammary-epithelial-cell,MCF-10A,MCF10A-Er-Src,MCF-10AT1,MCF-10CA1a,MCF-7,MCF-7L,MCF-7-Luc,MCF-7-Luc-Y537S,MCF-7-TAMR-1,MCF7-Tet-On,MCF-7-WS8,MDA-BoM-1833,MDA-MB-134-VI,MDA-MB-157,MDA-MB-231,MDA-MB-361,MDA-MB-435,MDA-MB-436,MDA-MB-453,MDA-MB-468,MDA-Pca-2b,MDM,ME-1,medulloblastoma,Mel270,melanocyte,mesenchymal,metastatic-neuroblastoma,MG-63-3,MIA-PaCa-2,MKN28,MKN74,ML-2,MM1-S,MNNG-HOS,MO91,MOLM-13,MOLM-14,MOLT-3,MOLT-4,monocyte,MPNST,MRC-5,MSTO,Mutu-1,MUTUL,MV4-11,MV4-11-B,MYCN-3,myoblast,myofibroblast,myometrium,myotube,NALM-6,Namalwa,NB-1643,NB4,NB69,NCCIT,NCI-H1048,NCI-H128,NCI-H1299,NCI-H1703,NCI-H1819,NCI-H1963,NCI-H1975,NCI-H2087,NCI-H2107,NCI-H2171,NCI-H23,NCI-H295R,NCI-H3122,NCI-H3396,NCI-H358,NCI-H441,NCI-H460,NCI-H520,NCI-H524,NCI-H526,NCI-H82,NCI-H838,NCI-H889,NCI-H929,nerve,neural,neural-progenitor,neuroblastoma,neuroepithelilal-cells,neuron,neuron-progenitor,neutrophil,NGP,NHEK,NMC24335,NOMO1,NPC,NSC,NT2-D1,NTERA2,NUT,NY15,OACP4-C,OCI-AML-3,OCI-AML3,OCI-Ly1,OCI-Ly10,OCI-Ly19,OCI-Ly3,OCI-Ly7,ocular-melanoma-cell,OE33,omental-fat-pad,OSK,OSKM,osteoblast,OSvK,OSvKM,ovary,OVCA429,OVCAR-3,OVCAR-5,OVCAR-8,OVSAHO,P12,P493-6,PANC-1,pancreas,pancreatic-progenitor,PATU8988,PAVE,PBMC,PC-3,PC-9,PDAC,PEO1,PER-117,peripheral-blood-mononuclear-cell,peripheral-blood-neutrophil,Peyers-patch,PF-382,Pfeiffer,PFSK1,PK-LCLs,placenta,plasmablast,pleural-effusion,pre-B-cell,PrEC,PRIMA2,PRIMA5,primary-B-cell,primary-breast-cancer,primary-bronchial-epithelial,primary-chondrocyte,primary-dermal-fibroblasts,primary-endometrial-stromal-cell,primary-endometrium-cancer,primary-epidermal-keratinocyte,primary-glioblastoma,primary-keratinocyte,primary-lung-fibroblast,primary-monocyte,primary-neutrophil,primary-prostate-cancer,primary-prostate-epithelial-cell,primordial-germ-cell-like-cell,ProEs,proliferating-human-fibroblast,prostate,prostate-cancer,pulmonary-artery,Raji,Ramos,RCC10,RCC4,RCH-ACV,RD,REC-1,Reh,RENVM,retina,Rh18,RH3,RH30,RH4,Rh41,RH5,rhabdomyosarcoma,RKO,RL,RMG-I,RPE,RPMI8402,RS4-11,RWPE-1,RWPE-2,SaOS-2,SCC,SCC-25,SCC-9,SCCOHT-1,SCLC,SCMC,SEM,SET-2,SF8628,SGBS,SH-EP,SHEP-21N,SHI-1,SH-SY5Y,sigmoid-colon,SiHa,SJSA-1,SK-BR-3,SKH1,skin,SKM-1,SK-MEL-147,SK-MEL-239,SK-MEL-28,SK-MEL-5,SK-N-AS,SK-N-BE2,SK-N-BE2-C,SK-N-MC,SKNO-1,SK-N-SH,SK-UT-1,SLK,SMMC-7721,smooth-muscle-cell,SMS-CTR,SMS-KCN,SMS-KCNR,SNU-216,SNU-398,SP-49,spleen,ST-1,stomach,subcutaneous-adipose-tissue,SU-DHL-10,SU-DHL-2,SU-DHL-4,SU-DHL-5,SU-DHL-6,SUIT-2,SUM1315,SUM149,SUM149PT,SUM159,SUM159PT,SUM185,SUM229PE,SUM44PE,SUP-B15,SVOG-3e,SW1353,SW1783,SW1990,SW480,SW620,SYO-1,T-47D,T-47D-A,T47D-A1-2,T-47D-B,T-47D-MTVL,T778,T98G,TALL-1,TC-32,TC-71,T-cell,TE-5,testis,TF1,Th1,Th17,T-HESCs,thoracic-aorta,THP-1,THP-6,thymocyte,thymus,thyroid-cancer,thyroid-gland,tibial-artery,tibial-nerve,TMD8,tonsil,TOV-21G,T-REx-293,TSU-1621MT,TT,TTC-1240,TTC-549,U266,U266B1,U2932,U2OS,U-87MG,U-937,UACC-257,UACC-62,UAE,UCLA1-hESCs,UCSD-AML1,UM-RC-6,UO-31,UPCI-SCC-090,UTEIPS11,UTEIPS4,UTEIPS6,UTEIPS7,uterus,vagina,VCaP,VCaP-LTAD,VU-SCC-147,WA01,WA09,WERI-Rb-1,WHIM12,WI-38,WI-38VA13,WIBR3,WN8532,WPMY-1,WSU-DLCL2,YCC-3,ZR-75-1,ZR751
+    showCfg on
+    itemRgb on
+    priority 2
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/reMap/reMap2022.bb
+    filterLabel.TF Transcriptional regulators
+    denseCoverage 100
+    filterValues.TF AATF,ADNP,AEBP2,AFF1,AFF4,AGO1,AHR,AHRR,APC,AR,ARHGAP35,ARID1A,ARID1B,ARID2,ARID3A,ARID3B,ARID4A,ARID4B,ARID5B,ARNT,ARNTL,ARRB1,ASCL1,ASH1L,ASH2L,ASXL1,ASXL3,ATF1,ATF2,ATF3,ATF4,ATF7,ATM,ATOH8,ATRX,ATXN7L3,BACH1,BACH2,BAF155,BAHD1,BAP1,BATF,BATF3,BCL11A,BCL11B,BCL3,BCL6,BCL6B,BCLAF1,BCOR,BDP1,BHLHE22,BHLHE40,BICRA,BMI1,BMPR1A,BNC2,BPTF,BRCA1,BRD1,BRD2,BRD3,BRD4,BRD7,BRD9,BRF1,BRF2,C17orf49,CARM1,CASZ1,CBFA2T2,CBFA2T3,CBFB,CBX1,CBX2,CBX3,CBX4,CBX5,CBX7,CBX8,CC2D1A,CCAR2,CCNT2,CD74,CDC5L,CDK2,CDK6,CDK7,CDK8,CDK9,CDK9-HEXIM1,CDKN1B,CDX2,CEBPA,CEBPB,CEBPD,CEBPG,CEBPZ,CERS6,CHAF1B,CHAMP1,CHD1,CHD2,CHD4,CHD7,CHD8,CIITA,CLOCK,COBLL1,CREB1,CREB3,CREB3L1,CREB5,CREBBP,CREM,CRX,CRY1,CRY2,CSDC2,CSNK2A1,CTBP1,CTBP2,CTCF,CTCFL,CTNNB1,CUX1,CXXC4,CXXC5,DACH1,DAXX,DDX20,DDX21,DDX5,DEAF1,DEK,DIDO1,DLX4,DLX6,DMAP1,DNMT1,DNMT3B,DPF1,DPF2,DR1,DRAP1,DUX4,E2F1,E2F3,E2F4,E2F5,E2F6,E2F7,E2F8,E4F1,EBF1,EBF3,EED,EGR1,EHF,EHMT2,ELF1,ELF2,ELF3,ELF4,ELF5,ELK1,ELK4,ELL,ELL2,EOMES,EP300,EP400,EPAS1,ERF,ERG,ESR1,ESR2,ESRRA,ESRRB,ESRRG,ETS1,ETS2,ETV1,ETV2,ETV4,ETV6,EVI1,EWSR1,EZH1,EZH2,FANCD2,FANCL,FEZF1,FIP1L1,FLI1,FOS,FOSB,FOSL1,FOSL2,FOXA1,FOXA2,FOXF1,FOXF2,FOXJ2,FOXJ3,FOXK1,FOXK2,FOXL2,FOXM1,FOXO1,FOXO1-PAX3,FOXO3,FOXP1,FOXP2,FOXP4,FOXS1,FUS,GABPA,GABPB1,GATA1,GATA2,GATA3,GATA4,GATA6,GATAD1,GATAD2A,GATAD2B,GFI1,GFI1B,GLI1,GLI2,GLI4,GLIS1,GLIS2,GLIS3,GLYR1,GMEB1,GMEB2,GPS2,GR,GRHL1,GRHL2,GSPT2,GTF2A2,GTF2B,GTF2F1,GTF3A,GTF3C2,GTF3C5,HAND2,HBP1,HCFC1,HCFC1R1,HDAC1,HDAC2,HDAC3,HDAC6,HDAC8,HDGF,HES1,HEXIM1,HEXIM1-CDK9,HEY1,HEY2,HHEX,HIC1,HIF1A,HIF3A,HINFP,HIVEP1,HKR1,HLF,HMBOX1,HMGA1,HMGB1,HMGB2,HMGN3,HMGXB4,HNF1A,HNF1B,HNF4A,HNF4G,HNRNPC,HNRNPH1,HNRNPK,HNRNPL,HNRNPLL,HNRNPUL1,HOMEZ,HOXA3,HOXA7,HOXA9,HOXB13,HOXB5,HOXB7,HOXB8,HOXC5,HOXC6,HSF1,HSF2,ICE1,ICE2,ID3,IFNA1,IKZF1,IKZF2,IKZF3,ILF3,ILK,INO80,INSM2,INTS11,INTS13,IRF1,IRF2,IRF2BP2,IRF3,IRF4,IRF5,IRF8,IRF9,ISL1,ISL2,JARID2,JDP2,JMJD1C,JMJD6,JUN,JUNB,JUND,KAT2A,KAT2B,KAT7,KAT8,KDM1A,KDM3A,KDM4A,KDM4B,KDM4C,KDM5A,KDM5B,KDM6B,KLF1,KLF10,KLF12,KLF13,KLF14,KLF15,KLF16,KLF17,KLF3,KLF4,KLF5,KLF6,KLF7,KLF8,KLF9,KMT2A,KMT2B,KMT2C,KMT2D,L3MBTL2,L3MBTL4,LCORL,LDB1,LEF1,LHX2,LIN54,LIN9,LMO1,LMO2,LYL1,MAF,MAF1,MAFB,MAFF,MAFG,MAFK,MAML1,MAML3,MAX,MAZ,MBD1,MBD2,MBD3,MBD4,MCM2,MCM3,MCM5,MCM7,MCRS1,MECOM,MECP2,MED,MED1,MED12,MED25,MED26,MEF2A,MEF2B,MEF2C,MEF2D,MEIS1,MEIS2,MEN1,MGA,MIER1,MITF,MLL4,MLLT1,MLLT3,MLX,MLXIP,MNT,MNX1,MORC2,MPHOSPH8,MRTFA,MRTFB,MSX2,MTA1,MTA2,MTA3,MTF2,MXD4,MXI1,MYB,MYBL2,MYC,MYC-DAXX,MYCN,MYF5,MYNN,MYOCD,MYOD1,MYOG,MZF1,NAB2,NANOG,NBN,NCAPH2,NCBP1,NCOA1,NCOA2,NCOA3,NCOA4,NCOA6,NCOR1,NCOR2,NELFA,NELFCD,NELFE,NEUROD1,NEUROG2,NFAT5,NFATC1,NFATC2,NFATC3,NFE2,NFE2L1,NFE2L2,NFIA,NFIB,NFIC,NFIL3,NFIX,NFKB1,NFKB2,NFKBIA,NFKBIZ,NFRKB,NFXL1,NFYA,NFYB,NFYC,NIPBL,NKX2-1,NKX2-5,NKX3-1,NME2,NONO,NOTCH1,NOTCH3,NR0B1,NR1H2,NR1H3,NR2C1,NR2C2,NR2F1,NR2F2,NR2F6,NR3C1,NR4A1,NR5A1,NR5A2,NRF1,NRIP1,NRL,NSD2,NUFIP1,NUP98-HOXA9,NUTM1,OGG1,OGT,OLIG2,ONECUT1,ONECUT2,OSR2,OTX2,OVOL1,OVOL3,PAF1,PALB2,PARP1,PATZ1,PAX3-FOXO1,PAX5,PAX6,PAX7,PAX8,PAXIP1,PBX1,PBX1-2-3,PBX2,PBX3,PCBP1,PCBP2,PCGF1,PCGF2,PDX1,PGR,PHB2,PHC1,PHF19,PHF20,PHF21A,PHF5A,PHF8,PHIP,PHOX2B,PITX3,PKNOX1,PLAG1,PLRG1,PML,POU2AF1,POU2F1,POU2F2,POU2F3,POU3F1,POU3F2,POU4F2,POU5F1,PPARA,PPARG,PPARGC1A,PRDM1,PRDM10,PRDM12,PRDM14,PRDM15,PRDM2,PRDM4,PRDM6,PREB,PRKDC,PRMT5,PROX1,PRPF4,PSIP1,PTBP1,PTRF,PTTG1,PYGO2,RAD21,RAD51,RARA,RB1,RBAK,RBBP4,RBBP5,RBFOX2,RBM14,RBM15,RBM22,RBM25,RBM34,RBM39,RBP2,RBPJ,RCOR1,REL,RELA,RELB,REPIN1,REST,RFX1,RFX2,RFX3,RFX5,RFXAP,RING1,RLF,RNF2,RORB,RORC,RPA2,RREB1,RUNX1,RUNX1-3,RUNX1-RUNX1T1,RUNX1T1,RUNX2,RUVBL1,RUVBL2,RXR,RXRA,RYBP,SAFB,SAFB2,SALL1,SALL2,SALL3,SALL4,SAP30,SATB1,SCRT1,SETDB1,SETX,SFMBT1,SFPQ,SGF29,SHOX2,SIN3A,SIN3B,SIRT3,SIRT6,SIX1,SIX2,SIX4,SIX5,SKI,SKIL,SMAD1,SMAD1-5,SMAD1-5-8,SMAD2,SMAD2-3,SMAD3,SMAD3-EPAS1,SMAD3-HIF1A,SMAD4,SMAD5,SMARCA2,SMARCA4,SMARCA5,SMARCB1,SMARCC1,SMARCC2,SMARCD3,SMARCE1,SMC1,SMC1A,SMC1A-B,SMC3,SMC4,SNAI1,SNAI2,SNAPC1,SNAPC4,SND1,SNIP1,SNRNP70,SOX10,SOX11,SOX13,SOX2,SOX21,SOX3,SOX4,SOX6,SOX8,SOX9,SP1,SP140L,SP2,SP3,SP4,SP5,SP7,SPDEF,SPI1,SPIB,SPIN1,SRC,SREBF1,SREBF2,SREBP2,SRF,SRSF1,SRSF3,SRSF4,SRSF7,SRSF9,SS18,SS18-SSX,SSRP1,STAG1,STAG2,STAT1,STAT2,STAT3,STAT5A,STAT5B,SUPT16H,SUPT5H,SUPT6H,SUZ12,SVIL,T,TAF1,TAF15,TAF2,TAF3,TAF7,TAF9B,TAL1,TARDBP,TASOR,TBL1X,TBL1XR1,TBP,TBX18,TBX2,TBX21,TBX3,TBX5,TCF12,TCF21,TCF25,TCF3,TCF3-PBX1,TCF4,TCF7,TCF7L2,TCFL5,TCOF1,TEAD1,TEAD2,TEAD4,TERF1,TERF2,TERT,TET2,TFAP2A,TFAP2C,TFAP4,TFCP2,TFDP1,TFDP2,TFE3,TFEB,TFIIIC,TGIF2,THAP1,THAP11,THRA,THRAP3,THRB,TLE3,TOP1,TOP2A,TOX2,TP53,TP63,TP73,TRIM22,TRIM24,TRIM25,TRIM28,TRIP13,TRPS1,TRRAP,TSC22D4,TSHZ1,TSHZ2,TWIST1,U2AF1,U2AF2,UBN1,UBTF,USF1,USF2,USP7,UTX,VDR,VEZF1,WDHD1,WDR5,WRNIP1,WT1,XBP1,XRCC3,XRCC5,XRN2,YAP1,YBX1,YBX3,YY1,YY1AP1,YY2,ZBED1,ZBED2,ZBED4,ZBTB1,ZBTB10,ZBTB11,ZBTB12,ZBTB14,ZBTB16,ZBTB18,ZBTB2,ZBTB20,ZBTB21,ZBTB24,ZBTB26,ZBTB33,ZBTB40,ZBTB42,ZBTB44,ZBTB48,ZBTB49,ZBTB5,ZBTB6,ZBTB7A,ZBTB7B,ZBTB8A,ZC3H11A,ZC3H8,ZEB1,ZEB2,ZFP14,ZFP28,ZFP3,ZFP36,ZFP37,ZFP41,ZFP42,ZFP57,ZFP64,ZFP69,ZFP69B,ZFP82,ZFP90,ZFP91,ZFX,ZFY,ZGPAT,ZHX1,ZHX2,ZIC2,ZIC5,ZIK1,ZIM3,ZKSCAN1,ZKSCAN2,ZKSCAN3,ZKSCAN5,ZKSCAN8,ZMIZ1,ZMYM2,ZMYM3,ZMYND11,ZMYND8,ZNF10,ZNF101,ZNF112,ZNF114,ZNF12,ZNF121,ZNF124,ZNF132,ZNF133,ZNF134,ZNF135,ZNF136,ZNF138,ZNF140,ZNF141,ZNF142,ZNF143,ZNF146,ZNF148,ZNF154,ZNF155,ZNF157,ZNF16,ZNF165,ZNF169,ZNF17,ZNF174,ZNF175,ZNF18,ZNF180,ZNF182,ZNF184,ZNF189,ZNF19,ZNF195,ZNF197,ZNF2,ZNF202,ZNF205,ZNF207,ZNF211,ZNF212,ZNF213,ZNF214,ZNF215,ZNF217,ZNF22,ZNF221,ZNF222,ZNF223,ZNF224,ZNF225,ZNF23,ZNF232,ZNF239,ZNF24,ZNF248,ZNF25,ZNF250,ZNF253,ZNF256,ZNF257,ZNF26,ZNF260,ZNF263,ZNF264,ZNF266,ZNF267,ZNF273,ZNF274,ZNF276,ZNF28,ZNF280A,ZNF280C,ZNF280D,ZNF281,ZNF282,ZNF283,ZNF284,ZNF285,ZNF287,ZNF292,ZNF3,ZNF30,ZNF300,ZNF302,ZNF304,ZNF311,ZNF316,ZNF317,ZNF318,ZNF319,ZNF320,ZNF322,ZNF324,ZNF329,ZNF331,ZNF333,ZNF335,ZNF337,ZNF33A,ZNF33B,ZNF34,ZNF341,ZNF343,ZNF35,ZNF350,ZNF354A,ZNF354B,ZNF354C,ZNF362,ZNF366,ZNF37A,ZNF383,ZNF384,ZNF391,ZNF394,ZNF395,ZNF397,ZNF398,ZNF404,ZNF407,ZNF408,ZNF41,ZNF410,ZNF416,ZNF417,ZNF418,ZNF423,ZNF425,ZNF426,ZNF429,ZNF430,ZNF431,ZNF432,ZNF433,ZNF436,ZNF44,ZNF440,ZNF441,ZNF444,ZNF445,ZNF449,ZNF454,ZNF460,ZNF462,ZNF467,ZNF468,ZNF473,ZNF479,ZNF48,ZNF480,ZNF483,ZNF484,ZNF485,ZNF487,ZNF488,ZNF490,ZNF491,ZNF492,ZNF493,ZNF496,ZNF501,ZNF502,ZNF503,ZNF506,ZNF507,ZNF510,ZNF512,ZNF512B,ZNF513,ZNF514,ZNF518A,ZNF519,ZNF521,ZNF524,ZNF527,ZNF528,ZNF529,ZNF530,ZNF532,ZNF534,ZNF540,ZNF543,ZNF544,ZNF547,ZNF548,ZNF549,ZNF550,ZNF554,ZNF555,ZNF557,ZNF558,ZNF560,ZNF561,ZNF563,ZNF565,ZNF566,ZNF567,ZNF57,ZNF570,ZNF571,ZNF572,ZNF573,ZNF574,ZNF577,ZNF579,ZNF580,ZNF582,ZNF583,ZNF584,ZNF585A,ZNF585B,ZNF586,ZNF587,ZNF589,ZNF592,ZNF595,ZNF596,ZNF597,ZNF598,ZNF605,ZNF609,ZNF610,ZNF611,ZNF613,ZNF614,ZNF616,ZNF621,ZNF622,ZNF623,ZNF624,ZNF626,ZNF627,ZNF629,ZNF639,ZNF641,ZNF644,ZNF645,ZNF649,ZNF652,ZNF654,ZNF658,ZNF660,ZNF662,ZNF664,ZNF667,ZNF669,ZNF670,ZNF671,ZNF674,ZNF675,ZNF677,ZNF680,ZNF681,ZNF684,ZNF687,ZNF692,ZNF695,ZNF696,ZNF697,ZNF7,ZNF700,ZNF701,ZNF704,ZNF707,ZNF708,ZNF711,ZNF714,ZNF716,ZNF730,ZNF736,ZNF737,ZNF740,ZNF747,ZNF749,ZNF750,ZNF75A,ZNF76,ZNF764,ZNF765,ZNF766,ZNF768,ZNF77,ZNF770,ZNF774,ZNF776,ZNF777,ZNF778,ZNF780A,ZNF781,ZNF783,ZNF784,ZNF785,ZNF786,ZNF789,ZNF79,ZNF791,ZNF792,ZNF799,ZNF8,ZNF800,ZNF808,ZNF81,ZNF816,ZNF823,ZNF83,ZNF830,ZNF837,ZNF84,ZNF843,ZNF846,ZNF85,ZNF860,ZNF879,ZNF880,ZNF883,ZNF891,ZNF90,ZNF92,ZNF93,ZSCAN16,ZSCAN18,ZSCAN2,ZSCAN21,ZSCAN22,ZSCAN23,ZSCAN26,ZSCAN29,ZSCAN30,ZSCAN31,ZSCAN4,ZSCAN5A,ZSCAN5C,ZXDB,ZXDC,ZZZ3
+    filterType.TF multipleListOnlyOr
+    urls TF="https://remap.univ-amu.fr/target_page/$$:9606" Biotypes="https://remap.univ-amu.fr/biotype_page/$$:9606"
+
+    track ReMapDensity
+    shortLabel ReMap density
+    type bigWig
+    longLabel ReMap density
+    parent ReMap on
+    visibility hide
+    html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=ReMap
+    priority 1
+    graphType heatmap
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/reMap/reMapDensity2022.bw
+    autoScale on
+
+track TFrPeakClusters
+shortLabel TF rPeak Clusters
+type bigBed 12 +
+longLabel Transcription Factor Representative Peak (rPeak) Clusters (912 factors in 1152 biosamples) from ENCODE 4
+parent wgEncodeReg
+filterValues.factor ADNP,AFF1,AFF4,AGO1,AGO2,AHDC1,AHR,AKAP8,AKNA,ARHGAP35,ARID1B,ARID2,ARID3A,ARID4A,ARID4B,ARID5B,ARNTL,ARNT,AR,ASH1L,ASH2L,ATF1,ATF2,ATF3,ATF4,ATF5,ATF6,ATF7,ATOH8,BACH1,BATF,BCL11A,BCL11B,BCL3,BCL6B,BCL6,BCLAF1,BCOR,BDP1,BHLHE40,BMI1,BNC2,BRCA1,BRCA2,BRD4,BRD9,C11orf30,CAMTA2,CBFA2T2,CBFA2T3,CBFB,CBX1,CBX2,CBX3,CBX5,CBX8,CC2D1A,CCAR2,CCNT2,CDC5L,CEBPA,CEBPB,CEBPD,CEBPG,CEBPZ,CERS6,CGGBP1,CHAMP1,CHD1,CHD2,CHD4,CHD7,CLOCK,CREB1,CREB3L1,CREB3,CREB5,CREM,CSDC2,CSDE1,CSRNP3,CTBP1,CTBP2,CTCFL,CTCF,CUX1,DACH1,DBP,DDIT3,DDX20,DEAF1,DEK,DIDO1,DLX6,DMAP1,DMTF1,DNMT1,DNMT3B,DPF2,DR1,DRAP1,DZIP1,E2F1,E2F2,E2F3,E2F4,E2F5,E2F6,E2F7,E2F8,E4F1,EBF1,EEA1,EED,EGR1,EGR2,EHF,EHMT2,ELF1,ELF2,ELF3,ELF4,ELK1,ELK4,EMX1,EP300,EP400,ERF,ERG,ESR1,ESRRA,ESRRG,ETS1,ETV1,ETV4,ETV5,ETV6,EZH2phosphoT487,EZH2,FEZF1,FIP1L1,FOSB,FOSL1,FOSL2,FOS,FOXA1,FOXA2,FOXA3,FOXC1,FOXF2,FOXJ2,FOXJ3,FOXK1,FOXK2,FOXM1,FOXO1,FOXO4,FOXP1,FOXP2,FOXP4,FOXS1,FUBP1,FUBP3,FUS,GABPA,GABPB1,GATA1,GATA2,GATA3,GATA4,GATAD1,GATAD2A,GATAD2B,GFI1B,GFI1,GLI2,GLI4,GLIS1,GLIS2,GLIS3,GLYR1,GMEB1,GMEB2,GPN1,GTF2A2,GTF2B,GTF2E2,GTF2F1,GTF2I,GTF3A,GTF3C2,GZF1,HBP1,HCFC1,HDAC1,HDAC2,HDAC3,HDAC6,HDAC8,HDGF,HES1,HES2,HES4,HEYL,HHEX,HIC1,HIC2,HINFP,HIVEP1,HLF,HLTF,HMBOX1,HMG20A,HMG20B,HMGA2,HMGN3,HMGXB3,HMGXB4,HNF1A,HNF1B,HNF4A,HNF4G,HNRNPH1,HNRNPK,HNRNPLL,HNRNPL,HNRNPUL1,HOMEZ,HOXA3,HOXA5,HOXA7,HOXB13,HOXB5,HOXD1,HSF1,HSF2,HSF4,ID3,IKZF1,IKZF2,IKZF3,IKZF4,IKZF5,ILF3,INSM2,IRF1,IRF2,IRF3,IRF4,IRF5,IRF9,ISL1,ISL2,ISX,JRK,JUNB,JUND,JUN,KAT2B,KAT7,KAT8,KDM1A,KDM2A,KDM2B,KDM3A,KDM4A,KDM4B,KDM5A,KDM5B,KDM6A,KHSRP,KIAA2018,KLF10,KLF11,KLF12,KLF13,KLF16,KLF17,KLF1,KLF4,KLF5,KLF6,KLF7,KLF8,KLF9,KMT2A,KMT2B,L3MBTL2,LARP7,LBX2,LCORL,LCOR,LEF1,LIN54,MAF1,MAFF,MAFG,MAFK,MAX,MAZ,MBD1,MBD2,MBD4,MED13,MED1,MEF2A,MEF2B,MEF2C,MEF2D,MEIS1,MEIS2,MGA,MIER1,MIER2,MIER3,MITF,MIXL1,MLLT1,MLXIP,MLX,MNT,MNX1,MSX2,MTA1,MTA2,MTA3,MTF1,MTF2,MXD1,MXD3,MXD4,MXI1,MYBL2,MYB,MYC,MYNN,MYRF,MZF1,NAIF1,NANOG,NBN,NCOA1,NCOA2,NCOA3,NCOA6,NCOR1,NEUROD1,NFAT5,NFATC1,NFATC3,NFATC4,NFE2L1,NFE2L2,NFE2,NFIA,NFIB,NFIC,NFIL3,NFIX,NFKB2,NFKBIZ,NFRKB,NFXL1,NFYA,NFYB,NFYC,NKRF,NKX3-1,NONO,NR0B2,NR1H2,NR2C1,NR2C2,NR2E3,NR2F1,NR2F2,NR2F6,NR3C1,NR4A1,NR5A1,NR5A2,NRF1,NRL,NUFIP1,ONECUT1,ONECUT2,OSR2,OTX2,OVOL1,OVOL3,PAF1,PATZ1,PAWR,PAX5,PAX8,PAXIP1,PBX1,PBX2,PBX3,PCBP1,PCBP2,PHB2,PHB,PHF20,PHF21A,PHF5A,PHF8,PITX1,PKNOX1,PLSCR1,PML,POGZ,POLR2AphosphoS2,POLR2AphosphoS5,POLR2A,POLR2B,POLR2G,POLR2H,POLR3A,POU2F2,POU5F1,POU6F1,PPARG,PRDM10,PRDM15,PRDM1,PRDM4,PRDM6,PRPF4,PRRX2,PTBP1,PTRF,PTTG1,PYGO2,RAD21,RAD51,RARA,RARB,RARG,RB1,RBAK,RBBP5,RBFOX2,RBM14,RBM22,RBM25,RBM39,RBPJ,RCOR1,RCOR2,RELA,RELB,REPIN1,RERE,REST,RFX1,RFX3,RFX5,RFXANK,RFXAP,RLF,RNF219,RNF2,RORA,RREB1,RUNX1,RUNX3,RXRA,RXRB,SAFB2,SAFB,SAP130,SAP30,SATB2,SCRT1,SCRT2,SETDB1,SFPQ,SHOX2,SIN3A,SIN3B,SIRT6,SIX1,SIX4,SIX5,SKIL,SKI,SMAD1,SMAD3,SMAD4,SMAD5,SMAD9,SMARCA4,SMARCA5,SMARCB1,SMARCC1,SMARCC2,SMARCE1,SMC3,SNAI1,SNAI2,SNAPC4,SNIP1,SOX13,SOX18,SOX5,SOX6,SP110,SP140L,SP1,SP2,SP3,SP4,SP5,SP7,SPDEF,SPEN,SPI1,SREBF1,SREBF2,SRF,SRSF1,SRSF3,SRSF4,SSRP1,STAG1,STAT1,STAT3,STAT5A,STAT5B,STAT6,SUPT5H,SUZ12,TAF15,TAF1,TAF7,TAF9B,TAL1,TARDBP,TBL1XR1,TBPL1,TBP,TBX18,TBX21,TBX2,TBX3,TCF12,TCF15,TCF3,TCF4,TCF7L2,TCF7,TEAD1,TEAD2,TEAD3,TEAD4,TEF,TFAP4,TFCP2L1,TFCP2,TFDP1,TFDP2,TFE3,TGIF2,THAP11,THAP12,THAP1,THAP7,THAP8,THAP9,THRAP3,THRA,THRB,TIGD3,TIGD6,TOE1,TOX2,TOX,TP53,TP63,TRAFD1,TRIM22,TRIM24,TRIM25,TRIM28,TSC22D2,TSHZ1,TSHZ2,U2AF1,U2AF2,UBTF,USF1,USF2,VEZF1,WIZ,WRNIP1,WT1,XBP1,XRCC5,YBX1,YEATS2,YEATS4,YY1,YY2,ZBED1,ZBED4,ZBED5,ZBTB10,ZBTB11,ZBTB12,ZBTB14,ZBTB17,ZBTB1,ZBTB20,ZBTB21,ZBTB24,ZBTB25,ZBTB26,ZBTB2,ZBTB33,ZBTB37,ZBTB38,ZBTB39,ZBTB3,ZBTB40,ZBTB42,ZBTB43,ZBTB44,ZBTB46,ZBTB48,ZBTB49,ZBTB4,ZBTB5,ZBTB6,ZBTB7A,ZBTB7B,ZBTB8A,ZBTB9,ZC3H10,ZC3H11A,ZC3H4,ZC3H8,ZCCHC11,ZEB1,ZEB2,ZFHX2,ZFP14,ZFP1,ZFP36L2,ZFP36,ZFP37,ZFP3,ZFP41,ZFP64,ZFP69B,ZFP82,ZFP91,ZFX,ZFY,ZGPAT,ZHX1,ZHX2,ZHX3,ZIC2,ZIK1,ZKSCAN1,ZKSCAN5,ZKSCAN8,ZMAT3,ZMIZ1,ZMYM2,ZMYM3,ZNF101,ZNF10,ZNF121,ZNF124,ZNF12,ZNF133,ZNF134,ZNF138,ZNF140,ZNF142,ZNF143,ZNF146,ZNF148,ZNF157,ZNF165,ZNF16,ZNF175,ZNF17,ZNF180,ZNF184,ZNF189,ZNF18,ZNF197,ZNF202,ZNF205,ZNF207,ZNF20,ZNF215,ZNF217,ZNF219,ZNF221,ZNF223,ZNF224,ZNF225,ZNF230,ZNF232,ZNF234,ZNF239,ZNF24,ZNF251,ZNF256,ZNF257,ZNF25,ZNF263,ZNF264,ZNF266,ZNF26,ZNF274,ZNF276,ZNF280A,ZNF280B,ZNF280D,ZNF281,ZNF282,ZNF296,ZNF2,ZNF30,ZNF311,ZNF316,ZNF317,ZNF318,ZNF319,ZNF324,ZNF329,ZNF331,ZNF333,ZNF335,ZNF337,ZNF33A,ZNF33B,ZNF341,ZNF343,ZNF34,ZNF350,ZNF354B,ZNF354C,ZNF362,ZNF366,ZNF367,ZNF383,ZNF384,ZNF391,ZNF394,ZNF395,ZNF397,ZNF398,ZNF3,ZNF407,ZNF414,ZNF416,ZNF41,ZNF423,ZNF426,ZNF430,ZNF431,ZNF433,ZNF441,ZNF444,ZNF445,ZNF446,ZNF449,ZNF44,ZNF451,ZNF460,ZNF462,ZNF483,ZNF484,ZNF485,ZNF488,ZNF48,ZNF490,ZNF501,ZNF503,ZNF507,ZNF510,ZNF511,ZNF512B,ZNF512,ZNF513,ZNF518A,ZNF526,ZNF529,ZNF530,ZNF532,ZNF543,ZNF547,ZNF548,ZNF549,ZNF550,ZNF552,ZNF555,ZNF556,ZNF557,ZNF558,ZNF561,ZNF569,ZNF570,ZNF572,ZNF574,ZNF576,ZNF579,ZNF580,ZNF583,ZNF584,ZNF585B,ZNF589,ZNF592,ZNF596,ZNF598,ZNF600,ZNF605,ZNF607,ZNF608,ZNF609,ZNF610,ZNF614,ZNF615,ZNF616,ZNF619,ZNF623,ZNF624,ZNF629,ZNF639,ZNF644,ZNF646,ZNF652,ZNF654,ZNF660,ZNF664,ZNF671,ZNF674,ZNF677,ZNF678,ZNF680,ZNF687,ZNF691,ZNF692,ZNF697,ZNF700,ZNF703,ZNF707,ZNF709,ZNF70,ZNF710,ZNF713,ZNF737,ZNF740,ZNF75A,ZNF761,ZNF764,ZNF766,ZNF768,ZNF76,ZNF770,ZNF772,ZNF773,ZNF775,ZNF776,ZNF777,ZNF778,ZNF781,ZNF782,ZNF784,ZNF785,ZNF786,ZNF788,ZNF791,ZNF792,ZNF79,ZNF7,ZNF800,ZNF816,ZNF830,ZNF839,ZNF83,ZNF843,ZNF84,ZNF850,ZNF865,ZNF883,ZNF891,ZNF8,ZSCAN12,ZSCAN16,ZSCAN18,ZSCAN20,ZSCAN21,ZSCAN22,ZSCAN23,ZSCAN29,ZSCAN30,ZSCAN31,ZSCAN32,ZSCAN4,ZSCAN5A,ZSCAN5C,ZSCAN9,ZXDB,ZXDC,ZZZ3
+visibility hide
+group regulation
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=TFrPeakClusters
+labelFields factor
+scoreMin 1
+spectrum on
+itemRgb on
+priority 1
+filterType.factor multipleListOr
+canPack On
+superTrack on show
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/ENCODE4/TFrPeakClusters.bb
+detailsDynamicTable json_table|experiments support this rPeak
+scoreMax 1000
+mouseOverField factor
+decorator.default.bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/ENCODE4/TFrPeakClustersDecorator.bb
+urls exp="https://www.encodeproject.org/experiments/$$/" cCRE="https://screen.wenglab.org/search/?q=$$&assembly=GRCh38" factor="https://www.factorbook.org/tf/human/$$/function"
+
+track encodeCcreCombined
+shortLabel ENCODE cCREs
+type bigBed 9 +
+longLabel ENCODE Candidate Cis-Regulatory Elements (cCREs) combined from all cell types
+skipFields encodeLabel,ucscLabel,accessionLabel,description
+visibility dense
+group regulation
+labelFields accessionLabel,ucscLabel,encodeLabel
+filterValues.ucscLabel prom|promoter-like signature (PLS/prom),enhP|proximal enhancer-like signature (pELS/enhP),enhD|distal enhancer-like signature (dELS/enhD),CTCF|CTCF only (CTCF/CTCF-only),K4m3|DNase-H3K4me3 (DNase-H3K4me3/k4m3)
+bedNameLabel ENCODE Accession
+itemRgb On
+priority 1
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/encode3/ccre/encodeCcreCombined.bb
+darkerLabels on
+filterLabel.ucscLabel cCRE classification
+urlLabel cCRE details at ENCODE SCREEN:
+defaultLabelFields accessionLabel,ucscLabel
+url https://screen-v2.wenglab.org/search/?q=$$&assembly=GRCh38
+mouseOverField description
+
+track gtexEqtlHighConf
+compositeContainer TRUE
+shortLabel GTEx cis-eQTLs
+type bigBed
+longLabel GTEx fine-mapped cis-eQTLs
+visibility hide
+group regulation
+compositeTrack off
+itemRgb on
+
+    track gtexEqtlDapg
+    shortLabel GTEx DAP-G eQTLs
+    type bigBed 12 +
+    longLabel GTEx High-Confidence cis-eQTLs from DAP-G (no chrX)
+    parent gtexEqtlHighConf off
+    mouseOver $name; SNP PIP: $pip; Cluster PIP: $clusterPip
+    maxItems 100000
+    filterLabel.clusterPip SNP Cluster PIP (Posterior Inclusion Probability)
+    visibility pack
+    filterLabel.pip SNP PIP (Posterior Inclusion Probability)
+    filterLabel.tissue Tissue
+    filterText.geneName *
+    filterValues.tissue Adipose_Subcutaneous,Adipose_Visceral_Omentum,Adrenal_Gland,Artery_Aorta,Artery_Coronary,Artery_Tibial,Brain_Amygdala,Brain_Anterior_cingulate_cortex_BA24,Brain_Caudate_basal_ganglia,Brain_Cerebellar_Hemisphere,Brain_Cerebellum,Brain_Cortex,Brain_Frontal_Cortex_BA9,Brain_Hippocampus,Brain_Hypothalamus,Brain_Nucleus_accumbens_basal_ganglia,Brain_Putamen_basal_ganglia,Brain_Spinal_cord_cervical_c-1,Brain_Substantia_nigra,Breast_Mammary_Tissue,Cells_Cultured_fibroblasts,Cells_EBV-transformed_lymphocytes,Colon_Sigmoid,Colon_Transverse,Esophagus_Gastroesophageal_Junction,Esophagus_Mucosa,Esophagus_Muscularis,Heart_Atrial_Appendage,Heart_Left_Ventricle,Kidney_Cortex,Liver,Lung,Minor_Salivary_Gland,Muscle_Skeletal,Nerve_Tibial,Ovary,Pancreas,Pituitary,Prostate,Skin_Not_Sun_Exposed_Suprapubic,Skin_Sun_Exposed_Lower_leg,Small_Intestine_Terminal_Ileum,Spleen,Stomach,Testis,Thyroid,Uterus,Vagina,Whole_Blood
+    showCfg on
+    itemRgb on
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/eQtl/gtexDapg.bb
+    filterLabel.geneName Gene Symbol
+    filter.clusterPip 0
+    filter.pip 0
+    mergeSpannedItems on
+    urls eqtlName="https://gtexportal.org/home/snp/$$" geneName="https://gtexportal.org/home/locusBrowserPage/$$" eqtlPos="hgTracks?db=$D&position=$$" genePos="hgTracks?db=$D&position=$$" geneId="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=$$"
+
+    track gtexEqtlCaviar
+    shortLabel GTEx CAVIAR eQTLs
+    type bigBed 12 +
+    longLabel GTEx High-Confidence cis-eQTLs from CAVIAR (no chrX)
+    parent gtexEqtlHighConf
+    mouseOver $name; CPP: $cpp
+    maxItems 100000
+    filter.cpp 0
+    visibility pack
+    filterLabel.tissue Tissue
+    filterText.geneName *
+    filterValues.tissue Adipose_Subcutaneous,Adipose_Visceral_Omentum,Adrenal_Gland,Artery_Aorta,Artery_Coronary,Artery_Tibial,Brain_Amygdala,Brain_Anterior_cingulate_cortex_BA24,Brain_Caudate_basal_ganglia,Brain_Cerebellar_Hemisphere,Brain_Cerebellum,Brain_Cortex,Brain_Frontal_Cortex_BA9,Brain_Hippocampus,Brain_Hypothalamus,Brain_Nucleus_accumbens_basal_ganglia,Brain_Putamen_basal_ganglia,Brain_Spinal_cord_cervical_c-1,Brain_Substantia_nigra,Breast_Mammary_Tissue,Cells_Cultured_fibroblasts,Cells_EBV-transformed_lymphocytes,Colon_Sigmoid,Colon_Transverse,Esophagus_Gastroesophageal_Junction,Esophagus_Mucosa,Esophagus_Muscularis,Heart_Atrial_Appendage,Heart_Left_Ventricle,Kidney_Cortex,Liver,Lung,Minor_Salivary_Gland,Muscle_Skeletal,Nerve_Tibial,Ovary,Pancreas,Pituitary,Prostate,Skin_Not_Sun_Exposed_Suprapubic,Skin_Sun_Exposed_Lower_leg,Small_Intestine_Terminal_Ileum,Spleen,Stomach,Testis,Thyroid,Uterus,Vagina,Whole_Blood
+    filterLabel.cpp CPP (Causal Posterior Probability)
+    showCfg on
+    itemRgb on
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/gtex/eQtl/gtexCaviar.bb
+    filterLabel.geneName Gene Symbol
+    noParentConfig on
+    mergeSpannedItems on
+    urls eqtlName="https://gtexportal.org/home/snp/$$" geneName="https://gtexportal.org/home/locusBrowserPage/$$" eqtlPos="hgTracks?db=$D&position=$$" genePos="hgTracks?db=$D&position=$$" geneId="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=$$"
+
+track hicAndMicroC
+compositeContainer TRUE
+shortLabel Hi-C and Micro-C
+type hic
+longLabel Comparison of Micro-C and In situ Hi-C protocols in H1-hESC and HFFc6
+group regulation
+compositeTrack on
+
+    track hffc6MicroC
+    shortLabel HFFc6 Micro-C
+    type hic
+    longLabel Micro-C Chromatin Structure on HFFc6
+    parent hicAndMicroC off
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/hic/4DNFI18Q799K.hic
+
+    track hffc6Insitu
+    shortLabel HFFc6 In situ
+    type hic
+    longLabel In situ Hi-C Chromatin Structure on HFFc6
+    parent hicAndMicroC off
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/hic/4DNFIFLJLIS5.hic
+
+    track h1hescMicroC
+    shortLabel H1-hESC Micro-C
+    type hic
+    longLabel Micro-C Chromatin Structure on H1-hESC
+    parent hicAndMicroC on
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/hic/4DNFI2TK7L2F.hic
+
+    track h1hescInsitu
+    shortLabel H1-hESC In situ
+    type hic
+    longLabel In situ Hi-C Chromatin Structure on H1-hESC
+    parent hicAndMicroC off
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/hic/4DNFIQYQWPF5.hic
+
+track jaspar
+compositeContainer TRUE
+shortLabel JASPAR Transcription Factors
+type bigBed 6 .
+longLabel JASPAR Transcription Factor Binding Site Database
+filterByRange.score 0:1000
+noGenomeReason JASPAR files contain billions of items. The Table Browser allows regional queries for this track, but those may timeout if the regions are too big. See the Data Access section in the track description page for other ways to query this data, such as command-line tools and our API.
+visibility hide
+group regulation
+maxWindowCoverage 15000
+compositeTrack on
+spectrum on
+exonArrows on
+showCfg on
+tableBrowser tbNoGenome
+filter.score 400
+urlLabel View on JASPAR:
+noParentConfig on
+url https://jaspar.genereg.net/search?q=$$&collection=all&tax_group=all&tax_id=all&type=all&class=all&family=all&version=all
+
+    track jaspar2018
+    shortLabel JASPAR 2018 TFBS
+    type bigBed 6 +
+    longLabel JASPAR CORE 2018 - Predicted Transcription Factor Binding Sites
+    parent jaspar off
+    visibility pack
+    filterValues.name Ahr::Arnt,Alx1,ALX3,Alx4,Ar,Arid3a,Arid3b,Arid5a,Arnt,ARNT::HIF1A,Arntl,Arx,ASCL1,Ascl2,Atf1,Atf3,ATF4,ATF7,Atoh1,Bach1::Mafk,BACH2,Barhl1,BARHL2,BARX1,BATF3,BATF::JUN,Bcl6,BCL6B,Bhlha15,BHLHE22,BHLHE23,BHLHE40,BHLHE41,BSX,CDX1,CDX2,CEBPA,CEBPB,CEBPD,CEBPE,CEBPG,CENPB,CLOCK,CREB1,CREB3,CREB3L1,Creb3l2,Creb5,Crem,Crx,CTCF,CTCFL,CUX1,CUX2,DBP,Ddit3::Cebpa,Dlx1,Dlx2,Dlx3,Dlx4,DLX6,Dmbx1,DMRT3,Dux,DUX4,DUXA,E2F1,E2F2,E2F3,E2F4,E2F6,E2F7,E2F8,EBF1,EGR1,EGR2,EGR3,EGR4,EHF,ELF1,ELF3,ELF4,ELF5,ELK1,ELK3,ELK4,EMX1,EMX2,EN1,EN2,EOMES,ERF,ERG,ESR1,ESR2,Esrra,ESRRB,Esrrg,ESX1,ETS1,ETV1,ETV2,ETV3,ETV4,ETV5,ETV6,EVX1,EVX2,EWSR1-FLI1,FEV,FIGLA,FLI1,FOS,FOSB::JUN,FOSB::JUNB,FOSB::JUNB(var.2),FOS::JUN,FOS::JUNB,FOS::JUND,FOS::JUN(var.2),FOSL1,FOSL1::JUN,FOSL1::JUNB,FOSL1::JUND,FOSL1::JUND(var.2),FOSL1::JUN(var.2),FOSL2,FOSL2::JUN,FOSL2::JUNB,FOSL2::JUNB(var.2),FOSL2::JUND,FOSL2::JUND(var.2),FOSL2::JUN(var.2),FOXA1,Foxa2,FOXB1,FOXC1,FOXC2,FOXD1,FOXD2,Foxd3,FOXF2,FOXG1,FOXH1,FOXI1,Foxj2,Foxj3,FOXK1,FOXK2,FOXL1,Foxo1,FOXO3,FOXO4,FOXO6,FOXP1,FOXP2,FOXP3,Foxq1,Gabpa,Gata1,GATA1::TAL1,GATA2,GATA3,Gata4,GATA5,GATA6,GBX1,GBX2,GCM1,GCM2,Gfi1,Gfi1b,GLI2,GLIS1,GLIS2,GLIS3,Gmeb1,GMEB2,GRHL1,GRHL2,GSC,GSC2,GSX1,GSX2,Hand1::Tcf3,Hes1,Hes2,HES5,HES7,HESX1,HEY1,HEY2,Hic1,HIC2,HIF1A,HINFP,HLF,HLTF,HMBOX1,Hmx1,Hmx2,Hmx3,HNF1A,HNF1B,Hnf4a,HNF4G,HOXA10,Hoxa11,HOXA13,HOXA2,HOXA5,Hoxa9,HOXB13,HOXB2,HOXB3,Hoxb5,HOXC10,HOXC11,HOXC12,HOXC13,Hoxc9,HOXD11,HOXD12,HOXD13,Hoxd3,Hoxd8,Hoxd9,HSF1,HSF2,HSF4,Id2,ID4,INSM1,IRF1,IRF2,IRF3,IRF4,IRF5,IRF7,IRF8,IRF9,ISL2,ISX,JDP2,JDP2(var.2),JUN,JUNB,JUNB(var.2),JUND,JUND(var.2),JUN::JUNB,JUN::JUNB(var.2),JUN(var.2),Klf1,Klf12,KLF13,KLF14,KLF16,KLF4,KLF5,KLF9,LBX1,LBX2,LEF1,LHX2,Lhx3,Lhx4,LHX6,Lhx8,LHX9,LIN54,LMX1A,LMX1B,Mafb,MAFF,MAFG,MAFG::NFE2L1,MAFK,MAF::NFE2,MAX,MAX::MYC,Mecom,MEF2A,MEF2B,MEF2C,MEF2D,MEIS1,MEIS2,MEIS3,MEOX1,MEOX2,MGA,MITF,mix-a,MIXL1,MLX,Mlxip,MLXIPL,MNT,MNX1,MSC,MSX1,MSX2,Msx3,MTF1,MXI1,MYB,MYBL1,MYBL2,MYC,MYCN,MYF6,Myod1,Myog,MZF1,MZF1(var.2),NEUROD1,NEUROD2,Neurog1,NEUROG2,NFAT5,NFATC1,NFATC2,NFATC3,NFE2,Nfe2l2,NFIA,NFIC,NFIC::TLX1,NFIL3,NFIX,NFKB1,NFKB2,NFYA,NFYB,NHLH1,NKX2-3,Nkx2-5,Nkx2-5(var.2),NKX2-8,Nkx3-1,NKX3-2,NKX6-1,NKX6-2,Nobox,NOTO,Npas2,NR1A4::RXRA,NR1H2::RXRA,Nr1h3::Rxra,NR1H4,NR2C2,Nr2e1,Nr2e3,NR2F1,NR2F2,Nr2f6,Nr2f6(var.2),NR3C1,NR3C2,NR4A1,NR4A2,NR4A2::RXRA,Nr5a2,NRF1,NRL,OLIG1,OLIG2,OLIG3,ONECUT1,ONECUT2,ONECUT3,OTX1,OTX2,PAX1,Pax2,PAX3,PAX4,PAX5,Pax6,PAX7,PAX9,PBX1,PBX2,PBX3,PDX1,PHOX2A,Phox2b,Pitx1,PITX3,PKNOX1,PKNOX2,PLAG1,POU1F1,POU2F1,POU2F2,Pou2f3,POU3F1,POU3F2,POU3F3,POU3F4,POU4F1,POU4F2,POU4F3,POU5F1,POU5F1B,Pou5f1::Sox2,POU6F1,POU6F2,PPARA::RXRA,PPARG,Pparg::Rxra,PRDM1,PROP1,PROX1,PRRX1,Prrx2,RARA,RARA::RXRA,RARA::RXRG,RARA(var.2),Rarb,Rarb(var.2),Rarg,Rarg(var.2),RAX,RAX2,RBPJ,REL,RELA,RELB,REST,Rfx1,RFX2,RFX3,RFX4,RFX5,Rhox11,RHOXF1,RORA,RORA(var.2),RORB,RORC,RREB1,RUNX1,RUNX2,RUNX3,Rxra,RXRA::VDR,RXRB,RXRG,SCRT1,SCRT2,SHOX,Shox2,SIX1,SIX2,Six3,SMAD2::SMAD3::SMAD4,SMAD3,Smad4,SNAI2,Sox1,SOX10,Sox11,SOX13,SOX15,Sox17,Sox2,SOX21,Sox3,SOX4,Sox5,Sox6,SOX8,SOX9,SP1,SP2,SP3,SP4,SP8,SPDEF,SPI1,SPIB,SPIC,Spz1,SREBF1,Srebf1(var.2),SREBF2,SREBF2(var.2),SRF,SRY,STAT1,STAT1::STAT2,STAT3,Stat4,Stat5a::Stat5b,Stat6,T,TAL1::TCF3,TBP,TBR1,TBX1,TBX15,TBX19,TBX2,TBX20,TBX21,TBX4,TBX5,Tcf12,Tcf21,TCF3,TCF4,Tcf7,TCF7L1,TCF7L2,Tcfl5,TEAD1,TEAD2,TEAD3,TEAD4,TEF,TFAP2A,TFAP2A(var.2),TFAP2A(var.3),TFAP2B,TFAP2B(var.2),TFAP2B(var.3),TFAP2C,TFAP2C(var.2),TFAP2C(var.3),TFAP4,TFCP2,TFDP1,TFE3,TFEB,TFEC,TGIF1,TGIF2,THAP1,TP53,TP63,TP73,TWIST1,Twist2,UNCX,USF1,USF2,VAX1,VAX2,VDR,VENTX,VSX1,VSX2,XBP1,YY1,YY2,ZBED1,ZBTB18,ZBTB33,ZBTB7A,ZBTB7B,ZBTB7C,ZEB1,Zfx,ZIC1,ZIC3,ZIC4,ZNF143,ZNF24,ZNF263,ZNF282,ZNF354C,ZNF384,ZNF410,Znf423,ZNF740,ZSCAN4
+    priority 4
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/jaspar/JASPAR2018.bb
+
+    track jaspar2020
+    shortLabel JASPAR 2020 TFBS
+    type bigBed 6 +
+    longLabel JASPAR CORE 2020 - Predicted Transcription Factor Binding Sites
+    parent jaspar off
+    visibility hide
+    filterValues.name Ahr::Arnt,Alx1,ALX3,Alx4,Ar,ARGFX,Arid3a,Arid3b,Arid5a,Arnt,ARNT2,ARNT::HIF1A,Arntl,Arx,ASCL1,ASCL1(var.2),Ascl2,Atf1,ATF2,ATF3,ATF4,ATF6,ATF7,Atoh1,ATOH1(var.2),ATOH7,BACH1,Bach1::Mafk,BACH2,BACH2(var.2),BARHL1,BARHL2,BARX1,BARX2,BATF,BATF3,BATF::JUN,BCL6,BCL6B,Bhlha15,BHLHA15(var.2),BHLHE22,BHLHE22(var.2),BHLHE23,BHLHE40,BHLHE41,BSX,CDX1,CDX2,CDX4,CEBPA,CEBPB,CEBPD,CEBPE,CEBPG,CEBPG(var.2),CENPB,CLOCK,CREB1,CREB3,CREB3L1,Creb3l2,CREB3L4,CREB3L4(var.2),Creb5,CREM,Crx,CTCF,CTCFL,CUX1,CUX2,DBP,Ddit3::Cebpa,Dlx1,Dlx2,Dlx3,Dlx4,DLX5,DLX6,Dmbx1,Dmrt1,DMRT3,DMRTA2,DMRTC2,DPRX,DRGX,Dux,DUX4,DUXA,E2F1,E2F2,E2F3,E2F4,E2F6,E2F7,E2F8,EBF1,Ebf2,EBF3,EGR1,EGR2,EGR3,EGR4,EHF,ELF1,ELF2,ELF3,ELF4,ELF5,ELK1,ELK3,ELK4,EMX1,EMX2,EN1,EN2,EOMES,ERF,ERG,ESR1,ESR2,ESRRA,ESRRB,Esrrg,ESX1,ETS1,ETS2,ETV1,ETV2,ETV3,ETV4,ETV5,ETV6,EVX1,EVX2,EWSR1-FLI1,FERD3L,FEV,FIGLA,FLI1,FOS,FOSB::JUN,FOSB::JUNB,FOSB::JUNB(var.2),FOS::JUN,FOS::JUNB,FOS::JUND,FOS::JUN(var.2),FOSL1,FOSL1::JUN,FOSL1::JUNB,FOSL1::JUND,FOSL1::JUND(var.2),FOSL1::JUN(var.2),FOSL2,FOSL2::JUN,FOSL2::JUNB,FOSL2::JUNB(var.2),FOSL2::JUND,FOSL2::JUND(var.2),FOSL2::JUN(var.2),FOXA1,FOXA2,FOXA3,FOXB1,FOXC1,FOXC2,FOXD1,FOXD2,Foxd3,FOXE1,Foxf1,FOXF2,FOXG1,FOXH1,FOXI1,Foxj2,Foxj3,FOXK1,FOXK2,FOXL1,Foxl2,FOXN3,Foxo1,FOXO3,FOXO4,FOXO6,FOXP1,FOXP2,FOXP3,Foxq1,GABPA,GATA1,GATA1::TAL1,GATA2,GATA3,GATA4,GATA5,GATA6,GBX1,GBX2,GCM1,GCM2,GFI1,Gfi1b,GLI2,GLI3,GLIS1,GLIS2,GLIS3,Gmeb1,GMEB2,GRHL1,GRHL2,GSC,GSC2,GSX1,GSX2,Hand1::Tcf3,HAND2,HES1,HES2,HES5,HES6,HES7,HESX1,HEY1,HEY2,Hic1,HIC2,HIF1A,HINFP,HLF,HLTF,HMBOX1,Hmx1,Hmx2,Hmx3,HNF1A,HNF1B,HNF4A,HNF4A(var.2),HNF4G,HOXA1,HOXA10,Hoxa11,HOXA13,HOXA2,HOXA4,HOXA5,HOXA6,HOXA7,HOXA9,HOXB13,HOXB2,HOXB3,HOXB4,HOXB5,HOXB6,HOXB7,HOXB8,HOXB9,HOXC10,HOXC11,HOXC12,HOXC13,HOXC4,HOXC8,HOXC9,HOXD10,HOXD11,HOXD12,HOXD13,HOXD3,HOXD4,HOXD8,HOXD9,HSF1,HSF2,HSF4,IKZF1,INSM1,IRF1,IRF2,IRF3,IRF4,IRF5,IRF6,IRF7,IRF8,IRF9,Isl1,ISL2,ISX,JDP2,JDP2(var.2),JUN,JUNB,JUNB(var.2),JUND,JUND(var.2),JUN::JUNB,JUN::JUNB(var.2),JUN(var.2),Klf1,KLF10,KLF11,Klf12,KLF13,KLF14,KLF15,KLF16,KLF17,KLF2,KLF3,KLF4,KLF5,KLF6,KLF9,LBX1,LBX2,LEF1,LHX1,LHX2,Lhx3,Lhx4,LHX5,LHX6,Lhx8,LHX9,LIN54,LMX1A,LMX1B,MAF,MAFA,Mafb,MAFF,MAFG,MAFK,MAF::NFE2,MAX,MAX::MYC,MAZ,Mecom,MEF2A,MEF2B,MEF2C,MEF2D,MEIS1,MEIS1(var.2),MEIS2,MEIS2(var.2),MEIS3,MEOX1,MEOX2,MGA,MITF,mix-a,MIXL1,MLX,Mlxip,MLXIPL,MNT,MNX1,MSANTD3,MSC,MSGN1,MSX1,MSX2,Msx3,MTF1,MXI1,MYB,MYBL1,MYBL2,MYC,MYCN,MYF5,MYF6,MYOD1,MYOG,MZF1,MZF1(var.2),NEUROD1,NEUROD2,NEUROG1,NEUROG2,NEUROG2(var.2),NFAT5,NFATC1,NFATC2,NFATC3,NFATC4,NFE2,NFE2L1,Nfe2l2,NFIA,NFIB,NFIC,NFIC::TLX1,NFIC(var.2),NFIL3,NFIX,NFIX(var.2),NFKB1,NFKB2,NFYA,NFYB,NFYC,NHLH1,NHLH2,NKX2-2,NKX2-3,NKX2-5,Nkx2-5(var.2),NKX2-8,Nkx3-1,Nkx3-2,NKX6-1,NKX6-2,NKX6-3,Nobox,NOTO,Npas2,NR1D1,NR1D2,NR1H2::RXRA,Nr1h3::Rxra,NR1H4,NR1H4::RXRA,NR1I2,NR1I3,NR2C1,NR2C2,NR2C2(var.2),Nr2e1,Nr2e3,NR2F1,NR2F1(var.2),NR2F1(var.3),NR2F2,Nr2f6,Nr2f6(var.2),NR2F6(var.3),NR3C1,NR3C2,NR4A1,NR4A2,NR4A2::RXRA,NR5A1,Nr5a2,NR6A1,NRF1,NRL,OLIG1,OLIG2,OLIG3,ONECUT1,ONECUT2,ONECUT3,OSR1,OSR2,OTX1,OTX2,OVOL1,OVOL2,PAX1,Pax2,PAX3,PAX3(var.2),PAX4,PAX5,PAX6,PAX7,PAX9,PBX1,PBX2,PBX3,PDX1,PHOX2A,PHOX2B,PITX1,PITX2,PITX3,PKNOX1,PKNOX2,PLAG1,Plagl1,PLAGL2,POU1F1,POU2F1,POU2F2,POU2F3,POU3F1,POU3F2,POU3F3,POU3F4,POU4F1,POU4F2,POU4F3,POU5F1,POU5F1B,Pou5f1::Sox2,POU6F1,POU6F1(var.2),POU6F2,PPARA::RXRA,PPARD,PPARG,Pparg::Rxra,PRDM1,Prdm15,PRDM4,PROP1,PROX1,PRRX1,PRRX2,Ptf1a,Ptf1a(var.2),Ptf1a(var.3),RARA,RARA::RXRA,RARA::RXRG,RARA(var.2),Rarb,Rarb(var.2),RARB(var.3),Rarg,Rarg(var.2),RARG(var.3),RAX,RAX2,RBPJ,Rbpjl,REL,RELA,RELB,REST,RFX1,RFX2,RFX3,RFX4,RFX5,RFX7,Rhox11,RHOXF1,RORA,RORA(var.2),RORB,RORC,RREB1,RUNX1,RUNX2,RUNX3,Rxra,RXRA::VDR,RXRB,RXRB(var.2),RXRG,RXRG(var.2),SCRT1,SCRT2,SHOX,Shox2,SIX1,SIX2,Six3,Smad2::Smad3,SMAD2::SMAD3::SMAD4,SMAD3,Smad4,SMAD5,SNAI1,SNAI2,SNAI3,SOHLH2,Sox1,SOX10,Sox11,SOX12,SOX13,SOX14,SOX15,Sox17,SOX18,SOX2,SOX21,Sox3,SOX4,Sox5,Sox6,SOX8,SOX9,SP1,SP2,SP3,SP4,SP8,SP9,SPDEF,SPI1,SPIB,SPIC,Spz1,SREBF1,SREBF1(var.2),SREBF2,SREBF2(var.2),SRF,SRY,STAT1,STAT1::STAT2,Stat2,STAT3,Stat4,Stat5a,Stat5a::Stat5b,Stat5b,Stat6,TAL1::TCF3,TBP,TBR1,TBX1,TBX15,TBX18,TBX19,TBX2,TBX20,TBX21,TBX3,TBX4,TBX5,TBX6,TBXT,Tcf12,TCF12(var.2),Tcf21,TCF21(var.2),TCF3,TCF4,TCF7,TCF7L1,TCF7L2,TCFL5,TEAD1,TEAD2,TEAD3,TEAD4,TEF,TFAP2A,TFAP2A(var.2),TFAP2A(var.3),TFAP2B,TFAP2B(var.2),TFAP2B(var.3),TFAP2C,TFAP2C(var.2),TFAP2C(var.3),TFAP2E,TFAP4,TFAP4(var.2),TFCP2,TFDP1,TFE3,TFEB,TFEC,TGIF1,TGIF2,TGIF2LX,TGIF2LY,THAP1,THAP11,THRB,THRB(var.2),THRB(var.3),TLX2,TP53,TP63,TP73,TWIST1,Twist2,UNCX,USF1,USF2,VAX1,VAX2,VDR,VENTX,VEZF1,VSX1,VSX2,Wt1,XBP1,YY1,YY2,ZBED1,ZBTB12,ZBTB14,ZBTB18,ZBTB26,ZBTB32,ZBTB33,ZBTB6,ZBTB7A,ZBTB7B,ZBTB7C,ZEB1,ZFP42,ZFP57,Zfx,ZIC1,Zic1::Zic2,Zic2,ZIC3,ZIC4,ZIC5,ZKSCAN1,ZKSCAN5,ZNF135,ZNF136,ZNF140,ZNF143,ZNF148,ZNF16,ZNF24,ZNF263,ZNF274,Znf281,ZNF282,ZNF317,ZNF341,ZNF354C,ZNF382,ZNF384,ZNF410,Znf423,ZNF449,ZNF460,ZNF528,ZNF652,ZNF682,ZNF684,ZNF740,ZNF75D,ZSCAN29,ZSCAN4
+    motifPwmTable hgFixed.jasparVertebrates2020
+    priority 3
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/jaspar/JASPAR2020.bb
+
+    track jaspar2022
+    shortLabel JASPAR 2022 TFBS
+    type bigBed 6 +
+    longLabel JASPAR CORE 2022 - Predicted Transcription Factor Binding Sites
+    parent jaspar off
+    visibility hide
+    labelFields TFName
+    filterValues.TFName Ahr::Arnt,Alx1,ALX3,Alx4,Ar,ARGFX,Arid3a,Arid3b,Arid5a,Arnt,ARNT2,ARNT::HIF1A,Arntl,Arx,ASCL1,Ascl2,Atf1,ATF2,Atf3,ATF3,ATF4,ATF6,ATF7,Atoh1,ATOH7,BACH1,Bach1::Mafk,BACH2,BARHL1,BARHL2,BARX1,BARX2,BATF,BATF3,BATF::JUN,Bcl11B,BCL6,BCL6B,Bhlha15,BHLHA15,BHLHE22,BHLHE23,BHLHE40,BHLHE41,BNC2,BSX,CDX1,CDX2,CDX4,CEBPA,CEBPB,CEBPD,CEBPE,CEBPG,CLOCK,CREB1,CREB3,CREB3L1,Creb3l2,CREB3L4,Creb5,CREM,Crx,CTCF,CTCFL,CUX1,CUX2,DBP,Ddit3::Cebpa,DLX1,Dlx2,Dlx3,Dlx4,Dlx5,DLX6,Dmbx1,Dmrt1,DMRT3,DMRTA1,DMRTA2,DMRTC2,DPRX,DRGX,Dux,DUX4,DUXA,E2F1,E2F2,E2F3,E2F4,E2F6,E2F7,E2F8,EBF1,Ebf2,EBF3,EGR1,EGR2,EGR3,EGR4,EHF,ELF1,ELF2,ELF3,ELF4,Elf5,ELK1,ELK1::HOXA1,ELK1::HOXB13,ELK1::SREBF2,ELK3,ELK4,EMX1,EMX2,EN1,EN2,EOMES,ERF,ERF::FIGLA,ERF::FOXI1,ERF::FOXO1,ERF::HOXB13,ERF::NHLH1,ERF::SREBF2,Erg,ESR1,ESR2,ESRRA,ESRRB,Esrrg,ESX1,ETS1,ETS2,ETV1,ETV2,ETV2::DRGX,ETV2::FIGLA,ETV2::FOXI1,ETV2::HOXB13,ETV3,ETV4,ETV5,ETV5::DRGX,ETV5::FIGLA,ETV5::FOXI1,ETV5::FOXO1,ETV5::HOXA2,ETV6,ETV7,EVX1,EVX2,EWSR1-FLI1,FERD3L,FEV,FIGLA,FLI1,FLI1::DRGX,FLI1::FOXI1,FOS,FOSB::JUN,FOSB::JUNB,FOS::JUN,FOS::JUNB,FOS::JUND,FOSL1,FOSL1::JUN,FOSL1::JUNB,FOSL1::JUND,FOSL2,FOSL2::JUN,FOSL2::JUNB,FOSL2::JUND,FOXA1,FOXA2,FOXA3,FOXB1,FOXC1,FOXC2,FOXD1,FOXD2,FOXD3,FOXE1,Foxf1,FOXF2,FOXG1,FOXH1,FOXI1,Foxj2,FOXJ2::ELF1,Foxj3,FOXK1,FOXK2,FOXL1,Foxl2,Foxn1,FOXN3,Foxo1,FOXO1::ELF1,FOXO1::ELK1,FOXO1::ELK3,FOXO1::FLI1,Foxo3,FOXO4,FOXO6,FOXP1,FOXP2,FOXP3,Foxq1,GABPA,GATA1,GATA1::TAL1,GATA2,Gata3,GATA4,GATA5,GATA6,GBX1,GBX2,GCM1,GCM2,GFI1,Gfi1B,Gli1,Gli2,GLI3,GLIS1,GLIS2,GLIS3,Gmeb1,GMEB2,GRHL1,GRHL2,GSC,GSC2,GSX1,GSX2,Hand1::Tcf3,HAND2,HES1,HES2,HES5,HES6,HES7,HESX1,HEY1,HEY2,Hic1,HIC2,HIF1A,HINFP,HLF,HMBOX1,Hmx1,Hmx2,Hmx3,Hnf1A,HNF1A,HNF1B,HNF4A,HNF4G,HOXA1,HOXA10,Hoxa11,Hoxa13,HOXA2,HOXA4,HOXA5,HOXA6,HOXA7,HOXA9,HOXB13,HOXB2,HOXB2::ELK1,HOXB3,HOXB4,HOXB5,HOXB6,HOXB7,HOXB8,HOXB9,HOXC10,HOXC11,HOXC12,HOXC13,HOXC4,HOXC8,HOXC9,HOXD10,HOXD11,HOXD12,HOXD12::ELK1,Hoxd13,HOXD3,HOXD4,HOXD8,HOXD9,HSF1,HSF2,HSF4,IKZF1,Ikzf3,INSM1,Irf1,IRF2,IRF3,IRF4,IRF5,IRF6,IRF7,IRF8,IRF9,Isl1,ISL2,ISX,JDP2,Jun,JUN,JUNB,JUND,JUN::JUNB,KLF1,KLF10,KLF11,KLF12,KLF13,KLF14,KLF15,KLF16,KLF17,KLF2,KLF3,KLF4,KLF5,KLF6,KLF7,KLF9,LBX1,LBX2,Lef1,Lhx1,LHX2,Lhx3,Lhx4,LHX5,LHX6,Lhx8,LHX9,LIN54,LMX1A,LMX1B,MAF,MAFA,Mafb,MAFF,Mafg,MAFG::NFE2L1,MAFK,MAF::NFE2,MAX,MAX::MYC,MAZ,Mecom,MEF2A,MEF2B,MEF2C,MEF2D,MEIS1,MEIS2,MEIS3,MEOX1,MEOX2,MGA,MGA::EVX1,MITF,mix-a,MIXL1,MLX,Mlxip,MLXIPL,MNT,MNX1,MSANTD3,MSC,Msgn1,MSX1,MSX2,Msx3,MTF1,MXI1,MYB,MYBL1,MYBL2,MYC,MYCN,MYF5,MYF6,MYOD1,MYOG,MZF1,NEUROD1,Neurod2,NEUROG1,NEUROG2,Nfat5,Nfatc1,Nfatc2,NFATC3,NFATC4,NFE2,Nfe2l2,NFIA,NFIB,NFIC,NFIC::TLX1,NFIL3,NFIX,NFKB1,NFKB2,NFYA,NFYB,NFYC,NHLH1,NHLH2,Nkx2-1,NKX2-2,NKX2-3,NKX2-4,NKX2-5,NKX2-8,Nkx3-1,Nkx3-2,NKX6-1,NKX6-2,NKX6-3,Nobox,NOTO,Npas2,Npas4,NR1D1,NR1D2,Nr1H2,NR1H2::RXRA,Nr1h3::Rxra,Nr1H4,NR1H4::RXRA,NR1I2,NR1I3,NR2C1,NR2C2,Nr2e1,Nr2e3,NR2F1,NR2F2,Nr2f6,Nr2F6,NR2F6,NR3C1,NR3C2,NR4A1,NR4A2,NR4A2::RXRA,NR5A1,Nr5A2,NR6A1,Nrf1,NRL,OLIG1,Olig2,OLIG2,OLIG3,ONECUT1,ONECUT2,ONECUT3,OSR1,OSR2,OTX1,OTX2,OVOL1,OVOL2,PATZ1,PAX1,PAX2,PAX3,PAX4,PAX5,PAX6,Pax7,PAX9,PBX1,PBX2,PBX3,PDX1,PHOX2A,PHOX2B,PITX1,PITX2,PITX3,PKNOX1,PKNOX2,PLAG1,Plagl1,PLAGL2,POU1F1,POU2F1,POU2F1::SOX2,POU2F2,POU2F3,POU3F1,POU3F2,POU3F3,POU3F4,POU4F1,POU4F2,POU4F3,POU5F1,POU5F1B,Pou5f1::Sox2,POU6F1,POU6F2,PPARA::RXRA,PPARD,PPARG,Pparg::Rxra,PRDM1,Prdm14,Prdm15,Prdm4,Prdm5,PRDM9,PROP1,PROX1,PRRX1,PRRX2,Ptf1a,Ptf1A,RARA,RARA::RXRA,RARA::RXRG,Rarb,RARB,Rarg,RARG,RAX,RAX2,RBPJ,Rbpjl,REL,RELA,RELB,REST,RFX1,RFX2,RFX3,RFX4,RFX5,Rfx6,RFX7,Rhox11,RHOXF1,RORA,RORB,RORC,RREB1,Runx1,RUNX2,RUNX3,Rxra,RXRA::VDR,RXRB,RXRG,SATB1,SCRT1,SCRT2,Sf1,SHOX,Shox2,SIX1,SIX2,Six3,Six4,SMAD2,Smad2::Smad3,SMAD2::SMAD3::SMAD4,SMAD3,Smad4,SMAD5,SNAI1,SNAI2,SNAI3,SOHLH2,Sox1,SOX10,Sox11,SOX12,SOX13,SOX14,SOX15,Sox17,SOX18,SOX2,SOX21,Sox3,SOX4,Sox5,Sox6,SOX8,SOX9,SP1,SP2,SP3,SP4,SP5,SP8,SP9,SPDEF,Spi1,SPIB,SPIC,Spz1,SREBF1,SREBF2,SRF,SRY,STAT1,STAT1::STAT2,Stat2,STAT3,Stat4,Stat5a,Stat5a::Stat5b,Stat5b,Stat6,TAL1::TCF3,TBP,TBR1,TBX1,TBX15,TBX18,TBX19,TBX2,TBX20,TBX21,TBX3,TBX4,TBX5,Tbx6,TBXT,Tcf12,TCF12,Tcf21,TCF21,TCF3,TCF4,TCF7,TCF7L1,TCF7L2,TCFL5,TEAD1,TEAD2,TEAD3,TEAD4,TEF,TFAP2A,TFAP2B,TFAP2C,TFAP2E,TFAP4,TFAP4::ETV1,TFAP4::FLI1,TFCP2,Tfcp2l1,TFDP1,TFE3,TFEB,TFEC,TGIF1,TGIF2,TGIF2LX,TGIF2LY,THAP1,Thap11,THRA,THRB,TLX2,TP53,TP63,TP73,TRPS1,TWIST1,Twist2,UNCX,USF1,USF2,VAX1,VAX2,Vdr,VENTX,VEZF1,VSX1,VSX2,Wt1,XBP1,Yy1,YY2,ZBED1,ZBED2,ZBTB12,ZBTB14,ZBTB18,ZBTB26,ZBTB32,ZBTB33,ZBTB6,ZBTB7A,ZBTB7B,ZBTB7C,ZEB1,ZFP14,Zfp335,ZFP42,ZFP57,Zfx,ZIC1,Zic1::Zic2,Zic2,Zic3,ZIC4,ZIC5,ZIM3,ZKSCAN1,ZKSCAN3,ZKSCAN5,ZNF135,ZNF136,ZNF140,ZNF143,ZNF148,ZNF16,ZNF189,ZNF211,ZNF214,ZNF24,ZNF257,ZNF263,ZNF274,ZNF281,ZNF282,ZNF317,ZNF320,ZNF324,ZNF331,ZNF341,ZNF343,ZNF354A,ZNF354C,ZNF382,ZNF384,ZNF410,ZNF416,ZNF417,ZNF418,Znf423,ZNF449,ZNF454,ZNF460,ZNF528,ZNF530,ZNF549,ZNF574,ZNF582,ZNF610,ZNF652,ZNF667,ZNF669,ZNF675,ZNF680,ZNF682,ZNF684,ZNF692,ZNF701,ZNF707,ZNF708,ZNF740,ZNF75D,ZNF76,ZNF768,ZNF784,ZNF8,ZNF816,ZNF85,ZNF93,ZSCAN29,ZSCAN31,ZSCAN4
+    motifPwmTable hgFixed.jasparCore2022
+    priority 2
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/jaspar/JASPAR2022.bb
+
+    track jaspar2024
+    shortLabel JASPAR 2024 TFBS
+    type bigBed 6 +
+    longLabel JASPAR CORE 2024 - Predicted Transcription Factor Binding Sites
+    parent jaspar on
+    maxItems 100000
+    filterByRange.score 0:1000
+    visibility pack
+    labelFields TFName
+    filterValues.TFName Ahr::Arnt,Alx1,ALX3,Alx4,Ar,ARGFX,Arid3a,Arid3b,Arid5a,Arnt,ARNT2,ARNT::HIF1A,Arntl,Arx,ASCL1,ASCL1,Ascl2,Atf1,ATF2,Atf3,ATF3,ATF4,ATF6,ATF7,Atoh1,Atoh1,ATOH7,BACH1,Bach1::Mafk,BACH2,BACH2,BARHL1,BARHL2,BARX1,BARX2,BATF,BATF3,BATF::JUN,BCL11A,Bcl11B,BCL6,BCL6B,Bhlha15,BHLHA15,BHLHE22,BHLHE22,BHLHE23,BHLHE40,BHLHE41,BNC2,BSX,CDX1,CDX2,CDX4,CEBPA,CEBPB,CEBPD,CEBPE,CEBPG,CEBPG,CLOCK,CREB1,CREB3,CREB3L1,Creb3l2,CREB3L4,CREB3L4,Creb5,CREM,Crx,CTCF,CTCF,CTCF,CTCFL,CUX1,CUX2,DBP,Ddit3::Cebpa,DLX1,Dlx2,Dlx3,Dlx4,Dlx5,DLX6,Dmbx1,Dmrt1,DMRT3,DMRTA1,DMRTA2,DMRTC2,DPRX,DRGX,Dux,DUX4,DUXA,E2F1,E2F2,E2F3,E2F4,E2F6,E2F7,E2F8,EBF1,Ebf2,EBF3,Ebf4,EGR1,EGR2,EGR3,EGR4,EHF,ELF1,ELF2,ELF3,ELF4,Elf5,ELK1,ELK1::HOXA1,ELK1::HOXB13,ELK1::SREBF2,ELK3,ELK4,EMX1,EMX2,EN1,EN2,EOMES,EPAS1,ERF,ERF::FIGLA,ERF::FOXI1,ERF::FOXO1,ERF::HOXB13,ERF::NHLH1,ERF::SREBF2,Erg,ESR1,ESR2,ESRRA,ESRRB,Esrrg,ESX1,ETS1,ETS2,ETV1,ETV2,ETV2::DRGX,ETV2::FIGLA,ETV2::FOXI1,ETV2::HOXB13,ETV3,ETV4,ETV5,ETV5::DRGX,ETV5::FIGLA,ETV5::FOXI1,ETV5::FOXO1,ETV5::HOXA2,ETV6,ETV7,EVX1,EVX2,EWSR1-FLI1,FERD3L,FEV,FEZF2,FIGLA,FLI1,FLI1::DRGX,FLI1::FOXI1,FOS,FOS,FOSB::JUN,FOSB::JUNB,FOSB::JUNB,FOS::JUN,FOS::JUN,FOS::JUNB,FOS::JUND,FOSL1,FOSL1::JUN,FOSL1::JUN,FOSL1::JUNB,FOSL1::JUND,FOSL1::JUND,FOSL2,FOSL2::JUN,FOSL2::JUN,FOSL2::JUNB,FOSL2::JUNB,FOSL2::JUND,FOSL2::JUND,FOXA1,FOXA2,FOXA3,FOXB1,FOXC1,FOXC2,FOXD1,FOXD2,FOXD3,FOXE1,Foxf1,FOXF2,FOXG1,FOXH1,FOXI1,Foxj2,FOXJ2::ELF1,Foxj3,FOXK1,FOXK2,FOXL1,Foxl2,Foxn1,FOXN3,Foxo1,FOXO1::ELF1,FOXO1::ELK1,FOXO1::ELK3,FOXO1::FLI1,Foxo3,FOXO4,FOXO6,FOXP1,FOXP2,FOXP3,FOXP4,Foxq1,FOXS1,GABPA,GATA1,GATA1::TAL1,GATA2,Gata3,GATA4,GATA5,GATA6,GBX1,GBX2,GCM1,GCM2,GFI1,Gfi1B,Gli1,Gli2,GLI3,GLIS1,GLIS2,GLIS3,Gmeb1,GMEB2,GRHL1,GRHL2,GSC,GSC2,GSX1,GSX2,Hand1,Hand1::Tcf3,HAND2,HES1,HES2,HES5,HES6,HES7,HESX1,HEY1,HEY2,Hic1,HIC2,HIF1A,HINFP,HLF,HMBOX1,Hmga1,Hmx1,Hmx2,Hmx3,Hnf1A,HNF1A,HNF1B,HNF4A,HNF4A,HNF4G,HOXA1,HOXA10,Hoxa11,Hoxa13,HOXA2,HOXA3,HOXA4,HOXA5,HOXA6,HOXA7,HOXA9,HOXB1,HOXB13,HOXB2,HOXB2::ELK1,HOXB3,HOXB4,HOXB5,HOXB6,HOXB7,HOXB8,HOXB9,HOXC10,HOXC11,HOXC12,HOXC13,HOXC4,HOXC8,HOXC9,HOXD10,HOXD11,HOXD12,HOXD12::ELK1,Hoxd13,HOXD3,HOXD4,HOXD8,HOXD9,HSF1,HSF2,HSF4,IKZF1,IKZF2,Ikzf3,INSM1,Irf1,IRF2,IRF3,IRF4,IRF5,IRF6,IRF7,IRF8,IRF9,Isl1,ISL2,ISX,JDP2,JDP2,Jun,JUN,JUNB,JUNB,JUND,JUND,JUN::JUNB,JUN::JUNB,KLF1,KLF10,KLF11,KLF12,KLF13,KLF14,KLF15,KLF16,KLF17,KLF2,KLF3,KLF4,KLF5,KLF6,KLF7,KLF9,LBX1,LBX2,Lef1,Lhx1,LHX2,Lhx3,Lhx4,LHX5,LHX6,Lhx8,LHX9,LIN54,LMX1A,LMX1B,MAF,MAFA,Mafb,MAFF,Mafg,MAFG::NFE2L1,MAFK,MAF::NFE2,MAX,MAX::MYC,MAZ,Mecom,MEF2A,MEF2B,MEF2C,MEF2D,MEIS1,MEIS1,MEIS2,MEIS2,MEIS3,MEOX1,MEOX2,MGA,MGA::EVX1,MITF,mix-a,MIXL1,MLX,Mlxip,MLXIPL,MNT,MNX1,MSANTD3,MSC,Msgn1,MSX1,MSX2,Msx3,MTF1,MXI1,MYB,MYBL1,MYBL2,MYC,MYCN,MYF5,MYF6,MYOD1,MYOG,MZF1,Nanog,NEUROD1,Neurod2,Neurod2,NEUROG1,NEUROG2,NEUROG2,Nfat5,Nfatc1,Nfatc2,NFATC3,NFATC4,NFE2,Nfe2l2,NFIA,NFIB,NFIC,NFIC,NFIC::TLX1,NFIL3,NFIX,NFIX,NFKB1,NFKB2,NFYA,NFYB,NFYC,NHLH1,NHLH2,Nkx2-1,NKX2-2,NKX2-3,NKX2-4,NKX2-5,NKX2-8,Nkx3-1,Nkx3-2,NKX6-1,NKX6-2,NKX6-3,Nobox,NOTO,Npas2,Npas4,NR1D1,NR1D2,Nr1H2,NR1H2::RXRA,Nr1h3,Nr1h3::Rxra,Nr1H4,NR1H4::RXRA,NR1I2,NR1I3,NR2C1,NR2C2,NR2C2,Nr2e1,Nr2e3,NR2F1,NR2F1,NR2F1,NR2F2,Nr2f6,Nr2F6,NR2F6,NR3C1,NR3C2,NR4A1,NR4A2,NR4A2::RXRA,NR5A1,Nr5A2,NR6A1,Nrf1,NRL,OLIG1,Olig2,OLIG2,OLIG3,ONECUT1,ONECUT2,ONECUT3,OSR1,OSR2,OTX1,OTX2,OVOL1,OVOL2,PATZ1,PAX1,PAX2,PAX3,PAX3,PAX4,PAX5,PAX6,Pax7,PAX8,PAX9,PBX1,PBX2,PBX3,PDX1,Pgr,PGR,PHOX2A,PHOX2B,PITX1,PITX2,PITX3,PKNOX1,PKNOX2,PLAG1,Plagl1,PLAGL2,POU1F1,POU2F1,POU2F1::SOX2,POU2F2,POU2F3,POU3F1,POU3F2,POU3F3,POU3F4,POU4F1,POU4F2,POU4F3,POU5F1,POU5F1B,Pou5f1::Sox2,POU6F1,POU6F1,POU6F2,Ppara,PPARA::RXRA,PPARD,PPARG,Pparg::Rxra,PRDM1,Prdm14,Prdm15,Prdm4,Prdm5,PRDM9,PROP1,PROX1,PRRX1,PRRX2,Ptf1A,Ptf1A,Ptf1A,RARA,RARA,RARA::RXRA,RARA::RXRG,Rarb,Rarb,RARB,Rarg,Rarg,RARG,RAX,RAX2,RBPJ,REL,RELA,RELB,REST,RFX1,RFX2,RFX3,RFX4,RFX5,Rfx6,RFX7,Rhox11,RHOXF1,RORA,RORA,RORB,RORC,RREB1,Runx1,RUNX2,RUNX3,Rxra,RXRA::VDR,RXRB,RXRB,RXRG,RXRG,SATB1,SCRT1,SCRT2,SHOX,Shox2,SIX1,SIX2,Six3,Six4,SMAD2,SMAD3,Smad4,SMAD5,SNAI1,SNAI2,SNAI3,SOHLH2,Sox1,SOX10,Sox11,SOX12,SOX13,SOX14,SOX15,Sox17,SOX18,SOX2,SOX21,Sox3,SOX4,Sox5,Sox6,Sox7,SOX8,SOX9,SP1,SP2,SP3,SP4,SP5,SP8,SP9,SPDEF,Spi1,SPIB,SPIC,Spz1,SREBF1,SREBF1,SREBF2,SREBF2,SRF,SRY,STAT1,STAT1::STAT2,Stat2,STAT3,Stat4,Stat5a,Stat5a::Stat5b,Stat5b,Stat6,TAL1::TCF3,TBP,TBR1,TBX1,TBX15,TBX18,TBX19,TBX2,TBX20,TBX21,TBX3,TBX4,TBX5,Tbx6,TBXT,Tcf12,TCF12,Tcf21,TCF21,TCF3,TCF4,TCF7,TCF7L1,TCF7L2,TCFL5,TEAD1,TEAD2,TEAD3,TEAD4,TEF,TFAP2A,TFAP2A,TFAP2A,TFAP2B,TFAP2B,TFAP2B,TFAP2C,TFAP2C,TFAP2C,TFAP2E,TFAP4,TFAP4,TFAP4::ETV1,TFAP4::FLI1,TFCP2,Tfcp2l1,TFDP1,TFE3,TFEB,TFEC,TGIF1,TGIF2,TGIF2LX,TGIF2LY,THAP1,Thap11,THRA,THRB,THRB,THRB,TLX2,TP53,TP63,TP73,TRPS1,TWIST1,Twist2,UNCX,USF1,USF2,VAX1,VAX2,Vdr,VENTX,VEZF1,VSX1,VSX2,Wt1,XBP1,Yy1,YY2,ZBED1,ZBED2,ZBED4,ZBTB11,ZBTB12,ZBTB14,ZBTB17,ZBTB18,Zbtb2,ZBTB24,ZBTB26,ZBTB32,ZBTB33,ZBTB6,ZBTB7A,ZBTB7B,ZBTB7C,ZEB1,ZFP14,Zfp335,ZFP42,ZFP57,Zfp809,Zfp961,Zfx,ZIC1,Zic1::Zic2,Zic2,Zic3,ZIC4,ZIC5,ZIM3,ZKSCAN1,ZKSCAN3,ZKSCAN5,ZNF135,ZNF136,ZNF140,ZNF143,ZNF148,ZNF157,ZNF16,ZNF175,ZNF184,ZNF189,ZNF211,ZNF213,ZNF214,ZNF24,ZNF257,ZNF263,ZNF274,ZNF281,ZNF282,ZNF317,ZNF320,ZNF324,ZNF331,ZNF341,ZNF343,ZNF35,ZNF354A,ZNF354C,ZNF382,ZNF384,ZNF410,ZNF416,ZNF417,ZNF418,Znf423,ZNF449,ZNF454,ZNF460,ZNF524,ZNF528,ZNF530,ZNF547,ZNF549,ZNF558,ZNF574,ZNF582,ZNF610,ZNF652,ZNF667,ZNF669,ZNF675,ZNF677,ZNF680,ZNF682,ZNF684,ZNF692,ZNF701,ZNF707,ZNF708,ZNF740,ZNF75A,ZNF75D,ZNF76,ZNF766,ZNF768,ZNF770,ZNF784,ZNF8,ZNF816,ZNF85,ZNF93,ZSCAN16,ZSCAN21,ZSCAN29,ZSCAN31,ZSCAN4
+    motifPwmTable hgFixed.jasparCore2024
+    priority 1
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/jaspar/JASPAR2024.bb
+    filter.score 400
+
+track refSeqFuncElems
+shortLabel RefSeq Func Elems
+type bigBed 9 +
+longLabel NCBI RefSeq Functional Elements
+group regulation
+itemRgb on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/ncbiRefSeq/refSeqFuncElems.bb
+noScoreFilter .
+mouseOverField _mouseOver
+urls geneIds=https://www.ncbi.nlm.nih.gov/gene?cmd=Retrieve&dopt=full_report&list_uids=$$ pubMedIds=https://www.ncbi.nlm.nih.gov/pubmed/$$ soTerm=https://www.sequenceontology.org/browser/obob.cgi?rm=term_list&release=current_svn&obo_query=$$
+
+track vistaEnhancersBb
+shortLabel VISTA Enhancers
+type bigBed 9 +
+longLabel VISTA Enhancers
+group regulation
+itemRgb on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/vistaEnhancers/vistaEnhancers.bb
+urlLabel View on the VISTA Enhancer Browser
+url https://enhancer.lbl.gov/vista/browse?filter=$$
+mouseOverField patternExpression
+
+
+##### Variation
+
+track dbSnp155Composite
+compositeContainer TRUE
+shortLabel dbSNP 155
+type bed 3
+longLabel Short Genetic Variants from dbSNP release 155
+subGroup1 view Views variants=Variants errs=Mapping_Errors
+visibility pack
+group var
+maxWindowCoverage 4000000
+compositeTrack on
+priority 0.8
+urlLabel dbSNP:
+url https://www.ncbi.nlm.nih.gov/snp/$$
+
+       track dbSnp155
+        shortLabel All dbSNP(155)
+        type bigDbSnp
+        longLabel All Short Genetic Variants from dbSNP Release 155
+        parent dbSnp155Composite
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/snp/dbSnp155.bb
+
+        track dbSnp155Mult
+        shortLabel Mult. dbSNP(155)
+        type bigDbSnp
+        longLabel Short Genetic Variants from dbSNP Release 155 that Map to Multiple Genomic Loci
+        parent dbSnp155Composite
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/snp/dbSnp155Mult.bb
+
+        track dbSnp155ClinVar
+        shortLabel ClinVar dbSNP(155)
+        type bigDbSnp
+        longLabel Short Genetic Variants from dbSNP Release 155 Included in ClinVar
+        parent dbSnp155Composite
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/snp/dbSnp155ClinVar.bb
+
+        track dbSnp155Common
+        shortLabel Common dbSNP(155)
+        type bigDbSnp
+        longLabel Common (1000 Genomes Phase 3 MAF >= 1%) Short Genetic Variants from dbSNP Release 155
+        parent dbSnp155Composite
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/snp/dbSnp155Common.bb
+
+        track dbSnp155BadCoords
+        shortLabel Map Err dbSnp(155)
+        type bigBed 4
+        longLabel Mappings with Inconsistent Coordinates from dbSNP 155
+        parent dbSnp155Composite
+        priority 5
+        subGroups view=errs
+        bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/snp/dbSnp155BadCoords.bb
+        color 100,100,100
+
+
+track dgvPlus
+compositeContainer TRUE
+shortLabel DGV Struct Var
+type bed 9 +
+longLabel Database of Genomic Variants: Structural Variation (CNV, Inversion, In/del)
+visibility hide
+group var
+compositeTrack on
+exonArrows off
+itemRgb on
+exonNumbers off
+coriellUrlBase https://ccr.coriell.org/Sections/Search/Sample_Detail.aspx?Ref=
+noScoreFilter .
+urlLabel DGV Browser and Report:
+url https://dgv.tcag.ca/dgv/app/variant?id=$$&ref=$D
+dataVersion 2020-02-25
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=dgvPlus
+
+    track dgvGold
+    shortLabel DGV Gold Standard
+    type bigBed 12 +
+    longLabel Database of Genomic Variants: Gold Standard Variants
+    parent dgvPlus
+    mouseOver ID:$name; Position; $chrom:${chromStart}-${chromEnd}; Type:$variant_sub_type; Frequency:$Frequency
+    searchIndex name
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/dgv/dgvGold.bb
+    url https://dgv.tcag.ca/gb2/gbrowse_details/dgv2_hg38?ref=$S;start=${;end=$};name=$$;class=Sequence
+
+    track dgvSupporting
+    shortLabel DGV Supp Var
+    type bigBed 9 +
+    longLabel Database of Genomic Variants: Supporting Structural Var (CNV, Inversion, In/del)
+    parent dgvPlus
+    mouseOver ID:$name; Position; $chrom:${chromStart}-${chromEnd}; Size:$_size; Type:$varType; Affected genes:$genes
+    searchIndex name
+    filter._size 1:9320633
+    priority 2
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/dgv/dgvSupporting.bb
+    filterByRange._size on
+    filterLabel._size Genomic size of variant
+    filterValues.varType complex,deletion,duplication,gain,gain+loss,insertion,inversion,loss,mobile element insertion,novel sequence insertion,sequence alteration,tandem duplication
+    dataVersion 2020-02-25
+
+    track dgvMerged
+    shortLabel DGV Struct Var
+    type bigBed 9 +
+    longLabel Database of Genomic Variants: Structural Var Regions (CNV, Inversion, In/del)
+    parent dgvPlus on
+    mouseOver ID:$name; Position; $chrom:${chromStart}-${chromEnd}; Size:$_size; Type:$varType; Affected genes:$genes
+    searchIndex name
+    filter._size 1:9734324
+    priority 1
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/dgv/dgvMerged.bb
+    filterByRange._size on
+    filterLabel._size Genomic size of variant
+    filterValues.varType complex,deletion,duplication,gain,gain+loss,insertion,inversion,loss,mobile element insertion,novel sequence insertion,sequence alteration,tandem duplication
+    dataVersion 2020-02-25
+
+
+track platinumGenomes
+compositeContainer TRUE
+shortLabel Platinum Genomes
+type vcfTabix
+longLabel Platinum genome variants
+group var
+vcfDoFilter off
+configureByPopup off
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=../platinumGenomes
+compositeTrack on
+vcfDoMaf off
+dataVersion Release 2017-1.0
+
+    track platinumNA12878
+    shortLabel NA12878
+    type vcfTabix
+    longLabel Platinum genome variant NA12878
+    parent platinumGenomes
+    visibility pack
+    group var
+    vcfDoFilter off
+    configureByPopup off
+    maxWindowToDraw 200000
+    vcfDoMaf off
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/platinumGenomes/NA12878.vcf.gz
+    showHardyWeinberg on
+    chromosomes chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19,chr20,chr21,chr22,chrX
+
+    track platinumNA12877
+    shortLabel NA12877
+    type vcfTabix
+    longLabel Platinum genome variant NA12877
+    parent platinumGenomes
+    visibility pack
+    group var
+    vcfDoFilter off
+    configureByPopup off
+    maxWindowToDraw 200000
+    vcfDoMaf off
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/platinumGenomes/NA12877.vcf.gz
+    showHardyWeinberg on
+    chromosomes chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19,chr20,chr21,chr22,chrX
+
+    track platinumHybrid
+    shortLabel hybrid
+    type vcfTabix
+    longLabel Platinum genome hybrid
+    parent platinumGenomes
+    visibility pack
+    group var
+    vcfDoFilter off
+    configureByPopup off
+    maxWindowToDraw 200000
+    vcfDoMaf off
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/platinumGenomes/hg38.hybrid.vcf.gz
+    showHardyWeinberg on
+    chromosomes chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19,chr20,chr21,chr22,chrX
+
+
+#### Repeats
+
+
+track nuMtSeq
+shortLabel NuMTs Sequence
+type bigBed 6
+longLabel Nuclear mitochondrial DNA segments
+group rep
+spectrum on
+priority 3
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/bbi/nuMtSeq/nuMtSeq_hg38.bb
+scoreMax 100
+
+
+##### HPRC
+
+
+track hprcArrV1
+compositeContainer TRUE
+shortLabel Rearrangements
+type bigBed 9 +
+longLabel Rearrangements including indels, inversions, and duplications
+filterLabel.score Minimum number of assemblies with arrangement
+visibility hide
+group hprc
+compositeTrack on
+priority 100
+altColor 100,50,0
+color 0,0,0
+filter.score 1
+
+    track hprcDoubleV1
+    shortLabel Other Rearrangements
+    type bigBed 9 +
+    longLabel Other Rearrangements: Unalignable sequences in both assemblies (inversions, partial transpositions)
+    parent hprcArrV1
+    maxItems 100000
+    visibility hide
+    group hprc
+    labelFields label
+    exonArrows off
+    itemRgb on
+    priority 105
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hprcArrV1/hprcDoubleV1.bb
+    mouseOverField _mouseover
+
+    track hprcArrDupBedV1
+    shortLabel Duplications
+    type bigBed 9 +
+    longLabel Duplications with respect to hg38 in HPRC assemblies
+    parent hprcArrV1 on
+    mouseOver # genomes in HPRC with duplication: $label
+    maxItems 100000
+    visibility hide
+    labelFields label
+    exonArrows off
+    itemRgb on
+    priority 104
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hprcArrV1/hprcArrDupV1.bb
+
+    track hprcArrInvBedV1
+    shortLabel Inversions
+    type bigBed 9 +
+    longLabel Inversions with respect to hg38 in HPRC assemblies
+    parent hprcArrV1 on
+    maxItems 100000
+    visibility hide
+    labelFields label
+    exonArrows off
+    itemRgb on
+    priority 103
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hprcArrV1/hprcArrInvV1.bb
+    mouseOverField _mouseover
+
+    track hprcDeletionsV1
+    shortLabel Deletions
+    type bigBed 9 +
+    longLabel Insertions in hg38 = Deletion in the HPRC assemblies
+    parent hprcArrV1
+    maxItems 100000
+    visibility hide
+    group hprc
+    labelFields label
+    exonArrows off
+    itemRgb on
+    priority 102
+    filter.querySize 1
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hprcArrV1/hprcDeletionsV1.bb
+    mouseOverField _mouseover
+    filterLabel.querySize Minimum size of insertion in hg38
+
+    track hprcInsertsV1
+    shortLabel Insertions
+    type bigBed 9 +
+    longLabel Deletions in hg38 = Insertion in the HPRC assemblies
+    parent hprcArrV1
+    maxItems 100000
+    visibility hide
+    group hprc
+    labelFields label
+    itemRgb on
+    priority 101
+    filter.querySize 1
+    bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hprcArrV1/hprcInsertsV1.bb
+    mouseOverField _mouseover
+
+track hprcDecomposed
+shortLabel HPRC All Variants
+type vcfTabix
+longLabel HPRC variants decomposed from hprc-v1.0-mc.grch38.vcfbub.a100k.wave.vcf.gz (Liao et al 2023), no size filtering
+parent hprcVCF
+visibility hide
+group hprc
+configureByPopup off
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=hprcVCF
+maxWindowToDraw 200000
+superTrack on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hprc/decomposed.vcf.gz
+showHardyWeinberg on
+dataVersion August 2023
+
+track hprcVCFDecomposedOver3
+shortLabel HPRC Variants > 3bp
+type vcfTabix
+longLabel HPRC VCF variants filtered for items size > 3bp
+parent hprcVCF
+visibility hide
+group hprc
+configureByPopup off
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=hprcVCF
+maxWindowToDraw 200000
+superTrack on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hprc/decomposedOver3.vcf.gz
+showHardyWeinberg on
+dataVersion August 2023
+
+track hprcVCFDecomposedUnder4
+shortLabel HPRC Variants <= 3bp
+type vcfTabix
+longLabel HPRC VCF variants filtered for items size <= 3bp
+parent hprcVCF
+visibility pack
+group hprc
+configureByPopup off
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=hprcVCF
+maxWindowToDraw 200000
+superTrack on
+bigDataUrl https://hgdownload.soe.ucsc.edu/gbdb/hg38/hprc/decomposedUnder4.vcf.gz
+showHardyWeinberg on
+dataVersion August 2023
+

@@ -1,0 +1,54 @@
+{
+  "id": "danRer11",
+  "name": "Zebrafish (GRCZ11/danRer11)",
+  "twoBitURL": "https://hgdownload.soe.ucsc.edu/goldenPath/danRer11/bigZips/danRer11.2bit",
+  "wholeGenomeView": true,
+  "cytobandURL": "https://hgdownload.soe.ucsc.edu/goldenPath/danRer11/database/cytoBandIdeo.txt.gz",
+  "aliasURL": "https://hgdownload.soe.ucsc.edu/goldenPath/danRer11/bigZips/danRer11.chromAlias.txt",
+  "chromosomeOrder": [
+    "chr1",
+    "chr2",
+    "chr3",
+    "chr4",
+    "chr5",
+    "chr6",
+    "chr7",
+    "chr8",
+    "chr9",
+    "chr10",
+    "chr11",
+    "chr12",
+    "chr13",
+    "chr14",
+    "chr15",
+    "chr16",
+    "chr17",
+    "chr18",
+    "chr19",
+    "chr20",
+    "chr21",
+    "chr22",
+    "chr23",
+    "chr24",
+    "chr25"
+  ],
+  "chromSizesURL": "https://hgdownload.soe.ucsc.edu/goldenPath/danRer11/bigZips/danRer11.chrom.sizes",
+  "tracks": [
+    {
+      "id": "ncbiRefSeqCurated",
+      "name": "RefSeq Curated",
+      "url": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/002/035/GCF_000002035.6/bbi/GCF_000002035.6_GRCz11.ncbiRefSeqCurated.bb",
+      "trixURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/002/035/GCF_000002035.6/ixIxx/GCF_000002035.6_GRCz11.ncbiRefSeqCurated.ix",
+      "format": "biggenepred",
+      "displayMode": "EXPANDED",
+      "color": "rgb(12,12,120)",
+      "searchIndex": "name",
+      "html": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/002/035/GCF_000002035.6/html/GCF_000002035.6_GRCz11.refSeqComposite",
+      "labelField": "geneName2",
+      "order": 100000
+    }
+  ],
+  "hubs": [
+    "https://igv.org/genomes/hubs/danRer11/hub.txt"
+  ]
+}

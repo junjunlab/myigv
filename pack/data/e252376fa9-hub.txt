@@ -1,0 +1,8 @@
+hub IGV
+shortLabel Hosted Annotations
+longLabel Hosted Annotations
+genomesFile genomes.txt
+groups groups.txt
+
+
+

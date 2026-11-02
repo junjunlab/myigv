@@ -1,0 +1,51 @@
+{
+  "id": "mm10",
+  "name": "Mouse (GRCm38/mm10)",
+  "fastaURL": "https://igv.org/genomes/data/mm10/mm10.fa",
+  "indexURL": "https://igv.org/genomes/data/mm10/mm10.fa.fai",
+  "twoBitURL": "https://hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/mm10.2bit",
+  "nameSet": "ucsc",
+  "wholeGenomeView": true,
+  "description": "house mouse (GRCm38.p6 2017)\nMus musculus/GCF_000001635.26_GRCm38.p6 genome assembly",
+  "cytobandURL": "https://hgdownload.soe.ucsc.edu/goldenPath/mm10/database/cytoBand.txt.gz",
+  "aliasURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/GCF_000001635.26.chromAlias.txt",
+  "chromosomeOrder": [
+    "chr1",
+    "chr2",
+    "chr3",
+    "chr4",
+    "chr5",
+    "chr6",
+    "chr7",
+    "chr8",
+    "chr9",
+    "chr10",
+    "chr11",
+    "chr12",
+    "chr13",
+    "chr14",
+    "chr15",
+    "chr16",
+    "chr17",
+    "chr18",
+    "chr19",
+    "chrX",
+    "chrY"
+  ],
+  "chromSizesURL": "https://hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/mm10.chrom.sizes",
+  "tracks": [
+    {
+      "id": "ncbiRefSeq",
+      "name": "RefSeq All",
+      "url": "https://hgdownload.soe.ucsc.edu/goldenPath/mm10/database/ncbiRefSeq.txt.gz",
+      "indexed": false,
+      "format": "refgene",
+      "color": "rgb(12,12,120)",
+      "order": 100000
+    }
+  ],
+  "hubs": [
+    "https://igv.org/genomes/hubs/mm10/hub.txt",
+    "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/hub.txt"
+  ]
+}

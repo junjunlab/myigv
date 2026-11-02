@@ -1,0 +1,115 @@
+name: Build installers
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+jobs:
+  package:
+    name: Package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write        # needed to attach installers to a release
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-latest, macos-latest ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@417ae3ccd767c252f5661f1ace9f835f9654f2b5 # v3.1.0
+
+      # ---- Build the plain distribution (jars + offline annotation pack) ----
+      - name: Build distribution
+        run: ./gradlew createDist --no-daemon
+        shell: bash
+
+      # ---- WiX is required by jpackage to build a Windows .exe installer ----
+      - name: Install WiX Toolset (Windows)
+        if: runner.os == 'Windows'
+        run: choco install wixtoolset -y --no-progress
+        shell: pwsh
+
+      # ---- Runtime image: link only the JDK's own modules. Linking the app
+      #      modules together with jlink fails on IGV's automatic modules
+      #      (e.g. batik.xml), so we provide a pre-built runtime instead and
+      #      let jpackage copy it. ----
+      - name: Create runtime image
+        run: |
+          "$JAVA_HOME/bin/jlink" --add-modules ALL-MODULE-PATH \
+            --strip-debug --no-man-pages --no-header-files \
+            --output build/jp/runtime
+        shell: bash
+
+      # ---- jpackage copies --app-content next to the app; LocalResourcePack
+      #      searches that location, so the offline pack is found at runtime. ----
+      - name: Stage offline annotation pack
+        run: |
+          mkdir -p build/jp/app-content
+          cp -r build/myigv-dist/pack build/jp/app-content/pack
+        shell: bash
+
+      - name: Package Windows installer (.exe)
+        if: runner.os == 'Windows'
+        run: |
+          "$JAVA_HOME/bin/jpackage" --type exe \
+            --name myigv --app-version 1.0.0 --vendor junjunlab \
+            --runtime-image build/jp/runtime \
+            --module-path build/myigv-dist/lib \
+            --module org.igv/org.broad.igv.ui.Main \
+            --java-options "-Xmx4g" \
+            --java-options "-Dproduction=true" \
+            --java-options "-Djava.net.preferIPv4Stack=true" \
+            --java-options "-Dsun.java2d.noddraw=true" \
+            --app-content build/jp/app-content \
+            --icon resources/IGV_64.ico \
+            --dest build/installer \
+            --win-menu --win-shortcut --win-dir-chooser --win-per-user-install
+        shell: bash
+
+      - name: Package macOS installer (.dmg)
+        if: runner.os == 'macOS'
+        run: |
+          "$JAVA_HOME/bin/jpackage" --type dmg \
+            --name myigv --app-version 1.0.0 --vendor junjunlab \
+            --runtime-image build/jp/runtime \
+            --module-path build/myigv-dist/lib \
+            --module org.igv/org.broad.igv.ui.Main \
+            --java-options "-Xmx4g" \
+            --java-options "-Dproduction=true" \
+            --java-options "-Djava.net.preferIPv4Stack=true" \
+            --java-options "-Dsun.java2d.noddraw=true" \
+            --app-content build/jp/app-content \
+            --icon resources/IGV_64.icns \
+            --mac-package-name myigv \
+            --mac-package-identifier org.junjunlab.myigv \
+            --dest build/installer
+        shell: bash
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: myigv-installer-${{ matrix.os }}
+          path: |
+            build/installer/*.exe
+            build/installer/*.dmg
+          if-no-files-found: error
+
+      - name: Attach installer to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/installer/*.exe
+            build/installer/*.dmg
+          generate_release_notes: true

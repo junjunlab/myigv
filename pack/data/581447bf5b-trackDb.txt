@@ -1,0 +1,38 @@
+track refSeqComposite
+shortLabel NCBI RefSeq
+longLabel RefSeq genes from NCBI
+group genes
+compositeTrack on
+noInherit on
+
+    track refseqCurated
+    type refgene
+    shortLabel Refseq Curated
+    longLabel Refseq Curated
+    group genes
+    bigDataUrl https://hgdownload.soe.ucsc.edu/goldenPath/ce11/database/ncbiRefSeqCurated.txt.gz
+    html https://www.ncbi.nlm.nih.gov/refseq/refseq_select/
+    parent refSeqComposite
+
+    track refseqAll
+    type refgene
+    shortLabel Refseq All
+    longLabel Refseq All
+    group genes
+    bigDataUrl https://hgdownload.soe.ucsc.edu/goldenPath/ce11/database/ncbiRefSeq.txt.gz
+    html https://www.ncbi.nlm.nih.gov/refseq/refseq_select/
+    parent refSeqComposite
+
+track augustusGenes
+shortLabel Augustus Genes
+type refgene
+group genes
+bigDataUrl https://hgdownload.soe.ucsc.edu/goldenPath/ce11/database/augustusGene.txt.gz
+https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=ce11&g=augustusGene
+
+track ensGene
+shortLabel Ensembl Genes
+type refgene
+group genes
+bigDataUrl https://hgdownload.soe.ucsc.edu/goldenPath/ce11/database/ensGene.txt.gz
+html https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=ce11&g=ensGene

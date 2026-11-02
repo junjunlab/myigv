@@ -1,0 +1,24 @@
+# --- Build outputs & IDE/tooling -----------------------------------------
+/.gradle/
+/build/
+/.idea/
+*.iml
+
+# JENV local config file
+.java-version
+
+# Bundled JDK used for local builds only; CI supplies its own JDK 21.
+/jdk-21/
+
+# Large binary integration-test fixtures. Not required to build the app or
+# the installers, and they would bloat the repository (~123 MB).
+/test/data/
+
+# Local, secret-bearing OAuth override. The application reads this from the
+# user's IGV data directory at runtime; it must never be committed.
+/oauth-config-custom.json
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini

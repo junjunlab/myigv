@@ -1,0 +1,80 @@
+hub IGV
+shortLabel Tutorials
+longLabel Tutorials
+useOneFile on
+
+genome hg19
+
+track uiBasics
+shortLabel UI Basics
+compositeTrack on
+defaultIsClosed 0
+
+    track GM12878_H3K27ac
+    type bigWig
+    shortLabel GM12878 H3K27ac
+    color 255,0,0
+    viewLimits 0:25
+    bigDataUrl https://www.encodeproject.org/files/ENCFF000ASJ/@@download/ENCFF000ASJ.bigWig
+    parent uiBasics
+
+    track GM12878_H3K27me3
+    type bigWig
+    shortLabel GM12878 H3K27me3
+    color 255,0,0
+    viewLimits 0:25
+    bigDataUrl https://www.encodeproject.org/files/ENCFF000AST/@@download/ENCFF000AST.bigWig
+    parent uiBasics
+
+    track GM12878_H3K36me3
+    type bigWig
+    shortLabel GM12878 H3K36me3
+    color 0,0,150
+    viewLimits 0:25
+    bigDataUrl https://www.encodeproject.org/files/ENCFF000ATA/@@download/ENCFF000ATA.bigWig
+    parent uiBasics
+
+    track GM12878_H3K4me1
+    type bigWig
+    shortLabel GM12878 H3K4me1
+    color 0,150,0
+    viewLimits 0:25
+    bigDataUrl https://www.encodeproject.org/files/ENCFF000ARZ/@@download/ENCFF000ARZ.bigWig
+    parent uiBasics
+
+track bodyMap
+shortLabel RNA-Seq (Body Map)
+compositeTrack on
+defaultIsClosed 0
+
+    track heart
+    shortLabel Heart
+    type bam
+    bigDataUrl https://igv.org/data/tutorials/rna/heart_slc25a3.bam
+    parent bodyMap
+
+    track liver
+    shortLabel Liver
+    type bam
+    bigDataUrl https://igv.org/data/tutorials/rna/liver_slc25a3.bam
+    parent bodyMap
+
+track variants
+shortLabel VCF Variants
+longLabel VCF Variants from 1000 Genomes
+defaultIsClosed 0
+
+    track phase_3_genotypes
+    shortLabel Phase 3 genotypes
+    bigDataUrl https://igv.org/genomes/data/hg19/ALL.phase3_shapeit2_mvncall_integrated_v1b.20130502.genotypes.vcf.list
+    parent variants
+    maxWindowToDraw 10000
+    maxHeightPixels 10000000:800:10
+    type vcf.list
+
+    track sampleInfo
+    shortLabel Sample Information
+    bigDataUrl https://igv.org/data/tutorials/vcf/integrated_call_samples_v3.20130502.ALL.panel
+    type sampleinfo
+    parent variants
+

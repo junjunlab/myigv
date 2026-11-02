@@ -1,0 +1,28 @@
+{
+  "id": "GCF_000002945.1",
+  "name": "S. pombe (GCF_000002945.1)",
+  "fastaURL": "https://igv.org/genomes/data/ASM294v2/Schizosaccharomyces_pombe_all_chromosomes.fa",
+  "indexURL": "https://igv.org/genomes/data/ASM294v2/Schizosaccharomyces_pombe_all_chromosomes.fa.fai",
+  "twoBitURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/002/945/GCF_000002945.1/GCF_000002945.1.2bit",
+  "nameSet": "ucsc",
+  "chromSizesURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/002/945/GCF_000002945.1/GCF_000002945.1.chrom.sizes.txt",
+  "aliasURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/002/945/GCF_000002945.1/GCF_000002945.1.chromAlias.txt",
+  "twoBitBptURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/002/945/GCF_000002945.1/GCF_000002945.1.2bit.bpt",
+  "cytobandBbURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/002/945/GCF_000002945.1/bbi/GCF_000002945.1_ASM294v2.cytoBand.bb",
+  "tracks": [
+    {
+      "type": "annotation",
+      "name": "RefSeq Curated",
+      "format": "biggenepred",
+      "url": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/002/945/GCF_000002945.1/bbi/GCF_000002945.1_ASM294v2.ncbiRefSeqCurated.bb",
+      "displayMode": "EXPANDED",
+      "searchIndex": "name",
+      "trixURL": "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/002/945/GCF_000002945.1/ixIxx/GCF_000002945.1_ASM294v2.ncbiRefSeqCurated.ix",
+      "visibilityWindow": -1,
+      "order": 100000
+    }
+  ],
+  "hubs": [
+    "https://hgdownload.soe.ucsc.edu/hubs/GCF/000/002/945/GCF_000002945.1/hub.txt"
+  ]
+}

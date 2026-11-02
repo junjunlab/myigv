@@ -1,0 +1,7 @@
+genome hg38
+trackDb trackDb.txt
+groups groups.txt
+
+genome hg38_1kg
+trackDb trackDb.txt
+groups groups.txt

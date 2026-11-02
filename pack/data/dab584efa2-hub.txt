@@ -1,0 +1,109 @@
+hub tumorscape
+longLabel Copy Number Alterations Across Human Cancers (TCGA 2011)
+shortLabel Copy Number Alterations Across Human Cancers (TCGA 2011)
+useOneFile on
+html tumorscape.html
+
+genome hg18
+
+track Sample_Information
+shortLabel Sample Information
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/sample_info_100215.txt.gz
+
+track All_Cancers
+shortLabel All Cancers
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/all_cancers.seg.gz
+
+track All_Epithelial
+shortLabel All Epithelial
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/all_epithelial.seg.gz
+
+track All_Hematologic
+shortLabel All Hematologic
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/all_hematologic.seg.gz
+
+track All_Lung
+shortLabel All Lung
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/all_lung.seg.gz
+
+track All_Neural
+shortLabel All Neural
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/all_neural.seg.gz
+
+track Acute_lymphoblastic leukemia
+shortLabel Acute lymphoblastic leukemia
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Acute%20lymphoblastic%20leukemia.seg.gz
+
+track Breast
+shortLabel Breast
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Breast.seg.gz
+
+track Colorectal
+shortLabel Colorectal
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Colorectal.seg.gz
+
+track Esophageal_squamous
+shortLabel Esophageal squamous
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Esophageal%20squamous.seg.gz
+
+track Glioma
+shortLabel Glioma
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Glioma.seg.gz
+
+track Hepatocellular
+shortLabel Hepatocellular
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Hepatocellular.seg.gz
+
+track Lung_NSC
+shortLabel Lung NSC
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Lung%20NSC.seg.gz
+
+track Lung_SC
+shortLabel Lung SC
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Lung%20SC.seg.gz
+
+track Medulloblastoma
+shortLabel Medulloblastoma
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Medulloblastoma.seg.gz
+
+track Melanoma
+shortLabel Melanoma
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Melanoma.seg.gz
+
+track Myeloproliferative_disorder
+shortLabel Myeloproliferative disorder
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Myeloproliferative%20disorder.seg.gz
+
+track Ovarian
+shortLabel Ovarian
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Ovarian.seg.gz
+
+track Prostate
+shortLabel Prostate
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Prostate.seg.gz
+
+track Renal
+shortLabel Renal
+type seg
+bigDataUrl https://data.broadinstitute.org/igvdata/Tumorscape/gz/Renal.seg.gz
+
+

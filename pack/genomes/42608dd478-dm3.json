@@ -1,0 +1,24 @@
+{
+  "id": "dm3",
+  "name": "D. melanogaster (dm3)",
+  "twoBitURL": "https://hgdownload.soe.ucsc.edu/goldenPath/dm3/bigZips/dm3.2bit",
+  "wholeGenomeView": true,
+  "chromosomeOrder": [
+    "chr2L",
+    "chr2R",
+    "chr3L",
+    "chr3R",
+    "chr4",
+    "chrX"
+  ],
+  "chromSizesURL": "https://hgdownload.soe.ucsc.edu/goldenPath/dm3/bigZips/dm3.chrom.sizes",
+  "tracks": [
+    {
+      "name": "Refseq Curated",
+      "url": "https://hgdownload.soe.ucsc.edu/goldenPath/dm3/database/refGene.txt.gz",
+      "indexed": false,
+      "format": "refgene",
+      "order": 100000
+    }
+  ]
+}
