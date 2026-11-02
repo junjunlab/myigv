@@ -18,6 +18,10 @@
 # user's IGV data directory at runtime; it must never be committed.
 /oauth-config-custom.json
 
+# Local-only Windows launchers -- kept on disk for convenience, never published.
+/启动myigv.bat
+/启动myigv-控制台.bat
+
 # OS junk
 .DS_Store
 Thumbs.db
