@@ -6,12 +6,17 @@ IGV 原逻辑——联网按需获取，放大到一定分辨率后才联网下�
 
 ## 如何启动
 
-直接双击根目录下的 **`启动myigv.bat`** 即可（首次会自动用 `gradlew createDist` 构建发行包）。
+推荐直接使用安装包（Windows `.exe` / macOS `.dmg`，自带 Java 运行时与离线注释）。
 
-- `启动myigv.bat`：静默 GUI 启动（无控制台窗口），推荐日常使用。
-- `启动myigv-控制台.bat`：带控制台窗口启动，**排错时请用它**——任何启动报错都会打印在窗口里。
+从源码运行（需要 JDK 21）：
 
-要求：根目录需带有 `jdk-21`（已随工程附带）；否则会回退到系统 `java`。
+```bash
+./gradlew createDist            # Windows: gradlew.bat createDist
+build/myigv-dist/myigv.bat      # Windows
+build/myigv-dist/myigv.sh       # Linux / macOS
+```
+
+排错时从终端运行上面的启动脚本，错误会直接打印到终端窗口。
 
 ## 离线能力说明
 
