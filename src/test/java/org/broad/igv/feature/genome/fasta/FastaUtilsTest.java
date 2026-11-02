@@ -29,6 +29,7 @@ import org.broad.igv.AbstractHeadlessTest;
 import org.broad.igv.exceptions.DataLoadException;
 import org.broad.igv.feature.genome.Genome;
 import org.broad.igv.feature.genome.GenomeManager;
+import org.broad.igv.feature.genome.load.GenomeLoader;
 import org.broad.igv.util.TestUtils;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -243,6 +244,61 @@ public class FastaUtilsTest extends AbstractHeadlessTest {
         assertTrue(idx.length() > 0);
         assertTrue("normalized copy should expose contigs",
                 !new FastaIndex(result[1]).getSequenceNames().isEmpty());
+    }
+
+    /**
+     * A gzipped fasta is decompressed once, then indexed like a plain fasta.  A second call
+     * reuses the existing decompressed copy and index instead of regenerating them.
+     */
+    @Test
+    public void testEnsureIndexedGzipFasta() throws Exception {
+        File dir = java.nio.file.Files.createTempDirectory("myigv_fasta").toFile();
+        File gz = new File(dir, "normal.fa.gz");
+        byte[] fasta = java.nio.file.Files.readAllBytes(
+                new File(TestUtils.DATA_DIR + "fasta/fasta_2contigs.fa").toPath());
+        try (java.util.zip.GZIPOutputStream out =
+                     new java.util.zip.GZIPOutputStream(new java.io.FileOutputStream(gz))) {
+            out.write(fasta);
+        }
+
+        String[] result = FastaUtils.ensureIndexed(gz.getAbsolutePath(), gz.getAbsolutePath() + ".fai");
+
+        assertTrue("expected a decompressed .fa, got " + result[0], result[0].endsWith(".fa"));
+        assertTrue(new File(result[0]).isFile());
+        File idx = new File(result[1]);
+        assertTrue(idx.isFile());
+        assertTrue(idx.length() > 0);
+        assertTrue("decompressed fasta should expose contigs",
+                !new FastaIndex(result[1]).getSequenceNames().isEmpty());
+
+        long idxModified = idx.lastModified();
+        String[] again = FastaUtils.ensureIndexed(gz.getAbsolutePath(), gz.getAbsolutePath() + ".fai");
+        assertEquals(result[0], again[0]);
+        assertEquals("index should be reused, not regenerated", idxModified, new File(again[1]).lastModified());
+    }
+
+    /**
+     * The genome loader should accept a gzipped fasta directly instead of rejecting it.
+     */
+    @Test
+    public void testGenomeLoaderAcceptsGzipFasta() throws Exception {
+        File dir = java.nio.file.Files.createTempDirectory("myigv_fasta").toFile();
+        File gz = new File(dir, "genome.fa.gz");
+        byte[] fasta = java.nio.file.Files.readAllBytes(
+                new File(TestUtils.DATA_DIR + "fasta/fasta_2contigs.fa").toPath());
+        try (java.util.zip.GZIPOutputStream out =
+                     new java.util.zip.GZIPOutputStream(new java.io.FileOutputStream(gz))) {
+            out.write(fasta);
+        }
+
+        GenomeLoader loader = GenomeLoader.getLoader(gz.getAbsolutePath());
+        assertNotNull(loader);
+        Genome genome = loader.loadGenome();
+        assertNotNull(genome);
+        assertTrue("the fasta should have been decompressed next to the .gz",
+                new File(dir, "genome.fa").isFile());
+        assertTrue("the decompressed fasta should be indexed",
+                new File(dir, "genome.fa.fai").isFile());
     }
 
 }

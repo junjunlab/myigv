@@ -12,6 +12,7 @@ import org.broad.igv.track.FeatureCollectionSource;
 import org.broad.igv.track.FeatureTrack;
 import org.broad.igv.ui.util.MessageUtils;
 import org.broad.igv.util.FileUtils;
+import org.broad.igv.util.GzipUtils;
 import org.broad.igv.util.HttpUtils;
 import org.broad.igv.util.Utilities;
 
@@ -53,11 +54,17 @@ abstract public class GenomeLoader {
             return new HubGenomeLoader(genomePath);
         } else {
             // Assume a fasta or 2bit file file
-            if (genomePath.endsWith(Globals.GZIP_FILE_EXTENSION)) {
+            if (GzipUtils.hasCompressionSuffix(genomePath)) {
                 String gziPath = genomePath + ".gzi";
                 String faiPath = genomePath + ".fai";
                 if (!(FileUtils.resourceExists(gziPath) && FileUtils.resourceExists(faiPath))) {
-                    throw new GenomeException("IGV cannot read gzipped fasta files.");
+                    // Plain gzip (not bgzip) is not seekable and cannot be indexed for random access.
+                    // Decompress once to a sibling fasta so the normal .fai indexing path can be used.
+                    String plain = GzipUtils.decompressToSibling(genomePath);
+                    if (plain == null || plain.equals(genomePath)) {
+                        throw new GenomeException("IGV cannot read gzipped fasta files.");
+                    }
+                    genomePath = plain;
                 }
             }
             return new FastaGenomeLoader(genomePath);

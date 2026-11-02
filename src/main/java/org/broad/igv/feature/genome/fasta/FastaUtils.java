@@ -29,6 +29,7 @@ import org.broad.igv.logging.*;
 import org.broad.igv.Globals;
 import org.broad.igv.exceptions.DataLoadException;
 import org.broad.igv.ui.util.MessageUtils;
+import org.broad.igv.util.GzipUtils;
 import org.broad.igv.util.ParsingUtils;
 import htsjdk.tribble.readers.AsciiLineReader;
 
@@ -180,6 +181,20 @@ public class FastaUtils {
      * original paths are returned and the caller will fail as before.
      */
     public static String[] ensureIndexed(String fastaPath, String indexPath) {
+
+        // Gzipped FASTA is not seekable and cannot be indexed as-is, so decompress it once to a
+        // sibling file and index that.  A previously decompressed copy + index is reused.
+        String plain = GzipUtils.decompressToSibling(fastaPath);
+        if (plain != null && !plain.equals(fastaPath)) {
+            File plainFile = new File(plain);
+            String plainIndex = plain + ".fai";
+            File existing = new File(plainIndex);
+            if (existing.isFile() && existing.length() > 0 && existing.lastModified() >= plainFile.lastModified()) {
+                return new String[]{plain, plainIndex};
+            }
+            fastaPath = plain;
+            indexPath = plainIndex;
+        }
 
         File indexFile = new File(indexPath);
 

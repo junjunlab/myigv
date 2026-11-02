@@ -107,7 +107,9 @@ Gene List 里记录的是基因名（feature 命中）或坐标（locus 命中�
 
 **说明与开关**
 
-- 压缩的 GTF（`.gtf.gz` / `.bgz`）不做自动处理——那需要 bgzip + tabix 重压缩，仍按非索引方式加载。
+- **压缩文件直接读取**：`.gtf.gz` / `.gff.gz` 会先解压成同目录的 `.gtf` / `.gff`（已有且较新则复用），
+  再排序 + 建索引；`.fa.gz` / `.fasta.gz` 同理先解压成 `.fa` 再建 `.fai`。已经是 bgzip + tabix（`.tbi`）
+  或 bgzip + `.gzi`/`.fai` 的文件不解压，按索引直接读取。原压缩文件不会被修改。
 - 目录只读等导致写入失败时只会记录日志，文件照常加载，不会中断。
 - 如需关闭自动处理：启动参数加 `-Dmyigv.autoIndex=false`，或设置环境变量 `MYIGV_AUTO_INDEX=false`。
 
@@ -116,6 +118,8 @@ Gene List 里记录的是基因名（feature 命中）或坐标（locus 命中�
 - `TrackLoader.load`：加载前调用 `AutoIndexer.ensureSortedAndIndexed`，必要时把 locator 指向排序副本
   （同时保留原文件名作为轨道名）。
 - `FastaUtils.ensureIndexed` + `FastaGenomeLoader`：静默建 `.fai`，行长不一致时自动规范化并重试。
+- `org/broad/igv/util/GzipUtils.java`（新增）：识别 gzip / BGZF，按需解压到同级文件（复用较新副本、原子替换）。
+- `GenomeLoader.getLoader`：`.fa.gz` 不再直接报错，先解压再走 FASTA 索引流程。
 
 ## 搜索框显示基因名（不显示坐标）
 

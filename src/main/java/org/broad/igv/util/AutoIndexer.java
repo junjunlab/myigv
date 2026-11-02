@@ -61,7 +61,8 @@ import java.util.Set;
  * annotation file needs no manual igvtools step.  Disable with {@code -Dmyigv.autoIndex=false}
  * (or the {@code MYIGV_AUTO_INDEX=false} environment variable).
  * <p>
- * Remote files and compressed files (which would require bgzip+tabix) are left untouched.
+ * Remote files are left untouched.  Local gzip-compressed annotations are decompressed once to a
+ * sibling file first (gzip is not seekable), so {@code genes.gtf.gz} is handled like {@code genes.gtf}.
  */
 public class AutoIndexer {
 
@@ -102,6 +103,21 @@ public class AutoIndexer {
     }
 
     private static String doEnsure(String path, Genome genome) throws Exception {
+
+        // A plain-gzip annotation file cannot be indexed in place (gzip is not seekable).
+        // Decompress it once to a sibling file and run the normal sort/index pipeline on that.
+        // Files that already carry a tabix index are left alone and read through the index.
+        if (GzipUtils.hasCompressionSuffix(path)) {
+            String base = GzipUtils.stripCompressionSuffix(path).toLowerCase();
+            boolean annotation = base.endsWith(".gtf") || base.endsWith(".gff")
+                    || base.endsWith(".gff3") || base.endsWith(".gvf");
+            if (annotation && !new File(path + ".tbi").isFile()) {
+                String decompressed = GzipUtils.decompressToSibling(path);
+                if (decompressed != null && !decompressed.equals(path)) {
+                    path = decompressed;
+                }
+            }
+        }
 
         if (!isLocalAnnotationFile(path)) return path;
 
@@ -266,7 +282,7 @@ public class AutoIndexer {
                 || lower.startsWith("s3://") || lower.startsWith("gs://") || lower.startsWith("data:")) {
             return false;
         }
-        // Compressed inputs would need bgzip + tabix; leave those to the user
+        // Compressed inputs are decompressed by the caller before this check; .bz2 / .zip are unsupported
         if (lower.endsWith(".gz") || lower.endsWith(".bgz") || lower.endsWith(".bz2") || lower.endsWith(".zip")) {
             return false;
         }

@@ -3,9 +3,12 @@ package org.broad.igv.util;
 import org.junit.Test;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.zip.GZIPOutputStream;
 
 import static org.junit.Assert.*;
 
@@ -111,6 +114,28 @@ public class AutoIndexerTest {
         assertEquals(input.getAbsolutePath(), result);
         assertTrue(new File(input.getPath() + ".idx").isFile());
         assertFalse("no sorted copy should be created", new File(dir, "genes.sorted.gtf").exists());
+    }
+
+    /**
+     * A gzip annotation is decompressed once, then sorted and indexed like a plain file.
+     */
+    @Test
+    public void testGzipAnnotationIsDecompressedAndIndexed() throws Exception {
+        File dir = Files.createTempDirectory("myigv_autoindex").toFile();
+        File gz = new File(dir, "genes.gtf.gz");
+        try (OutputStream out = new GZIPOutputStream(new FileOutputStream(gz))) {
+            out.write(UNSORTED_GTF.getBytes(StandardCharsets.UTF_8));
+        }
+
+        String result = AutoIndexer.ensureSortedAndIndexed(gz.getAbsolutePath(), null);
+
+        assertTrue("expected a derived .gtf, got " + result,
+                result.endsWith(".gtf") || result.endsWith(".sorted.gtf"));
+        assertTrue("derived file should exist", new File(result).isFile());
+        assertTrue("derived file should be indexed", new File(result + ".idx").isFile());
+        assertFalse("the .gz itself must not be indexed in place",
+                new File(gz.getAbsolutePath() + ".idx").exists());
+        assertTrue("original .gz must be left in place", gz.isFile());
     }
 
     private static File writeFile(String name, String content) throws Exception {
