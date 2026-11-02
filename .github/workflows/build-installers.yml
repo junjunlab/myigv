@@ -1,8 +1,9 @@
 name: Build installers
 
 on:
+  # Build installers only for releases (tags) or on demand, to avoid uploading
+  # ~325 MB of artifacts on every push to main.
   push:
-    branches: [ "main" ]
     tags: [ "v*" ]
   workflow_dispatch:
 
