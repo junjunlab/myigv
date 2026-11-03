@@ -223,6 +223,34 @@ bigwig / 折线等数据轨道左上角会显示一个 `[min - max]` 的 Y 轴�
 > 补充：若已勾选 `CHART_DRAW_Y_AXIS`（左侧带刻度的完整 Y 轴），则走的是另一条绘制路径，
 > 本标签不显示；上面的设置只作用于默认的 `[min - max]` 角标。
 
+## Sashimi 图（sashimi plot）增强
+
+打开 Sashimi 剪接图（菜单 Tools → Sashimi Plot 或对应入口）后新增两项：
+
+### Ctrl + 滚轮缩放
+原先只能用顶部的 `+/-` 按钮按固定步长缩放。现在在**剪接弧区**或**下方基因结构区**按住
+**Ctrl（Mac 上为 ⌘/Meta）+ 滚轮** 即可缩放，缩放以**光标位置为中心**（"zoom to cursor"），
+滚动多格可连续放大/缩小，不再受限于固定的 `+/-` 步长。
+
+- 没有 Ctrl/Meta 时，滚轮在基因结构区仍按原行为**纵向滚动**该区域；在剪接弧区则不触发任何动作。
+
+### 基因结构背景色可调
+下方基因结构（默认灰色）区域的背景色现在可配置：
+
+- **右键基因结构轨道 → Set Background Color…** 直接选色，立即生效并记住；
+- 也可在全局 **Preferences → RNA → Sashimi Plot → Gene structure background color** 里设置
+  （默认浅灰 `240,240,240`）。
+
+实现改动：
+
+- `Constants` 新增 `SASHIMI_GENE_BACKGROUND_COLOR`；`preferences.tab` 在 `RNA` 分节下新增
+  `##Sashimi Plot` 子节与该项（默认 `240,240,240`，格式 `R,G,B`）。
+- `SashimiPlot`：构造里读取该偏好并应用到基因 `TrackComponent` 与滚动面板 viewport 背景
+  （`applyGeneBackground()`）；新增 `addWheelZoomListeners()` 在剪接区与基因区挂 `MouseWheelListener`，
+  Ctrl/Meta 时调用 `referenceFrame.doIncrementZoomAtCursor(...)` 以光标为中心缩放。
+- `GeneTrackMouseAdapter.getPopupMenu()` 在基因轨道右键菜单（显示模式项之后）新增
+  "Set Background Color…" 项，用颜色选择器选色后写入偏好并即时刷新。
+
 ## 实现要点（供二次开发参考）
 
 - `src/main/java/org/broad/igv/local/LocalResourcePack.java`：资源包核心类，读取

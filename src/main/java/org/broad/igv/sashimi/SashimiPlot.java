@@ -51,6 +51,8 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
 import java.util.*;
@@ -81,6 +83,10 @@ public class SashimiPlot extends JFrame implements IGVEventObserver {
 
     private Map<Object, SashimiJunctionRenderer> junctionRendererMap;
 
+    private TrackComponent<SelectableFeatureTrack> geneTrackComponent;
+    private JScrollPane geneScrollPane;
+    private JPanel sashimiPanel;
+
     static {
         ColorPalette palette = ColorUtilities.getDefaultPalette();
         plotColors = Arrays.asList(palette.getColors());
@@ -107,6 +113,7 @@ public class SashimiPlot extends JFrame implements IGVEventObserver {
 
 
         JPanel sashimiPanel = new JPanel();
+        this.sashimiPanel = sashimiPanel;
         sashimiPanel.setBackground(Color.WHITE);
         BoxLayout boxLayout = new BoxLayout(sashimiPanel, BoxLayout.Y_AXIS);
         sashimiPanel.setLayout(boxLayout);
@@ -152,16 +159,21 @@ public class SashimiPlot extends JFrame implements IGVEventObserver {
         sashimiPanel.add(axis);
 
         featureTrack = new SelectableFeatureTrack(geneTrack);
-        TrackComponent<SelectableFeatureTrack> geneComponent = new TrackComponent<>(referenceFrame, featureTrack);
-        initGeneComponent(referenceFrame.getWidthInPixels(), geneComponent, featureTrack);
+        geneTrackComponent = new TrackComponent<>(referenceFrame, featureTrack);
+        initGeneComponent(referenceFrame.getWidthInPixels(), geneTrackComponent, featureTrack);
 
-        JScrollPane scrollableGenePane = new JScrollPane(geneComponent);
-        scrollableGenePane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scrollableGenePane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        geneScrollPane = new JScrollPane(geneTrackComponent);
+        geneScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        geneScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
 
-        sashimiContentPane = new SashimiContentPane(sashimiPanel, scrollableGenePane);
+        sashimiContentPane = new SashimiContentPane(sashimiPanel, geneScrollPane);
         sashimiContentPane.setDividerLocation(2 * height / 3);
         getContentPane().add(sashimiContentPane);
+
+        // Apply the configurable gene-structure background color, then enable
+        // ctrl/meta + mouse-wheel zoom (mirrors the main IGV data panel).
+        applyGeneBackground();
+        addWheelZoomListeners();
 
         validate();
     }
@@ -216,9 +228,9 @@ public class SashimiPlot extends JFrame implements IGVEventObserver {
         RenderContext context = new RenderContext(geneComponent, null, referenceFrame, null);
         geneTrack.load(context.getReferenceFrame());
 
-        GeneTrackMouseAdapter ad2 = new GeneTrackMouseAdapter(geneComponent);
-        geneComponent.addMouseListener(ad2);
-        geneComponent.addMouseMotionListener(ad2);
+        GeneTrackMouseAdapter ad2 = new GeneTrackMouseAdapter(geneTrackComponent);
+        geneTrackComponent.addMouseListener(ad2);
+        geneTrackComponent.addMouseMotionListener(ad2);
     }
 
     private void initSpliceJunctionComponent(TrackComponent<SpliceJunctionTrack> trackComponent, AlignmentDataManager dataManager, CoverageTrack coverageTrack) {
@@ -234,6 +246,50 @@ public class SashimiPlot extends JFrame implements IGVEventObserver {
 
     private SashimiJunctionRenderer getRenderer(SpliceJunctionTrack spliceJunctionTrack) {
         return junctionRendererMap.get(spliceJunctionTrack);
+    }
+
+    /**
+     * Apply the user-configurable background color of the gene-structure panel
+     * (the gray area below the sashimi arcs). The color comes from the
+     * {@code SASHIMI.GENE_BACKGROUND_COLOR} preference, which can be changed
+     * either in the global Preferences dialog or via the gene track's
+     * right-click menu.
+     */
+    private void applyGeneBackground() {
+        Color geneBg = PreferencesManager.getPreferences().getAsColor(Constants.SASHIMI_GENE_BACKGROUND_COLOR);
+        if (geneTrackComponent != null) {
+            geneTrackComponent.setBackground(geneBg);
+        }
+        if (geneScrollPane != null && geneScrollPane.getViewport() != null) {
+            geneScrollPane.getViewport().setBackground(geneBg);
+        }
+    }
+
+    /**
+     * Enable ctrl (Windows/Linux) or cmd/meta (macOS) + mouse-wheel zoom on the
+     * sashimi plot. The zoom is centered on the cursor ("zoom to cursor"), which
+     * matches the behavior of the main IGV data panel and lets the user zoom by
+     * an arbitrary, continuous amount instead of the fixed +/- steps.
+     * <p>
+     * Without the modifier the wheel event is left un-consumed so the gene
+     * scroll pane can scroll vertically as usual.
+     */
+    private void addWheelZoomListeners() {
+        MouseWheelListener zoomListener = e -> {
+            if (e.isControlDown() || e.isMetaDown()) {
+                int zoomIncr = -e.getWheelRotation();
+                if (zoomIncr != 0) {
+                    double cursorGenomePos = referenceFrame.getChromosomePosition(e);
+                    referenceFrame.doIncrementZoomAtCursor(zoomIncr, cursorGenomePos, e.getX());
+                }
+                e.consume();
+                SashimiPlot.this.repaint();
+            }
+        };
+        sashimiPanel.addMouseWheelListener(zoomListener);
+        if (geneTrackComponent != null) {
+            geneTrackComponent.addMouseWheelListener(zoomListener);
+        }
     }
 
     @Override
@@ -513,6 +569,24 @@ public class SashimiPlot extends JFrame implements IGVEventObserver {
         protected IGVPopupMenu getPopupMenu(MouseEvent e) {
             IGVPopupMenu menu = new IGVPopupMenu();
             TrackMenuUtils.addDisplayModeItems(Arrays.asList(trackComponent.track), menu);
+
+            menu.addSeparator();
+
+            JMenuItem setGeneBgItem = new JMenuItem("Set Background Color...");
+            setGeneBgItem.setToolTipText("Set the background color of the gene structure panel");
+            setGeneBgItem.addActionListener(e1 -> {
+                Color current = PreferencesManager.getPreferences().getAsColor(Constants.SASHIMI_GENE_BACKGROUND_COLOR);
+                Color chosen = UIUtilities.showColorChooserDialog("Gene Structure Background Color", current);
+                SashimiPlot.this.toFront();
+                if (chosen != null) {
+                    PreferencesManager.getPreferences().put(Constants.SASHIMI_GENE_BACKGROUND_COLOR,
+                            ColorUtilities.colorToString(chosen));
+                    SashimiPlot.this.applyGeneBackground();
+                    SashimiPlot.this.repaint();
+                }
+            });
+            menu.add(setGeneBgItem);
+
             menu.addPopupMenuListener(new RepaintPopupMenuListener(trackComponent));
             return menu;
         }

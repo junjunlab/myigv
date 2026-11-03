@@ -195,6 +195,9 @@ SAM.SHOW_JUNCTION_FLANKINGREGIONS	Show flanking regions	boolean	TRUE
 SAM.JUNCTION_MIN_FLANKING_WIDTH	Minimum flanking width	integer	0
 SAM.JUNCTION_MIN_COVERAGE	Minimum junction coverage	integer	1
 
+##Sashimi Plot
+SASHIMI.GENE_BACKGROUND_COLOR	Gene structure background color	color	240,240,240
+
 ##Insert Size Options
 SAM.COMPUTE_ISIZES	Compute insert size thresholds	boolean	FALSE
 SAM.MIN_ISIZE_MIN_PERCENTILE	Minimum (percentile)	float	0.5
