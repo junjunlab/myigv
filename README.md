@@ -22,6 +22,7 @@
 | 9 | **轴标签可调** | Y 轴 `[min - max]` 标签的字号、左上/右上位置可调 |
 | 10 | **一键安装包** | GitHub Actions 自动产出 Windows `.exe` / macOS `.dmg` |
 | 11 | **压缩文件直接读取** | `.gtf.gz` / `.fa.gz` 自动解压一次，无需手动 gunzip |
+| 12 | **转录本标签可切换** | 展开视图可显示基因名 / 转录本 ID / 两者 |
 
 ---
 
@@ -109,6 +110,25 @@ myigv 默认**每个分面独立 group autoscale**。可在轨道右键 → Grou
 
 解压只在第一次导入时发生一次，**原压缩文件不会被修改**；代价是需要一份解压后的副本（约为解压后大小）。
 解压过程中状态栏会显示进度提示，可用 `-Dmyigv.autoIndex=false` 关闭整套自动处理。
+
+## 12. 展开视图可切换转录本标签
+
+基因结构 **Expanded** 时，同一基因的每个转录本行默认都显示基因名（如 `HESX1`），无法区分具体转录本。
+现在在轨道上右键 → **Transcript label** 可以切换：
+
+| 选项 | 显示 |
+| :-- | :-- |
+| **Gene name** | 基因名（默认，等同原版 IGV） |
+| **Transcript ID (accession)** | RefSeq 显示 `NM_/NR_` 登录号；GTF 显示 `transcript_id`（如 `ENST...`） |
+| **Transcript name (readable)** | 优先 `transcript_name`（如 `HESX1-201`），没有则回退到登录号 |
+| **Gene + ID** | `HESX1 (NM_003865.3)` |
+| **Custom field...** | 任意属性名，如 `gene_id` |
+
+选择只作用于当前轨道，并随 session 一起保存。勾选 **Use for new annotation tracks** 可把它设为
+**新打开注释轨道的全局默认**（之后再右键切回 Gene name 可覆盖默认）。
+
+> 提示：长登录号（如 `ENST00000382410.4`）在很窄的转录本上可能放不下——渲染器会自动跳过放不下的标签，
+> 属正常现象；放大后再看即可。
 
 ---
 

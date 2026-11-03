@@ -140,7 +140,6 @@ public class IGVFeatureRenderer extends FeatureRenderer {
             boolean alternateExonColor = (track instanceof FeatureTrack && ((FeatureTrack) track).isAlternateExonColor());
             Color trackPosColor = track.getColor();
             Color trackNegColor = alternateExonColor ? track.getColor() : track.getAltColor();
-            String labelField = track.getLabelField();
 
             for (IGVFeature feature : featureList) {
 
@@ -254,7 +253,7 @@ public class IGVFeatureRenderer extends FeatureRenderer {
                 // Draw name , if there is room
                 if (displayMode != Track.DisplayMode.SQUISHED && track.isShowFeatureNames()) {
 
-                    String name = labelField != null ? feature.getDisplayName(labelField) : feature.getName();
+                    String name = FeatureTrack.getFeatureLabel(track, feature);
 
                     if (name != null) {
                         // Limit name display length

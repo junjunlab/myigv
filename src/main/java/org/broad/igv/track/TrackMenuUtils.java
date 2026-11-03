@@ -439,6 +439,7 @@ public class TrackMenuUtils {
         featurePopupMenu.addSeparator();
         featurePopupMenu.add(getShowFeatureNames(tracks));
         featurePopupMenu.add(getFeatureNameAttribute(tracks));
+        featurePopupMenu.add(getTranscriptLabelItem(tracks));
     }
 
     /**
@@ -1422,6 +1423,86 @@ public class TrackMenuUtils {
         });
 
         return item;
+    }
+
+    /**
+     * Submenu choosing what is drawn for each transcript in an expanded feature track:
+     * gene name (default), transcript accession, readable transcript name, or "gene (accession)".
+     * The choice is stored per track; "Use for new annotation tracks" sets the global default.
+     */
+    public static JMenu getTranscriptLabelItem(final Collection<Track> selectedTracks) {
+
+        final JMenu menu = new JMenu("Transcript label");
+        menu.setToolTipText("Text shown for each transcript in expanded view");
+
+        final List<FeatureTrack> featureTracks = new ArrayList<>();
+        for (Track t : selectedTracks) {
+            if (t instanceof FeatureTrack) {
+                featureTracks.add((FeatureTrack) t);
+            }
+        }
+        if (featureTracks.isEmpty()) {
+            menu.setEnabled(false);
+            return menu;
+        }
+
+        final String globalDefault = FeatureLabel.defaultMode();
+        final String effective = labelModeOf(featureTracks.get(0), globalDefault);
+        boolean mixed = false;
+        for (FeatureTrack t : featureTracks) {
+            if (!effective.equals(labelModeOf(t, globalDefault))) {
+                mixed = true;
+                break;
+            }
+        }
+
+        final ButtonGroup group = new ButtonGroup();
+        final String[] labels = {"Gene name", "Transcript ID (accession)", "Transcript name (readable)", "Gene + ID"};
+        final String[] values = {FeatureLabel.GENE, FeatureLabel.ID, FeatureLabel.TRANSCRIPT_NAME, FeatureLabel.GENE_AND_ID};
+        for (int i = 0; i < labels.length; i++) {
+            final String value = values[i];
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(labels[i]);
+            item.setSelected(!mixed && value.equals(effective));
+            group.add(item);
+            item.addActionListener(evt -> {
+                for (FeatureTrack t : featureTracks) {
+                    t.setLabelField(value);
+                }
+                IGV.getInstance().repaint(selectedTracks);
+            });
+            menu.add(item);
+        }
+
+        menu.addSeparator();
+        final JMenuItem custom = new JMenuItem("Custom field...");
+        custom.addActionListener(evt -> {
+            String current = featureTracks.get(0).getLabelField();
+            final String value = JOptionPane.showInputDialog(IGV.getInstance().getMainFrame(),
+                    "Feature label field (e.g. transcript_id, gene_id, Name):",
+                    current == null ? "" : current);
+            if (value != null) {
+                for (FeatureTrack t : featureTracks) {
+                    t.setLabelField(value.trim());
+                }
+                IGV.getInstance().repaint(selectedTracks);
+            }
+        });
+        menu.add(custom);
+
+        menu.addSeparator();
+        final JCheckBoxMenuItem useAsDefault = new JCheckBoxMenuItem("Use for new annotation tracks");
+        useAsDefault.setSelected(!mixed && effective.equals(globalDefault));
+        useAsDefault.addActionListener(evt -> PreferencesManager.getPreferences().put(
+                Constants.TRANSCRIPT_LABEL_MODE,
+                useAsDefault.isSelected() ? effective : FeatureLabel.GENE));
+        menu.add(useAsDefault);
+
+        return menu;
+    }
+
+    private static String labelModeOf(Track track, String globalDefault) {
+        String mode = track == null ? null : track.getLabelField();
+        return (mode == null || mode.trim().isEmpty()) ? globalDefault : mode;
     }
 
     public static JMenuItem getChangeFontSizeItem(final Collection<Track> selectedTracks) {

@@ -469,6 +469,22 @@ public class FeatureTrack extends AbstractTrack implements IGVEventObserver {
     }
 
     /**
+     * Resolve the text drawn for a feature in an expanded view.  A per-track label field wins;
+     * otherwise the application-wide default from {@link FeatureLabel} is used.
+     *
+     * @param track   the track being drawn (may be null)
+     * @param feature feature being drawn
+     * @return label to draw
+     */
+    public static String getFeatureLabel(Track track, IGVFeature feature) {
+        String mode = track == null ? null : track.getLabelField();
+        if (mode == null || mode.trim().isEmpty()) {
+            mode = FeatureLabel.defaultMode();
+        }
+        return FeatureLabel.resolve(mode, feature);
+    }
+
+    /**
      * Get all features which overlap the specified locus
      *
      * @return

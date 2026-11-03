@@ -86,6 +86,13 @@ final public class Constants {
      */
     public static final String AXIS_RANGE_POSITION = "AXIS_RANGE_POSITION";
 
+    /**
+     * Default label shown for each transcript in an expanded feature track.  One of
+     * "name" (gene name), "id" (transcript accession / transcript_id),
+     * "transcript_name" (readable name such as HESX1-201), or "gene_and_id".
+     */
+    public static final String TRANSCRIPT_LABEL_MODE = "TRANSCRIPT_LABEL_MODE";
+
     // Generic track options
     public static final String BYPASS_FILE_AUTO_DISCOVERY = "BYPASS_FILE_AUTO_DISCOVERY";
     public static final String TRACK_ATTRIBUTE_NAME_KEY = "TRACK_ATTRIBUTE_NAME_KEY";
