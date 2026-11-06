@@ -11,6 +11,7 @@ import org.broad.igv.logging.Logger;
 import org.broad.igv.exceptions.DataLoadException;
 import org.broad.igv.sam.cram.IGVReferenceSource;
 import org.broad.igv.ui.util.MessageUtils;
+import org.broad.igv.ui.util.UIUtilities;
 import org.broad.igv.util.FileUtils;
 import org.broad.igv.util.HttpUtils;
 import org.broad.igv.util.ResourceLocator;
@@ -45,6 +46,18 @@ public class SamReaderPool {
     private boolean requireIndex;
     private List<SamReader> availableReaders;
     byte [] indexBytes;
+
+    /**
+     * Serializes index creation so that concurrent readers (IGV loads tracks from several
+     * threads) do not try to build the same .bai twice.
+     */
+    private static final Object BAM_INDEX_LOCK = new Object();
+
+    /**
+     * Reason the most recent automatic BAM index creation failed, if any. Used to explain the
+     * failure in the fallback "enter index path" dialog.
+     */
+    private String indexCreationError;
 
     public SamReaderPool(ResourceLocator locator, boolean requireIndex) {
         this.locator = locator;
@@ -284,22 +297,115 @@ public class SamReaderPool {
 
         }
 
+        // Local BAM without an index: build one next to the BAM and use it.  Aligners such as
+        // STAR / HISAT2 write <sample>.bam without a .bai, which used to stop the load with a
+        // "please enter path to index file" prompt.
+        final boolean isLocalBam = !URLUtils.isURL(pathOrURL) && pathOrURL.toLowerCase().endsWith(".bam");
+        if (isLocalBam) {
+            String createdIndex = createBamIndexNearby(pathOrURL);
+            if (createdIndex != null) {
+                locator.setIndexPath(createdIndex);
+                return createdIndex;
+            }
+        }
+
         String defaultValue = pathOrURL + (pathOrURL.endsWith(".cram") ? ".crai" : ".bai");
-        indexPath = MessageUtils.showInputDialog(
-                "Index is required, but no index found.  Please enter path to index file:",
-                defaultValue);
+        indexPath = MessageUtils.showInputDialog(buildIndexPrompt(pathOrURL, isLocalBam, defaultValue), defaultValue);
         if (indexPath != null && FileUtils.resourceExists(indexPath)) {
             locator.setIndexPath(indexPath);
             return indexPath;
         }
 
-
-        String msg = "Index file not found.  Tried ";
-        for (String p : pathsTried) {
-            msg += "<br>" + p;
+        StringBuilder msg = new StringBuilder();
+        if (isLocalBam) {
+            msg.append("An index is required to view this BAM file, but none was found and creating one automatically failed.<br>");
+            if (indexCreationError != null) {
+                msg.append("<br><b>Reason:</b> ").append(escapeHtml(indexCreationError)).append("<br>");
+            }
+        } else {
+            msg.append("An index is required to view this file, but none was found.<br>");
         }
-        throw new DataLoadException(msg, indexPath);
+        msg.append("<br>Paths tried:");
+        for (String p : pathsTried) {
+            msg.append("<br>&nbsp;&nbsp;").append(escapeHtml(p));
+        }
+        throw new DataLoadException(msg.toString(), indexPath);
+    }
 
+    /**
+     * Create a .bai index next to a local BAM file.
+     *
+     * @return the path of the usable index, or null if it could not be created
+     */
+    private String createBamIndexNearby(String bamPath) {
+
+        final File bamFile = new File(bamPath);
+        final File indexFile = new File(bamPath + ".bai");
+
+        synchronized (BAM_INDEX_LOCK) {
+
+            // Another reader may have finished the job while we were waiting for the lock.
+            if (indexFile.isFile() && indexFile.length() > 0) {
+                return indexFile.getAbsolutePath();
+            }
+
+            indexCreationError = null;
+
+            if (!bamFile.isFile()) {
+                indexCreationError = "BAM file not found: " + bamPath;
+                return null;
+            }
+
+            log.info("No index found for " + bamPath + ", creating " + indexFile.getAbsolutePath());
+            setStatusMessage("No index found - creating " + indexFile.getName() + " ...");
+
+            try {
+                BamIndexBuilder.createIndex(bamFile, indexFile);
+                setStatusMessage("BAM index created: " + indexFile.getAbsolutePath());
+                return indexFile.getAbsolutePath();
+            } catch (Exception e) {
+                indexCreationError = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                log.error("Failed to create BAM index for " + bamPath, e);
+                setStatusMessage("Failed to create BAM index: " + indexCreationError);
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Build the prompt shown when the index could not be located or created automatically.
+     */
+    private String buildIndexPrompt(String pathOrURL, boolean isLocalBam, String defaultIndexPath) {
+        StringBuilder sb = new StringBuilder("<html>");
+        sb.append("<b>No index (.bai / .csi) was found for this file.</b><br><br>");
+        sb.append(escapeHtml(pathOrURL)).append("<br><br>");
+
+        if (isLocalBam) {
+            sb.append("Tried to create one automatically at:<br>&nbsp;&nbsp;")
+                    .append(escapeHtml(defaultIndexPath))
+                    .append("<br>");
+            if (indexCreationError != null) {
+                sb.append("<br><font color='#b00020'>Automatic index creation failed: ")
+                        .append(escapeHtml(indexCreationError))
+                        .append("</font><br>");
+            }
+            sb.append("<br>Enter the path to an existing index file, or Cancel to abort loading:");
+        } else {
+            sb.append("Remote files cannot be indexed automatically.<br><br>")
+                    .append("Please enter the path to an index file:");
+        }
+        return sb.toString();
+    }
+
+    private static String escapeHtml(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    private static void setStatusMessage(final String message) {
+        UIUtilities.invokeOnEventThread(() -> MessageUtils.setStatusBarMessage(message));
     }
 
 }

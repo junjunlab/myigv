@@ -121,6 +121,27 @@ Gene List 里记录的是基因名（feature 命中）或坐标（locus 命中�
 - `org/broad/igv/util/GzipUtils.java`（新增）：识别 gzip / BGZF，按需解压到同级文件（复用较新副本、原子替换）。
 - `GenomeLoader.getLoader`：`.fa.gz` 不再直接报错，先解压再走 FASTA 索引流程。
 
+## 加载 BAM 时自动建索引
+
+原生 IGV 要求 BAM 旁边先有 `.bai`，否则弹窗让你手动输入索引路径。myigv 改为**就地建索引**：
+
+- 本地 `.bam` 找不到 `.bai` / `.csi` 时，自动在同目录生成 `<文件名>.bam.bai`，建完直接加载，不再打断操作；
+- 索引先写到临时文件，**成功后才原子替换**，中途取消或失败不会留下半截 `.bai`；
+- 状态栏显示 `No index found - creating xxx.bam.bai ...`，完成后显示 `BAM index created: <路径>`；
+- 同一文件被多个轨道并发加载时加锁串行，不会重复建两遍。
+
+**失败时**（BAM 未按坐标排序、目录不可写等），弹窗会说明具体原因，并保留手动输入索引路径的入口，
+不再是原来那句 `Index is required, but no index found.`：
+
+- 未排序：提示 `BAM file is not coordinate sorted (header sort order = ...)`，需先 `samtools sort`；
+- 远程 BAM（http/https）：无法在本地建索引，弹窗会明确说明，并请你填写索引 URL。
+
+实测：272 MB 的 STAR 输出 BAM 建索引约 12 秒，生成索引 263 KB，坐标查询正常。
+
+实现改动：
+- `org/broad/igv/sam/reader/BamIndexBuilder.java`（新增）：用 htsjdk `BAMIndexer` 建索引，写临时文件后原子替换，并校验排序方式。
+- `SamReaderPool.getIndexPath`：本地 BAM 无索引时先尝试自动创建；失败才进入「输入索引路径」对话框，且文案改为说明失败原因。
+
 ## 搜索框显示基因名（不显示坐标）
 
 原生 IGV 的搜索框同时被当作「当前位置显示」——一跳转就把它替换成 `chr17:7,659,779-7,689,546`
