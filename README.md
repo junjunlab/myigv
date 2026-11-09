@@ -3,7 +3,8 @@
 > A customized IGV genome browser: offline annotations, multi-gene panels, GTF-based gene search, auto-indexing and per-panel autoscale.
 
 **myigv** 基于 [IGV 2.19.8](https://github.com/igvteam/igv) 定制，保留 IGV 的全部能力，并针对
-**离线使用**与**多基因对比**两个高频场景做了增强。适用于 RNA-seq / ChIP-seq / bigWig 等常见可视化。
+**离线使用**、**多基因对比**与 **Hi-C 染色质构象**三个高频场景做了增强。
+适用于 RNA-seq / ChIP-seq / bigWig / Hi-C 等常见可视化。
 
 ---
 
@@ -23,6 +24,9 @@
 | 10 | **一键安装包** | GitHub Actions 自动产出 Windows `.exe` / macOS `.dmg` |
 | 11 | **压缩文件直接读取** | `.gtf.gz` / `.fa.gz` 自动解压一次，无需手动 gunzip |
 | 12 | **转录本标签可切换** | 展开视图可显示基因名 / 转录本 ID / 两者 |
+| 13 | **Hi-C 矩阵轨道** | HiCExplorer `.h5` / cooler `.cool` 直读，三角形或方形、分辨率自选 |
+| 14 | **TAD 轮廓叠加** | 把 BED 直接画在矩阵上，每个文件独立的线宽、线型、颜色、填充 |
+| 15 | **BEDPE 弧线轨道** | loops / arcs 可视化，圆形、椭圆、贝塞尔三种弧型可选 |
 
 ---
 
@@ -138,8 +142,8 @@ myigv 默认**每个分面独立 group autoscale**。可在轨道右键 → Grou
 
 到 **Actions → Build installers** 下载对应 Artifact（或从 Release 下载）：
 
-- Windows：运行 `myigv-1.0.0.exe` 安装；
-- macOS：打开 `myigv-1.0.0.dmg`，把 myigv 拖入 Applications。
+- Windows：运行 `myigv-1.0.1.exe` 安装；
+- macOS：打开 `myigv-1.0.1.dmg`，把 myigv 拖入 Applications。
 
 安装包已自带运行时与离线注释，装完即用，无需另装 Java。
 
