@@ -49,14 +49,12 @@ public class HicFileSource implements HiCSource {
      * hundreds of thousands of cells for one screen, which costs seconds: at 1 kb bins a
      * 1 Mb window took 4.1 s to inflate, versus 0.26 s at 5 kb.
      */
-    private static final double MAX_BINS_ACROSS = 250;
 
     /**
      * Finest bin size the automatic mode will pick. Below 5 kb a single .hic block holds so
      * many contacts that inflating it costs seconds (measured: 4.1 s for a 200 kb window at
      * 1 kb, 0.26 s at 5 kb), so finer units stay an explicit choice in the menu.
      */
-    private static final int MIN_AUTO_BIN = 5_000;
 
     private final File file;
     private final RandomAccessFile raf;

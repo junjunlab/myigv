@@ -24,7 +24,7 @@
 | 10 | **一键安装包** | GitHub Actions 自动产出 Windows `.exe` / macOS `.dmg` |
 | 11 | **压缩文件直接读取** | `.gtf.gz` / `.fa.gz` 自动解压一次，无需手动 gunzip |
 | 12 | **转录本标签可切换** | 展开视图可显示基因名 / 转录本 ID / 两者 |
-| 13 | **Hi-C 矩阵轨道** | HiCExplorer `.h5` / cooler `.cool` 直读，三角形或方形、分辨率自选 |
+| 13 | **Hi-C 矩阵轨道** | 直读 HiCExplorer `.h5`、cooler `.cool` / `.mcool`、Juicer `.hic`（均支持 `.gz` 包裹），三角形或方形显示，多分辨率随缩放自动切换 |
 | 14 | **TAD 轮廓叠加** | 把 BED 直接画在矩阵上，每个文件独立的线宽、线型、颜色、填充 |
 | 15 | **BEDPE 弧线轨道** | loops / arcs 可视化，圆形、椭圆、贝塞尔三种弧型可选 |
 

@@ -151,7 +151,8 @@ Gene List 里记录的是基因名（feature 命中）或坐标（locus 命中�
 
 - **支持格式**：
   - HiCExplorer `.h5`（PyTables + blosc 压缩）
-  - cooler `.cool` / `.mcool`（mcool 自动挑选约 10 kb 的分辨率）
+  - cooler `.cool` / `.mcool`：`.cool` 单分辨率；`.mcool` 里的每一档分辨率都能用（`Hi-C display → Resolution`
+    列出全部档位，默认从最接近 10 kb 的那档开始，之后随视口自动切档，切过的档会缓存在内存里）
   - Juicer `.hic`（Aiden Lab 格式，**按需读取 block**，不会把几百 MB 的文件整体载入内存；
     文件里若有多档分辨率，按视口自动切换）
   - gzip 包装的 `.cool.gz` / `.h5.gz`：首次加载自动解压到同目录，之后直接复用；
@@ -210,7 +211,7 @@ Gene List 里记录的是基因名（feature 命中）或坐标（locus 命中�
     绑定关系随 session 保存；菜单标题会显示当前叠加数量，并提供 `Clear all`。
     查询域区间时若当前染色体名查不到，会自动尝试 `X` ↔ `chrX` 的写法，避免 BED 与基因组命名不同导致空图；
     只改线条样式时不会重绘矩阵（复用已算好的矩阵图，只重画描边），响应时间从数百毫秒降到几毫秒；
-  - `Hi-C display → Resolution`：多分辨率文件（`.hic`）按视口自动切档，默认 `Automatic`；
+  - `Hi-C display → Resolution`：多分辨率文件（`.hic` 与 `.mcool`）按视口自动切档，默认 `Automatic`；
     也可固定成 1 kb / 5 kb / … / 2.5 Mb。自动规则有两条约束——每档至少占 2 像素（否则会跳 bin、出现摩尔纹），
     且窗口内不超过 250 个 bin（1 kb 档单块数据量极大，实测 200 kb 窗口要 4.1 s，所以自动模式最低到 5 kb，
     更细的档位留作手动选择）；

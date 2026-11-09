@@ -85,20 +85,7 @@ public class HiCFileReader {
 
         log.info("Loading Hi-C matrix " + path + " (blosc filter registered: " + BLOSC_REGISTERED + ")");
 
-        try (HdfFile hdf = new HdfFile(file)) {
-
-            if (dataset(hdf, "matrix/indptr") != null) {
-                return loadHiCExplorer(hdf, path);
-            }
-            Node resolutions = node(hdf, "resolutions");
-            if (resolutions instanceof Group) {
-                return loadMcool((Group) resolutions, hdf, path);
-            }
-            if (dataset(hdf, "pixels/bin1_id") != null || dataset(hdf, "pixels/count") != null) {
-                return loadCooler(hdf, path, "");
-            }
-            throw new IOException("Unsupported Hi-C file layout: " + path);
-        }
+        return HdfSource.open(file, path);
     }
 
     // ------------------------------------------------------------------
@@ -195,30 +182,186 @@ public class HiCFileReader {
     // mcool: several resolutions in one file
     // ------------------------------------------------------------------
 
-    private static HiCData loadMcool(Group resolutions, HdfFile hdf, String path) throws IOException {
+    /** Bin sizes present in an mcool file, ascending; the group names are the bin sizes. */
+    private static List<Integer> mcoolResolutions(Group resolutions) {
+        List<Integer> sizes = new ArrayList<>();
+        for (String name : resolutions.getChildren().keySet()) {
+            if (name.matches("\\d+")) {
+                sizes.add(Integer.parseInt(name));
+            }
+        }
+        sizes.sort(Integer::compare);
+        return sizes;
+    }
 
-        List<String> names = new ArrayList<>(resolutions.getChildren().keySet());
-        names.removeIf(n -> !n.matches("\\d+"));
+    /** @return the element of {@code sizes} closest to {@code target} */
+    private static int closestTo(List<Integer> sizes, int target) {
+        int best = sizes.get(0);
+        for (int s : sizes) {
+            if (Math.abs(s - target) < Math.abs(best - target)) {
+                best = s;
+            }
+        }
+        return best;
+    }
 
-        if (names.isEmpty()) {
-            throw new IOException("mcool file has no resolution groups: " + path);
+    /**
+     * HDF5 matrix that keeps the file open. cooler archives with several resolutions
+     * (.mcool) expose all of them, so the track menu can switch bin size exactly like it
+     * does for a Juicer .hic; the other layouts simply report a single resolution.
+     * <p>
+     * Resolutions are loaded on demand and only the active one (plus the one before it) is
+     * kept, otherwise walking through the menu would end up holding every matrix in memory.
+     */
+    static final class HdfSource implements HiCSource {
+
+        private final HdfFile hdf;
+        private final String path;
+        private final List<Integer> resolutions;
+        private HiCData current;
+        private HiCData previous;
+
+        private HdfSource(HdfFile hdf, String path, HiCData current, List<Integer> resolutions) {
+            this.hdf = hdf;
+            this.path = path;
+            this.current = current;
+            this.resolutions = resolutions;
         }
 
-        names.sort((a, b) -> Integer.compare(Integer.parseInt(a), Integer.parseInt(b)));
-
-        // Prefer ~10kb: fine enough to resolve TADs, small enough to keep memory sane.
-        String chosen = names.get(0);
-        int bestDiff = Integer.MAX_VALUE;
-        for (String n : names) {
-            int diff = Math.abs(Integer.parseInt(n) - 10_000);
-            if (diff < bestDiff) {
-                bestDiff = diff;
-                chosen = n;
+        static HdfSource open(File file, String path) throws IOException {
+            HdfFile hdf = new HdfFile(file);
+            try {
+                if (dataset(hdf, "matrix/indptr") != null) {
+                    return new HdfSource(hdf, path, loadHiCExplorer(hdf, path),
+                            java.util.Collections.emptyList());
+                }
+                Node resolutions = node(hdf, "resolutions");
+                if (resolutions instanceof Group) {
+                    List<Integer> sizes = mcoolResolutions((Group) resolutions);
+                    if (sizes.isEmpty()) {
+                        throw new IOException("mcool file has no resolution groups: " + path);
+                    }
+                    // Prefer ~10 kb to start with: fine enough to resolve TADs, small enough
+                    // to keep memory sane. The renderer re-selects per zoom level afterwards.
+                    int chosen = closestTo(sizes, 10_000);
+                    log.info("mcool resolutions " + sizes + " -> starting at " + chosen);
+                    return new HdfSource(hdf, path,
+                            loadCooler(hdf, path, "resolutions/" + chosen + "/"), sizes);
+                }
+                if (dataset(hdf, "pixels/bin1_id") != null || dataset(hdf, "pixels/count") != null) {
+                    return new HdfSource(hdf, path, loadCooler(hdf, path, ""),
+                            java.util.Collections.emptyList());
+                }
+                throw new IOException("Unsupported Hi-C file layout: " + path);
+            } catch (IOException | RuntimeException e) {
+                try {
+                    hdf.close();
+                } catch (Exception ignored) {
+                    // the original failure is what matters
+                }
+                throw e;
             }
         }
 
-        log.info("mcool resolutions " + names + " -> using " + chosen);
-        return loadCooler(hdf, path, "resolutions/" + chosen + "/");
+        @Override
+        public List<String> getChromosomes() {
+            return current.getChromosomes();
+        }
+
+        @Override
+        public int getChromosomeLength(String chr) {
+            return current.getChromosomeLength(chr);
+        }
+
+        @Override
+        public synchronized int getBinSize() {
+            return current.getBinSize();
+        }
+
+        @Override
+        public int getBinCount() {
+            return current.getBinCount();
+        }
+
+        @Override
+        public int[] getChromBinRange(String chr) {
+            return current.getChromBinRange(chr);
+        }
+
+        @Override
+        public synchronized int binAt(String chr, double bp) {
+            return current.binAt(chr, bp);
+        }
+
+        @Override
+        public synchronized int[] getBinsOverlapping(String chr, int start, int end) {
+            return current.getBinsOverlapping(chr, start, end);
+        }
+
+        @Override
+        public double getValue(int binX, int binY) {
+            return current.getValue(binX, binY);
+        }
+
+        @Override
+        public List<Integer> getResolutions() {
+            return java.util.Collections.unmodifiableList(resolutions);
+        }
+
+        @Override
+        public synchronized void setBinSize(int newBinSize) {
+            if (resolutions.isEmpty() || newBinSize == current.getBinSize()
+                    || !resolutions.contains(newBinSize)) {
+                return;
+            }
+            HiCData data;
+            if (previous != null && previous.getBinSize() == newBinSize) {
+                data = previous;                 // zooming back out is instant
+            } else {
+                try {
+                    data = loadCooler(hdf, path, "resolutions/" + newBinSize + "/");
+                } catch (IOException e) {
+                    log.error("Could not read resolution " + newBinSize + " bp from " + path, e);
+                    return;
+                }
+            }
+            previous = current;
+            current = data;
+            log.info("Hi-C resolution -> " + newBinSize + " bp, " + data.getBinCount() + " bins");
+        }
+
+        @Override
+        public synchronized void autoSelectBinSize(double bpPerPixel, int windowWidth) {
+            if (resolutions.size() < 2 || !(bpPerPixel > 0)) {
+                return;
+            }
+            // Same rule as the .hic reader: at least ~2 pixels per bin, and never more than
+            // MAX_BINS_ACROSS bins for one repaint.
+            double target = 2 * bpPerPixel;
+            if (windowWidth > 0) {
+                target = Math.max(target, bpPerPixel * windowWidth / MAX_BINS_ACROSS);
+            }
+            int best = -1;
+            double bestDistance = Double.MAX_VALUE;
+            for (int r : resolutions) {
+                if (r < MIN_AUTO_BIN) {
+                    continue;
+                }
+                double d = Math.abs(Math.log(r / target));
+                if (d < bestDistance) {
+                    bestDistance = d;
+                    best = r;
+                }
+            }
+            setBinSize(best < 0 ? current.getBinSize() : best);
+        }
+
+        @Override
+        public void close() throws IOException {
+            previous = null;
+            current = null;
+            hdf.close();
+        }
     }
 
     private static Node node(HdfFile hdf, String path) {

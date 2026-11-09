@@ -14,6 +14,12 @@ import java.util.List;
  */
 public interface HiCSource extends AutoCloseable {
 
+    /** Finest bin size used when picking a resolution automatically. */
+    int MIN_AUTO_BIN = 5_000;
+
+    /** Upper bound on the bins a single repaint may span, used by auto selection. */
+    double MAX_BINS_ACROSS = 250;
+
     /** Chromosome names in file order. */
     List<String> getChromosomes();
 
