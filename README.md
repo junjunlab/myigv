@@ -208,6 +208,35 @@ TAD / domain 的 BED 可以直接画在 Hi-C 热图上，不用在矩阵和 BED 
 
 安装包已自带运行时与离线注释，装完即用，无需另装 Java。
 
+> **macOS 首次打开提示「Apple 无法验证 myigv 是否包含恶意软件」？**
+> 这是 Gatekeeper 对所有**未经 Apple 公证**的第三方应用的统一拦截，不是病毒，也不是安装包损坏。
+> 处理办法见下一节。
+
+#### macOS 首次打开被拦截怎么办
+
+**macOS 15 (Sequoia) 及以上**（弹窗只有 `Move to Trash` / `Done` 两个按钮）：
+
+1. 点 **`Done`**（不要点 `Move to Trash`）；
+2. 打开 **系统设置 → 隐私与安全性**，往下滚到「安全性」区域，会看到
+   *「"myigv" 已被阻止，因为无法验证开发者」*；
+3. 点 **`仍要打开`**（Open Anyway），输入开机密码；
+4. 再启动一次 myigv，在弹窗里点 **`打开`**。
+
+**macOS 14 及更早**：在 Finder 里**右键（或按住 Control 点击）** myigv → `打开` → 在弹窗里再点 `打开`。
+
+**命令行方式（最省事，一次搞定）**：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/myigv.app
+open /Applications/myigv.app
+```
+
+如果装在其他位置，把路径换成实际的 `myigv.app` 路径。这条命令只是去掉「从网络下载」的隔离标记，
+不会修改应用本身的任何文件。
+
+> 根治办法是由项目用 Apple Developer ID 签名并做公证（notarization），需要付费的 Apple Developer 账号；
+> 在此之前，上面三种方式都需要用户手动放行一次，之后不再提示。
+
 ### 从源码构建
 
 需要 **JDK 21**：
