@@ -100,6 +100,12 @@ module org.igv {
     requires commons.math3;
     requires com.google.gson;
     requires htsjdk;
+    requires io.jhdf;
+    // jhdf (and its filter manager) log through slf4j; the module must be resolved
+    // even though IGV itself does not use it directly.
+    requires org.slf4j;
+    // jhdf initialises its built-in LZF filter class eagerly
+    requires com.ning.compress.lzf;
     requires java.datatransfer;
     requires java.desktop;
     requires java.instrument;

@@ -72,6 +72,26 @@ abstract public class TribbleFeatureSource implements org.broad.igv.track.Featur
     Object header;
     Class featureClass;
 
+    /**
+     * htsjdk parses a bare Windows path such as {@code C:/data/x.bed} as a URI with scheme
+     * "C" and then fails with "No FileSystemProvider available". Rewrite local drive paths
+     * (including IGV's munged {@code /C:/...} form) as proper file URIs before handing them
+     * over, so command-line and drag-and-drop loading behave the same.
+     */
+    private static String toReaderPath(String path) {
+        if (path == null || path.isEmpty() || FileUtils.isRemote(path)) {
+            return path;
+        }
+        String p = path;
+        if (p.length() > 2 && p.charAt(0) == '/' && Character.isLetter(p.charAt(1)) && p.charAt(2) == ':') {
+            p = p.substring(1);
+        }
+        if (p.length() > 1 && Character.isLetter(p.charAt(0)) && p.charAt(1) == ':') {
+            return new java.io.File(p).toURI().toString();
+        }
+        return p;
+    }
+
     public static TribbleFeatureSource getFeatureSource(ResourceLocator locator, Genome genome) throws IOException, TribbleIndexNotFoundException {
         return getFeatureSource(locator, genome, true);
     }
@@ -130,6 +150,7 @@ abstract public class TribbleFeatureSource implements org.broad.igv.track.Featur
         if (FileUtils.isRemote(path)) {
             path = HttpUtils.createURL(path).toExternalForm();
         }
+        path = toReaderPath(path);
         if (idxPath != null && idxPath.length() > 0 && FileUtils.isRemote(idxPath)) {
             idxPath = HttpUtils.createURL(idxPath).toExternalForm();
         }
@@ -151,7 +172,7 @@ abstract public class TribbleFeatureSource implements org.broad.igv.track.Featur
         if (FileUtils.isRemote(path)) {
             path = HttpUtils.mapURL(path);
         }
-        return AbstractFeatureReader.getFeatureReader(path, null, codec, false);
+        return AbstractFeatureReader.getFeatureReader(toReaderPath(path), null, codec, false);
     }
 
     /**

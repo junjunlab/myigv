@@ -21,6 +21,8 @@ public class BedPEFeature implements BedPE {
     int thickness = 1;
     String type;
     Map<String, String> attributes;
+    /** Every column of this row keyed by the header name (or col1..colN without a header). */
+    public Map<String, String> columnValues;
     int row;
     BedPEShape shape;
 

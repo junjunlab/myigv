@@ -133,6 +133,10 @@ dependencies {
             [group: 'org.apache.commons', name: 'commons-jexl', version: '2.1.1'],
             [group: 'org.apache.commons', name: 'commons-lang3', version: '3.9'],
             [group: 'com.github.samtools', name: 'htsjdk', version: '4.3.0'],
+            // Pure-Java HDF5 reader, used for Hi-C matrices (.h5 / .cool)
+            [group: 'io.jhdf', name: 'jhdf', version: '0.13.0'],
+            // Required at runtime by jhdf's filter manager (LZF filter)
+            [group: 'com.ning', name: 'compress-lzf', version: '1.1.2'],
             [group: 'org.swinglabs', name: 'swing-layout', version: '1.0.3'],
             [group: 'com.formdev', name: 'jide-oss', version: '3.7.12'],
             [group: 'com.google.guava', name: 'guava', version: '32.1.3-jre'],

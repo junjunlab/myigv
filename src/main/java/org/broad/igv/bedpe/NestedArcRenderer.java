@@ -71,7 +71,7 @@ public class NestedArcRenderer implements BedPERenderer{
                     if (bedPE.isSameChr()) {
 
                         BedPEFeature feature = bedPE.get();
-                        Color fcolor = feature.color == null ? trackColor : feature.color;
+                        Color fcolor = track.getArcColor(feature, trackColor);
 
                         double pixelStart = (feature.getMidStart() - origin) / locScale;
                         double pixelEnd = (feature.getMidEnd() - origin) / locScale;
@@ -106,14 +106,34 @@ public class NestedArcRenderer implements BedPERenderer{
                         double angleSt = direction == UP ? 90 - Math.toDegrees(theta) : 270 - Math.toDegrees(theta);
                         double ext = Math.toDegrees(2 * theta);
 
-                        Arc2D.Double arcPath = new Arc2D.Double();
-                        arcPath.setArcByCenter(xc, yc, r, angleSt, ext, Arc2D.OPEN);
-                        g.draw(arcPath);
+                        double sagitta = r - b;
+                        double baseY = direction == UP ? trackBaseLine : gap + trackRectangle.y;
 
-                        feature.setShape(new NAShape(xc, yc, r));
+                        if (track.getArcStyle() == ArcStyle.BEZIER) {
+                            // Same apex height as the circular arc, so the nested envelope does
+                            // not change when the style is switched.
+                            g.draw(BezierArc.path(pixelStart, pixelStart + w, baseY, sagitta,
+                                    direction == UP, false));
+                            feature.setShape(new BezierArc.Hit(pixelStart, pixelStart + w, baseY,
+                                    sagitta, direction == UP));
+                        } else if (track.getArcStyle() == ArcStyle.ELLIPSE) {
+                            // Half ellipse: vertical feet and a rounded top, the HiCExplorer look.
+                            Arc2D.Double ellipse = new Arc2D.Double(
+                                    pixelStart, baseY - sagitta, w, 2 * sagitta,
+                                    direction == UP ? 0 : 180, 180, Arc2D.OPEN);
+                            g.draw(ellipse);
+                            feature.setShape(new EllipseShape(pixelStart + w / 2.0, baseY,
+                                    w / 2.0, sagitta));
+                        } else {
+                            Arc2D.Double arcPath = new Arc2D.Double();
+                            arcPath.setArcByCenter(xc, yc, r, angleSt, ext, Arc2D.OPEN);
+                            g.draw(arcPath);
+
+                            feature.setShape(new NAShape(xc, yc, r));
+                        }
 
                     } else {
-                        Color fcolor = bedPE.get().color == null ? Color.black : bedPE.get().color;
+                        Color fcolor = track.getArcColor(bedPE.get(), Color.black);
                         g.setColor(fcolor);
                         int h = trackRectangle.height / 2;
                         double ps = ((bedPE.getStart() + bedPE.getEnd()) / 2 - origin) / locScale;
@@ -198,6 +218,31 @@ public class NestedArcRenderer implements BedPERenderer{
             double dy = y - yc;
             double dist = Math.sqrt(dx*dx + dy*dy);
             return Math.abs(r - dist) <= 3;
+        }
+    }
+
+    /** Hit test for the half-ellipse arc: distance to the ellipse outline. */
+    public static class EllipseShape implements BedPEShape {
+
+        private final double cx;
+        private final double cy;
+        private final double a;
+        private final double b;
+
+        public EllipseShape(double cx, double cy, double a, double b) {
+            this.cx = cx;
+            this.cy = cy;
+            this.a = Math.max(1e-6, a);
+            this.b = Math.max(1e-6, b);
+        }
+
+        @Override
+        public boolean contains(double x, double y) {
+            double dx = (x - cx) / a;
+            double dy = (y - cy) / b;
+            double norm = Math.sqrt(dx * dx + dy * dy);
+            // Scale the normalised distance back to pixels with the smaller semi-axis.
+            return Math.abs(norm - 1.0) * Math.min(a, b) <= 3.5;
         }
     }
 

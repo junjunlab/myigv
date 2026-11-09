@@ -39,6 +39,9 @@ import org.broad.igv.data.expression.ExpressionFileParser;
 import org.broad.igv.data.seg.*;
 import org.broad.igv.exceptions.DataLoadException;
 import org.broad.igv.feature.*;
+import org.broad.igv.hic.HiCSource;
+import org.broad.igv.hic.HiCFileReader;
+import org.broad.igv.hic.HiCTrack;
 import org.broad.igv.feature.basepair.BasePairTrack;
 import org.broad.igv.feature.bionano.SMAPParser;
 import org.broad.igv.feature.bionano.SMAPRenderer;
@@ -171,7 +174,10 @@ public class TrackLoader {
             List<Track> newTracks = new ArrayList<Track>();
 
             // Determine track type, if possible, and add new tracks
-            if (locator.isHtsget()) {
+            // Hi-C contact matrices: HiCExplorer .h5 and cooler .cool/.mcool
+            if (!locator.isDataURL() && HiCFileReader.isHiCDataFile(path)) {
+                loadHiCTrack(locator, newTracks);
+            } else if (locator.isHtsget()) {
                 HtsgetUtils.Metadata htsgetMeta = HtsgetUtils.getMetadata(locator.getPath());
                 locator.setFormat(htsgetMeta.getFormat().toLowerCase());
                 if (htsgetMeta.getFormat().equals("VCF")) {
@@ -882,8 +888,24 @@ public class TrackLoader {
 
     }
 
-    private void loadGisticFile(ResourceLocator locator, List<Track> newTracks) {
+    /**
+     * Load a Hi-C contact matrix (.h5 / .cool / .mcool) as a dedicated heat-map track.
+     */
+    private void loadHiCTrack(ResourceLocator locator, List<Track> newTracks) {
+        try {
+            HiCSource data = HiCFileReader.load(locator.getPath());
+            HiCTrack track = new HiCTrack(locator, data);
+            if (locator.getFileName() != null) {
+                track.setName(locator.getFileName());
+            }
+            newTracks.add(track);
+        } catch (IOException e) {
+            log.error("Failed to load Hi-C matrix " + locator.getPath(), e);
+            throw new DataLoadException("Failed to load Hi-C matrix: " + e.getMessage(), locator.getPath());
+        }
+    }
 
+    private void loadGisticFile(ResourceLocator locator, List<Track> newTracks) {
         GisticTrack track = GisticFileParser.loadData(locator);
         track.setName(locator.getTrackName());
         newTracks.add(track);

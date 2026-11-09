@@ -140,7 +140,109 @@ Gene List 里记录的是基因名（feature 命中）或坐标（locus 命中�
 
 实现改动：
 - `org/broad/igv/sam/reader/BamIndexBuilder.java`（新增）：用 htsjdk `BAMIndexer` 建索引，写临时文件后原子替换，并校验排序方式。
+- `TribbleFeatureSource.toReaderPath`：本地 BED 路径在交给 htsjdk 前统一转成 `file:` URI，
+  修掉命令行/端口加载绝对 Windows 路径时报 `No FileSystemProvider` / `Illegal char <:>` 的问题；
 - `SamReaderPool.getIndexPath`：本地 BAM 无索引时先尝试自动创建；失败才进入「输入索引路径」对话框，且文案改为说明失败原因。
+
+## Hi-C 接触矩阵可视化
+
+参照 [pyGenomeTracks](https://github.com/deeptools/pyGenomeTracks) 的 `hic_matrix` / `hic_matrix_square` 实现，
+把 Hi-C 热图移植进 myigv，可直接加载接触矩阵：
+
+- **支持格式**：
+  - HiCExplorer `.h5`（PyTables + blosc 压缩）
+  - cooler `.cool` / `.mcool`（mcool 自动挑选约 10 kb 的分辨率）
+  - Juicer `.hic`（Aiden Lab 格式，**按需读取 block**，不会把几百 MB 的文件整体载入内存；
+    文件里若有多档分辨率，按视口自动切换）
+  - gzip 包装的 `.cool.gz` / `.h5.gz`：首次加载自动解压到同目录，之后直接复用；
+- **两种显示**：三角形（矩阵旋转 45°，x 为两个锚点的中点、y 为两点距离）与方形（双轴均为基因组坐标，对角线左上→右下）；
+- **配色**：`RdYlBu_r`（深蓝 → 黄 → 深红），上限取紧邻对角线值的 80 分位、下限取远距离接触的中位数，与 pyGenomeTracks 的取值方式一致；
+- **BEDPE interaction 轨道（loops / arcs）**：
+  - 默认 `Nested Arcs`；不再读取全局偏好或按 10x 文件类型推断，避免上一次的选择污染新轨道；
+  - 删除无效的 `Set Track Color...`（文件带 `color` 列时逐条颜色永远优先），
+    改为 `Set Arc Color...`（统一设置所有曲线颜色，优先级高于逐条色）+ `Reset Arc Colors To File`（恢复文件配色）；
+  - `Value Column (Proportional Arcs)`：选择用哪一列驱动弧高，菜单自动列出能解析为数值的列，
+    默认 `score`；`Autoscale` / `Set Max Score` 会按所选列重新归一化，列选择随 session 保存。
+  - `Arc shape`：曲线形状，三种，按轨道保存（session 属性 `arcStyle`，默认 `Circular arc`）：
+    - `Circular arc`（默认）——圆弧（旧版 IGV 的样子），两端与基线成一定角度；按强度定高时若高度超过半圆，
+      自动截断为半圆，否则圆弧会绕成接近整圆、看起来自我交叉；
+    - `Ellipse arc`——半椭圆，两端垂直落在基线上、顶部圆润，是 HiCExplorer / pyGenomeTracks
+      论文插图常见的画法；
+    - `Bezier arc`——三次贝塞尔拱（控制点在 4/3 高度），顶部更平，适合大量弧线重叠时看清层次。
+    嵌套模式下三种形状的弧顶高度一致（都取自同一个 sagitta），只是曲率不同；
+    `Proportional Arcs` 模式下高度由所选数值列决定，配合 `Ellipse arc` 最接近发表的 loop track 效果。
+- **交互**：
+  - `Hi-C display → Color legend`：在热图内画竖直色标图例，`Top left` / `Top right` / `None`（默认左上）。
+    色条与当前配色、数值变换（log1p / log / -log）完全一致，标注变换后的 vmin/vmax；
+    **色标下限固定为 0**（`log1p`/`线性` 下就是 0，`log`/`-log` 下是 log10(floor)，与 HiCExplorer 默认一致），
+    不再用远端接触的中位数当下限——旧行为会把整个低值区压成同一个深色，图例也会从一个莫名其妙的数值开始。
+    色条按**整幅图像**绘制（`BufferedImage` + 双线性缩放）而不是逐行 `drawLine`：
+    150% 缩放下逻辑 1 px 的横线落在设备像素行之间，会和白底混色，色条里出现一道道**横向白缝**。
+    图例画在缓存图之外，所以**翻转热图时位置与文字保持不变**，改位置也不会重算矩阵。状态随 session 保存。
+    数值标注在色条**右侧**：顶端对齐 vmax、底端对齐 vmin（下限 0），框的尺寸与位置按「轨道 rect ∩ 实际绘制裁剪区」
+    计算——轨道被滚出视野或窗口过矮时，裁剪区比 rect 小，若按 rect 定位会把框底连同 vmin 一起裁掉（曾出现「图例没有 0」）。
+    可见高度不足 78 px 时整体不画，而不是画一个被切掉一半的框。
+  - `Hi-C display`：切换三角形 / 方形；
+    - `Flip vertically (inverted triangle)`：整幅轨道上下镜像，对角线移到上沿、三角形顶点朝下
+      （等价于 pyGenomeTracks 的 `orientation: inverted`）。翻转作用在**合成完成的图像**上，
+      因此矩阵和所有 TAD overlay 一起翻转——之后才勾选的 BED 也自动对齐，overlay 不需要记录朝向；
+      方形模式下同样做上下镜像。状态随 session 的 `flipped` 属性保存，切换只重新合成、不重算矩阵。
+    - `Set maximum depth...`：三角形模式最大显示距离（bp），留空 = 自动；
+    - `Set triangle height (0-1)...`：对角线到顶点之间的距离，按视窗跨度的比例给，
+      `1` = 整个三角形一直到顶点正好顶到轨道上沿，`0.5` = 只画近对角线的一半（截断的梯形），
+      留空 = 自动（保持 45° 等比，单元为正方形）；设置该项时接触对会裁剪到当前视窗内，才会出现真正的顶点；
+    - `Make track square (height = width)`：方形模式下列表和轨道的两轴都是同一个基因组区间，
+      只有画布是正方形时单元才是正方形；点这一项把轨道高度设成面板宽度，矩阵即为满幅正方形。
+  - `TAD domains`：把已加载的 BED/特征轨道叠加到热图上，可多选（每个 BED 自动分配一种线色）。
+    三角形模式下每个 domain 画成"底边在对角线、顶点在区间中点上方"的闭合三角形，方形模式画沿对角线的方框。
+    参数：线宽（1/1.5/2/2.5/3 px，默认 2 px）、线型（实线/虚线/点线）、线色、填充色、填充透明度（默认 0%，完全透明）。
+    菜单结构：`Select multiple...`（弹复选框对话框，勾任意多个文件后回车一次性生效）、
+    每个 BED 一个子菜单（标题前的色块 = 该 overlay 当前线色），内含 `Show outline` 开关 +
+    该文件**独有**的线宽/线型/线色/填充色/填充透明度；叠加两个以上时还有 `All outlines ▸` 批量修改全部。
+    未启用的文件只显示 `Show outline`，避免出现改了也不生效的项。线色/填充色提供 6 个预设色 + `More colors...`。
+    描边画在 2 倍超采样的透明图层上再双线性缩小，并启用 `VALUE_STROKE_PURE`；1–2 px 的 45° 细线直接画在彩色热图上时
+    每行只有 1–3 个深色像素，抗锯齿边缘与亮色矩阵混合后肉眼容易看成「一串点」，超采样后是连续实线。
+    缓存图按 `Graphics2D` 变换里的 HiDPI 倍率（Windows 150% = 1.5）以**设备分辨率**渲染再 1:1 贴回，
+    否则整张逻辑像素图会被系统放大 1.5 倍重采样，把 45° 线拉成一串 1/2 像素交替的方块珠子。
+    支持多对多：每条 Hi-C 可挂任意多个 BED，同一个 BED 也可被任意多条 Hi-C 引用；
+    同一条 Hi-C 上同一个 BED 按文件路径去重，样式参数按 overlay 独立保存（`lineColor` / `lineWidth` / `lineStyle` / `fillColor` / `fillAlpha`）。
+    绑定后 BED 轨道会自动从面板隐藏（避免同一批区间显示两次），取消绑定或改回未勾选即恢复；多条 Hi-C 共用同一 BED 时按引用计数处理。
+    绑定关系随 session 保存；菜单标题会显示当前叠加数量，并提供 `Clear all`。
+    查询域区间时若当前染色体名查不到，会自动尝试 `X` ↔ `chrX` 的写法，避免 BED 与基因组命名不同导致空图；
+    只改线条样式时不会重绘矩阵（复用已算好的矩阵图，只重画描边），响应时间从数百毫秒降到几毫秒；
+  - `Hi-C display → Resolution`：多分辨率文件（`.hic`）按视口自动切档，默认 `Automatic`；
+    也可固定成 1 kb / 5 kb / … / 2.5 Mb。自动规则有两条约束——每档至少占 2 像素（否则会跳 bin、出现摩尔纹），
+    且窗口内不超过 250 个 bin（1 kb 档单块数据量极大，实测 200 kb 窗口要 4.1 s，所以自动模式最低到 5 kb，
+    更细的档位留作手动选择）；
+  - `Hi-C color → Transform`：取色前的数值变换，四档与 pyGenomeTracks 一致
+    （`Linear` / `log1p` / `log` / `-log`，**默认 log1p**）。变换在计算色标之前进行，
+    `log` 家族用样本里最小正计数兜底 0 值，`-log` 等于 `log` 加反转色带；
+  - `Hi-C color`：切换配色（RdYlBu_r / Viridis / Reds / Blues / Greys / Custom...）、手动设定色标上下限、恢复自动；
+    `Custom...` 可选低/中/高三色（中色可跳过），生成平滑渐变，并随 session 保存；
+  - 右键菜单里的 `Change Track Color...` 对热图无效，已从 Hi-C 轨道中移除，避免误导。
+- **方形模式**：矩阵始终铺满窗口宽度，与上方染色体标尺对齐；切到方形时轨道高度自动设为面板宽度，
+  这样单元才是正方形（等价于 pyGenomeTracks 按矩阵比例推导轨道高度的做法）。窗口宽度变化后可再点
+  `Make track square` 重新对齐。
+- **几何**：三角形模式严格保持 45° 旋转的等比映射（纵向 bp/像素 = 横向的 2 倍，因为旋转后分离度占两倍跨度），
+  每个接触单元都是等宽高的菱形（即旋转 45° 的正方形）；`depth` 留空时自动铺满轨道高度，任意缩放比例下形状都不变形。
+
+**无需 Python、无需 native 库**：HDF5 用纯 Java 的 `io.jhdf` 读取；HiCExplorer 的 chunk 用 blosc 压缩
+（PyTables 的 `complib='blosc'`），jhdf 原生不支持，因此内置了移植自 c-blosc 1.21.6 的解码器
+（`BloscFilter`，HDF5 filter id 32001），支持 blosclz + byte-shuffle。
+
+实测：`Li_et_al_2015.h5`（14 MB，11104 个 bin、166 万非零单元）读取约 0.26 秒，单次绘制约 30 毫秒；
+与原文件逐值比对一致（如 bin 8 的 `1054.47482997`）。
+
+实现改动：
+- `HiCSource` 接口：把"矩阵"抽象成按 bin 取值的数据源，渲染器不关心文件格式；
+- `HicFileSource.java`（新增）：Juicer `.hic` 解析——header / master index / 按染色体对的 block 表 / zlib block；
+  block 解压后按需缓存（LRU 8 个），实测单次绘制 26–146 ms；
+- `org/broad/igv/hic/BloscDecompressor.java`、`BlosclzDecompressor.java`、`BloscFilter.java`：纯 Java blosc 解码，注册到 jhdf；
+- `HiCFileReader.java`：识别并读取 HiCExplorer / cooler 两种布局（CSR 与 COO→CSR）；
+- `HiCData.java`：内存矩阵模型（按染色体分 bin、稀疏取值、区域子矩阵）；
+- `HiCRenderer.java` / `HiCColorScale.java`：三角形与方形绘制、RdYlBu_r 配色；
+- `HiCTrack.java`：IGV 轨道封装（右键菜单、session 持久化）；
+- `TrackLoader`：`.h5` / `.cool` / `.mcool` 走 Hi-C 分支。
 
 ## 搜索框显示基因名（不显示坐标）
 

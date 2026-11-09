@@ -66,6 +66,24 @@ public class InteractionTrack extends AbstractTrack {
     int gap = 5;
     boolean showBlocks = false;
 
+    /**
+     * Optional colour that overrides the per-feature colour read from the BEDPE `color`
+     * column.  A track-level colour is useless on its own because the renderers only use
+     * it when a feature has no colour of its own.
+     */
+    private Color arcColorOverride = null;
+
+    /** BEDPE column used as the value driving Proportional Arcs height; "score" by default. */
+    private String scoreColumn = "score";
+
+    /** Curve used to draw arcs; CIRCULAR keeps the historical IGV look. */
+    private ArcStyle arcStyle = ArcStyle.CIRCULAR;
+
+    private static final Set<String> NON_VALUE_COLUMNS = new HashSet<>(Arrays.asList(
+            "chrom1", "#chrom1", "chromosome1", "start1", "end1", "stop1", "x1", "x2",
+            "chrom2", "#chrom2", "chromosome2", "start2", "end2", "stop2",
+            "name", "strand1", "strand2", "color", "qual", "info", "filters"));
+
 
     //private Map<String, List<BedPE>> featureMap;
     private Map<GraphType, BedPERenderer> renderers;
@@ -87,17 +105,10 @@ public class InteractionTrack extends AbstractTrack {
         renderers.put(GraphType.PROPORTIONAL_ARC, new ProportionalArcRenderer(this));
         renderers.put(GraphType.BLOCK, new PEBlockRenderer(this));
 
-        String typeString = PreferencesManager.getPreferences().get(Constants.ARC_TYPE);
-        if (typeString != null) {
-            try {
-                graphType = GraphType.valueOf(typeString);
-            } catch (IllegalArgumentException e) {
-                log.error("Illegal graph type: " + typeString, e);
-                graphType = GraphType.NESTED_ARC; // default
-            }
-        } else {
-            graphType = dataset.type == BedPEParser.DatasetType.TENX ? GraphType.PROPORTIONAL_ARC : GraphType.NESTED_ARC;
-        }
+        // Always open in Nested Arcs. The old code read a global preference (and guessed
+        // PROPORTIONAL_ARC for 10x-style files), so one past choice leaked into every
+        // newly loaded BEDPE track. A saved session still restores its own graphType.
+        graphType = GraphType.NESTED_ARC;
 
 
         String directionString = PreferencesManager.getPreferences().get(Constants.ARC_DIRECTION);
@@ -233,11 +244,108 @@ public class InteractionTrack extends AbstractTrack {
     private double autoscale(List<BedPE> features) {
         double maxScore = 0;
         for (BedPE f : features) {
-            maxScore = Math.max(maxScore, f.getScore());
+            maxScore = Math.max(maxScore, getDisplayScore(f.get()));
         }
         return maxScore;
     }
 
+
+    /**
+     * Colour for one arc.  The explicit override wins; otherwise the feature's own colour
+     * (from the BEDPE `color` column) is used, and only then the supplied fallback.
+     */
+    public Color getArcColor(BedPEFeature feature, Color fallback) {
+        if (arcColorOverride != null) {
+            return arcColorOverride;
+        }
+        Color c = feature == null ? null : feature.color;
+        if (c != null) {
+            return c;
+        }
+        return fallback != null ? fallback : getColor();
+    }
+
+    public void setArcColorOverride(Color color) {
+        this.arcColorOverride = color;
+    }
+
+    public ArcStyle getArcStyle() {
+        return arcStyle;
+    }
+
+    public void setArcStyle(ArcStyle style) {
+        this.arcStyle = (style == null ? ArcStyle.CIRCULAR : style);
+    }
+
+    /** Value of the user-selected column for one feature (used by Proportional Arcs). */
+    public double getDisplayScore(BedPEFeature feature) {
+        if (feature == null) {
+            return 0;
+        }
+        if (scoreColumn == null || scoreColumn.equals("score")) {
+            return feature.score;
+        }
+        String v = feature.columnValues == null ? null : feature.columnValues.get(scoreColumn);
+        if (v == null) {
+            // The selected column is not in this file (a saved session can reference a column
+            // that was later dropped from the BEDPE). Degrade to the score column instead of
+            // drawing every arc at height zero.
+            return feature.score;
+        }
+        try {
+            return Double.parseDouble(v.trim());
+        } catch (NumberFormatException e) {
+            return feature.score;
+        }
+    }
+
+    public String getScoreColumn() {
+        return scoreColumn;
+    }
+
+    public void setScoreColumn(String column) {
+        this.scoreColumn = column;
+        // Re-normalise for the new range, otherwise the old max would squash every arc.
+        this.autoscale = true;
+        this.maxScore = -1;
+    }
+
+    /** Columns that contain at least one parseable number, in file order. */
+    public List<String> getNumericColumns() {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        if (allFeatures != null) {
+            for (BedPEFeature f : allFeatures) {
+                if (f.columnValues == null) {
+                    continue;
+                }
+                for (Map.Entry<String, String> e : f.columnValues.entrySet()) {
+                    String key = e.getKey();
+                    String value = e.getValue();
+                    // Blank column names (e.g. from spreadsheet exports) must never
+                    // show up as empty entries in the "Value Column" menu.
+                    if (key == null || key.trim().isEmpty() || value == null || value.trim().isEmpty()) {
+                        continue;
+                    }
+                    if (NON_VALUE_COLUMNS.contains(key.toLowerCase(Locale.ROOT))) {
+                        continue;
+                    }
+                    try {
+                        Double.parseDouble(value.trim());
+                        counts.merge(key, 1, Integer::sum);
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            }
+        }
+        List<String> result = new ArrayList<>();
+        result.add("score");
+        for (String key : counts.keySet()) {
+            if (!key.equals("score")) {
+                result.add(key);
+            }
+        }
+        return result;
+    }
 
     @Override
     public IGVPopupMenu getPopupMenu(TrackClickEvent te) {
@@ -266,9 +374,26 @@ public class InteractionTrack extends AbstractTrack {
         item.addActionListener(evt -> TrackMenuUtils.changeTrackHeight(Collections.singleton(InteractionTrack.this)));
         menu.add(item);
 
-        item = new JMenuItem("Set Track Color...");
-        item.addActionListener(evt -> TrackMenuUtils.changeTrackColor(Collections.singleton(InteractionTrack.this)));
+        item = new JMenuItem("Set Arc Color...");
+        item.addActionListener(evt -> {
+            Component parent = te.getMouseEvent() == null
+                    ? null : te.getMouseEvent().getComponent();
+            Color initial = arcColorOverride != null ? arcColorOverride : getColor();
+            Color chosen = JColorChooser.showDialog(parent, "Select arc color", initial);
+            if (chosen != null) {
+                setArcColorOverride(chosen);
+                repaint();
+            }
+        });
         menu.add(item);
+
+        JMenuItem resetColor = new JMenuItem("Reset Arc Colors To File");
+        resetColor.setEnabled(arcColorOverride != null);
+        resetColor.addActionListener(evt -> {
+            setArcColorOverride(null);
+            repaint();
+        });
+        menu.add(resetColor);
 
 
         menu.addSeparator();
@@ -285,12 +410,25 @@ public class InteractionTrack extends AbstractTrack {
             mm.setSelected(InteractionTrack.this.graphType == entry.getValue());
             mm.addActionListener(evt -> {
                 setGraphType(entry.getValue());
-                PreferencesManager.getPreferences().put(Constants.ARC_TYPE, entry.getValue().toString());
                 autoscaleCB.setEnabled(graphType == GraphType.PROPORTIONAL_ARC);
                 maxScoreItem.setEnabled(graphType == GraphType.PROPORTIONAL_ARC);
                 repaint();
             });
             group.add(mm);
+            menu.add(mm);
+        }
+
+        menu.addSeparator();
+        menu.add(new JLabel("<html><b>Arc shape</b>"));
+        ButtonGroup shapeGroup = new ButtonGroup();
+        for (final ArcStyle style : ArcStyle.values()) {
+            JRadioButtonMenuItem mm = new JRadioButtonMenuItem(style.getLabel());
+            mm.setSelected(this.arcStyle == style);
+            mm.addActionListener(evt -> {
+                setArcStyle(style);
+                repaint();
+            });
+            shapeGroup.add(mm);
             menu.add(mm);
         }
 
@@ -352,6 +490,19 @@ public class InteractionTrack extends AbstractTrack {
             }
         });
         menu.add(maxScoreItem);
+
+        JMenu columnMenu = new JMenu("Value Column (Proportional Arcs)");
+        ButtonGroup columnGroup = new ButtonGroup();
+        for (String col : getNumericColumns()) {
+            JRadioButtonMenuItem colItem = new JRadioButtonMenuItem(col, col.equals(scoreColumn));
+            colItem.addActionListener(evt -> {
+                setScoreColumn(col);
+                repaint();
+            });
+            columnGroup.add(colItem);
+            columnMenu.add(colItem);
+        }
+        menu.add(columnMenu);
 
         autoscaleCB.setEnabled(graphType == GraphType.PROPORTIONAL_ARC);
         maxScoreItem.setEnabled(graphType == GraphType.PROPORTIONAL_ARC);
@@ -449,6 +600,16 @@ public class InteractionTrack extends AbstractTrack {
         if (!autoscale) {
             element.setAttribute("maxScore", String.valueOf(maxScore));
         }
+        if (arcColorOverride != null) {
+            element.setAttribute("arcColor",
+                    String.format("#%06x", arcColorOverride.getRGB() & 0xFFFFFF));
+        }
+        if (!"score".equals(scoreColumn)) {
+            element.setAttribute("scoreColumn", scoreColumn);
+        }
+        if (arcStyle != ArcStyle.CIRCULAR) {
+            element.setAttribute("arcStyle", arcStyle.name());
+        }
 
     }
 
@@ -477,6 +638,23 @@ public class InteractionTrack extends AbstractTrack {
         }
         if (element.hasAttribute("maxScore")) {
             this.maxScore = Double.parseDouble(element.getAttribute("maxScore"));
+        }
+        if (element.hasAttribute("arcColor")) {
+            try {
+                this.arcColorOverride = Color.decode(element.getAttribute("arcColor"));
+            } catch (NumberFormatException ignored) {
+                // malformed colour: fall back to the colours from the file
+            }
+        }
+        if (element.hasAttribute("scoreColumn")) {
+            this.scoreColumn = element.getAttribute("scoreColumn");
+        }
+        if (element.hasAttribute("arcStyle")) {
+            try {
+                this.arcStyle = ArcStyle.valueOf(element.getAttribute("arcStyle").toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+                this.arcStyle = ArcStyle.CIRCULAR;
+            }
         }
     }
 
@@ -535,6 +713,7 @@ public class InteractionTrack extends AbstractTrack {
             wgFeature.thickness = f.thickness;
             wgFeature.color = f.color;
             wgFeature.attributes = f.attributes;
+            wgFeature.columnValues = f.columnValues;
 
             wgFeatures.add(wgFeature);
 

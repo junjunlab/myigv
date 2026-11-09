@@ -4,6 +4,7 @@ import org.broad.igv.track.RenderContext;
 
 import java.awt.*;
 import java.awt.geom.Arc2D;
+import java.awt.geom.Path2D;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,16 +48,18 @@ public class ProportionalArcRenderer implements BedPERenderer {
                     int gap = track.gap;
                     int h = trackRectangle.height - gap;
 
-                    if (track.maxScore > 0 && bedPE.getScore() > 0) {
+                    double value = track.getDisplayScore(bedPE.get());
+                    if (track.maxScore > 0 && value > 0) {
                         double logMax = Math.log10(track.maxScore + 1);
-                        h = (int) ((Math.log10(bedPE.getScore() + 1) / logMax) * h);
+                        double fraction = Math.min(1.0, Math.log10(value + 1) / logMax);
+                        h = (int) (fraction * h);
                     }
 
                     if (bedPE.isSameChr()) {
 
                         BedPEFeature feature = bedPE.get();
 
-                        Color fcolor = feature.color == null ? trackColor : feature.color;
+                        Color fcolor = track.getArcColor(feature, trackColor);
                         if (fcolor != null) {
                             g.setColor(fcolor);
                         }
@@ -78,26 +81,69 @@ public class ProportionalArcRenderer implements BedPERenderer {
                         }
 
                         double y = direction == UP ? gap + trackRectangle.y + trackRectangle.height - h : gap + trackRectangle.y - h;
-                        int angleSt = direction == UP ? 0 : 180;
-                        Arc2D.Double arcPath = new Arc2D.Double(
-                                pixelStart,
-                                y,
-                                w,
-                                2 * h,
-                                angleSt,
-                                180,
-                                Arc2D.OPEN
-                        );
 
-                        g.draw(arcPath);
-                        Color shadedColor = getAlphaColor(fcolor, PROP_ALPHA);
-                        g.setColor(shadedColor);
-                        g.fill(arcPath);
+                        if (track.getArcStyle() == ArcStyle.BEZIER) {
+                            double baseY = direction == UP
+                                    ? gap + trackRectangle.y + trackRectangle.height
+                                    : gap + trackRectangle.y;
+                            Path2D.Double path = BezierArc.path(pixelStart, pixelStart + w, baseY, h,
+                                    direction == UP, true);
+                            g.draw(path);
+                            Color shadedColor = getAlphaColor(fcolor, PROP_ALPHA);
+                            g.setColor(shadedColor);
+                            g.fill(path);
 
-                        bedPE.setShape(new PAShape(pixelStart + w/2, y + h, w/2, h));
+                            bedPE.setShape(new BezierArc.Hit(pixelStart, pixelStart + w, baseY, h,
+                                    direction == UP));
+                        } else if (track.getArcStyle() == ArcStyle.CIRCULAR) {
+                            // True circular segment through the same apex height, so it stays
+                            // visually distinct from the (default) half-ellipse. A circular
+                            // segment cannot be taller than its semicircle: past that limit the
+                            // arc would wrap around into a nearly complete circle and the loop
+                            // would appear to cross itself, so the height is capped.
+                            double a = w / 2.0;
+                            double hh = Math.min(h, a);
+                            double r = (a * a + hh * hh) / (2.0 * hh);
+                            double baseY = direction == UP
+                                    ? gap + trackRectangle.y + trackRectangle.height
+                                    : gap + trackRectangle.y;
+                            double cy = direction == UP ? baseY + (r - hh) : baseY - (r - hh);
+                            double phi = Math.toDegrees(Math.atan2(a, r - hh));
+                            Arc2D.Double circ = new Arc2D.Double();
+                            circ.setArcByCenter(pixelStart + a, cy, r,
+                                    direction == UP ? 90 - phi : 270 - phi, 2 * phi, Arc2D.OPEN);
+                            g.draw(circ);
+                            Color shadedColor = getAlphaColor(fcolor, PROP_ALPHA);
+                            Path2D.Double fill = new Path2D.Double(circ);
+                            fill.lineTo(pixelStart + w, baseY);
+                            fill.lineTo(pixelStart, baseY);
+                            fill.closePath();
+                            g.setColor(shadedColor);
+                            g.fill(fill);
+
+                            bedPE.setShape(new NestedArcRenderer.NAShape(pixelStart + a, cy, r));
+                        } else {
+                            int angleSt = direction == UP ? 0 : 180;
+                            Arc2D.Double arcPath = new Arc2D.Double(
+                                    pixelStart,
+                                    y,
+                                    w,
+                                    2 * h,
+                                    angleSt,
+                                    180,
+                                    Arc2D.OPEN
+                            );
+
+                            g.draw(arcPath);
+                            Color shadedColor = getAlphaColor(fcolor, PROP_ALPHA);
+                            g.setColor(shadedColor);
+                            g.fill(arcPath);
+
+                            bedPE.setShape(new PAShape(pixelStart + w/2, y + h, w/2, h));
+                        }
 
                     } else {
-                        Color fcolor = bedPE.get().color == null ? Color.black : bedPE.get().color;
+                        Color fcolor = track.getArcColor(bedPE.get(), Color.black);
                         g.setColor(fcolor);
                         double ps = ((bedPE.getStart() + bedPE.getEnd()) / 2 - origin) / locScale;
                         int yBase = direction == UP ? trackRectangle.y + trackRectangle.height - h : trackRectangle.y + gap;

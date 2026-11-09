@@ -31,7 +31,7 @@ public class PEBlockRenderer implements BedPERenderer {
 
             for (BedPE bedPE : features) {
 
-                Color fcolor = bedPE.getColor() == null ? trackColor : bedPE.getColor();
+                Color fcolor = track.getArcColor(bedPE.get(), trackColor);
                 if (fcolor != null) {
                     g.setColor(fcolor);
                 }
