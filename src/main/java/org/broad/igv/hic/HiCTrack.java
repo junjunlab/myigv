@@ -414,6 +414,43 @@ public class HiCTrack extends AbstractTrack {
         g.drawRect(rect.x, rect.y, rect.width - 1, rect.height - 1);
     }
 
+    /**
+     * Geometry of the legend box for this paint, or {@code null} when it must not be drawn.
+     * <p>
+     * Vertical size follows the *visible* part of the track: a tall track that is scrolled, or
+     * a window too short for the panel, is painted with a clip shorter than its rect, and a
+     * box anchored at rect.y would lose its bottom edge - exactly where the lower value label
+     * sits (the "legend has no 0" report).
+     * <p>
+     * The horizontal anchor stays on the track rect, never on the clip: a partial repaint (a
+     * popup closing, a tooltip) has a clip narrower than the track, and anchoring on the clip
+     * moved the box into the middle of the matrix while the previous legend stayed on screen,
+     * which showed up as two legends at once.
+     */
+    static Rectangle legendBox(Rectangle rect, Rectangle clip, LegendPosition position) {
+        final int barW = 12;
+        final int boxW = barW + 46;
+        final int top = rect.y + 8;
+        int bottom = rect.y + rect.height - 4;
+        if (clip != null) {
+            bottom = Math.min(bottom, clip.y + clip.height - 4);
+        }
+        // 36 px of chrome: title line above the bar, a little padding below it.
+        if (bottom - top < 78 || rect.width < boxW + 16) {
+            return null;
+        }
+        final int barH = Math.max(28, Math.min(90, bottom - top - 36));
+        final int x = position == LegendPosition.TOP_LEFT
+                ? rect.x + 8 : rect.x + rect.width - boxW - 8;
+        final Rectangle box = new Rectangle(x, top, boxW, barH + 30);
+        if (clip != null && !clip.contains(box)) {
+            // Partially damaged track: skip this pass. The legend comes back with the next
+            // full repaint instead of being drawn a second time somewhere else.
+            return null;
+        }
+        return box;
+    }
+
     /** Vertical colour bar matching the palette and value transform used for the matrix. */
     private void paintColorLegend(Graphics2D g, Rectangle rect, String chr,
                                   double origin, double end) {
@@ -431,35 +468,18 @@ public class HiCTrack extends AbstractTrack {
         final int[][] drawAnchors = transform.reversesRamp()
                 ? HiCColorScale.reversedAnchors(palette, customAnchors) : customAnchors;
 
+        final Rectangle box = legendBox(rect, g.getClipBounds(), legendPosition);
+        if (box == null) {
+            return;
+        }
         final int barW = 12;
-
-        // Size and place the box inside the *visible* part of the track. A tall track that is
-        // scrolled (or a window too short for the panel) is painted with a clip shorter than
-        // its rect, and a box anchored at rect.y then loses its bottom edge - which is exactly
-        // where the lower value label sits, so the legend appeared to have no "0".
-        final Rectangle clip = g.getClipBounds();
-        final int top = rect.y + 8;
-        int bottom = rect.y + rect.height - 4;
-        int right = rect.x + rect.width - 4;
-        if (clip != null) {
-            bottom = Math.min(bottom, clip.y + clip.height - 4);
-            right = Math.min(right, clip.x + clip.width - 4);
-        }
-        final int boxW = barW + 46;
-        // 36 px of chrome: title line above the bar, a little padding below it.
-        if (bottom - top < 78 || right - rect.x < boxW + 16) {
-            return;
-        }
-        final int barH = Math.max(28, Math.min(90, bottom - top - 36));
-        final int boxH = barH + 30;
-        final int x = legendPosition == LegendPosition.TOP_LEFT
-                ? rect.x + 8 : right - boxW - 8;
-        final int y = top;
-        if (x < rect.x || x + boxW > right) {
-            return;
-        }
-        final int barX = x + 7;
-        final int barY = y + 20;
+        final int barH = box.height - 30;
+        final int barX = box.x + 7;
+        final int barY = box.y + 20;
+        final int x = box.x;
+        final int y = box.y;
+        final int boxW = box.width;
+        final int boxH = box.height;
 
         Color oldColor = g.getColor();
         Font oldFont = g.getFont();
