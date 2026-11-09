@@ -29,7 +29,11 @@ import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * IGV track that renders a Hi-C contact matrix.
@@ -151,22 +155,23 @@ public class HiCTrack extends AbstractTrack {
 
     /** Colour limits for the current view, cached because sampling the matrix is not free. */
     /** Identity of the colour limits for one view; shared by the renderer and the legend. */
-    private String limitsKey(String chr, double origin, double end) {
-        return chr + "|" + (long) origin + "|" + (long) end + "|" + transform
-                + "|" + minValue + "|" + maxValue + "|" + data.getBinSize()
-                + "|" + forcedResolution;
+    private String limitsKey(String chr, double origin, double end, int width) {
+        // Deliberately not data.getBinSize(): with several facets visible the render thread
+        // switches resolution between panels, so that value drifts and the legend would keep
+        // re-sampling the matrix on the EDT. Width is what fixes the sampling grid.
+        return chr + "|" + (long) origin + "|" + (long) end + "|" + width + "|" + transform
+                + "|" + minValue + "|" + maxValue + "|" + forcedResolution;
     }
 
-    private double[] limitsFor(String chr, double origin, double end) {
-        String key = limitsKey(chr, origin, end);
-        double[] cached = cachedLimits;
-        if (cached != null && key.equals(cachedLimitsKey)) {
+    private double[] limitsFor(String chr, double origin, double end, int width) {
+        String key = limitsKey(chr, origin, end, width);
+        double[] cached = limitsCache.get(key);
+        if (cached != null) {
             return cached;
         }
         double[] limits = HiCRenderer.colorLimits(data, chr, origin, end, end - origin,
                 minValue, maxValue, transform);
-        cachedLimits = limits;
-        cachedLimitsKey = key;
+        limitsCache.put(key, limits);
         return limits;
     }
 
@@ -245,16 +250,66 @@ public class HiCTrack extends AbstractTrack {
     /** Square display has already been given a square track height once. */
     private transient boolean squareHeightAdjusted;
 
-    /** Matrix-only image, reused when only the domain overlay styling changed. */
-    private transient BufferedImage matrixImage;
-    private transient String matrixImageKey;
+    /**
+     * Finished frames, one per view. A faceted session paints this same track instance once
+     * per panel, each with a different key. With a single slot the panels evicted each other,
+     * and every completion repainted all of them, so the losers were resubmitted forever -
+     * the "cannot stop flickering" report.
+     */
+    private transient final Map<String, BufferedImage> frameCache =
+            Collections.synchronizedMap(new LinkedHashMap<String, BufferedImage>(8, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, BufferedImage> eldest) {
+                    return size() > 8;
+                }
+            });
 
-    private transient BufferedImage cachedImage;
-    private transient String cacheKey;
-    private transient volatile String pendingKey;
+    /** Last finished frame of any view, shown while a new one is still rendering. */
+    private transient volatile BufferedImage lastFrame;
 
-    private transient volatile double[] cachedLimits;
-    private transient volatile String cachedLimitsKey;
+    /** Views whose render is queued or running; per key, so facets do not cancel each other. */
+    private transient final Set<String> pendingKeys =
+            Collections.synchronizedSet(new LinkedHashSet<>());
+
+    /** Bound on queued views: a drag repaints per pixel and only the newest ones matter. */
+    private static final int MAX_PENDING = 12;
+
+    /**
+     * Marks {@code key} as queued. When more than {@link #MAX_PENDING} views are waiting the
+     * oldest is dropped; its task sees the key missing and returns without rendering, which
+     * keeps the supersede behaviour a single-slot pending key used to give us.
+     */
+    private boolean enqueueRender(String key) {
+        synchronized (pendingKeys) {
+            if (!pendingKeys.add(key)) {
+                return false;
+            }
+            while (pendingKeys.size() > MAX_PENDING) {
+                java.util.Iterator<String> it = pendingKeys.iterator();
+                it.next();
+                it.remove();
+            }
+            return true;
+        }
+    }
+
+    /** Matrix-only images, one per view (see frameCache). */
+    private transient final Map<String, BufferedImage> matrixCache =
+            Collections.synchronizedMap(new LinkedHashMap<String, BufferedImage>(8, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, BufferedImage> eldest) {
+                    return size() > 8;
+                }
+            });
+
+    /** Colour limits per view, sampled off the EDT by the renderer. */
+    private transient final Map<String, double[]> limitsCache =
+            Collections.synchronizedMap(new LinkedHashMap<String, double[]>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, double[]> eldest) {
+                    return size() > 16;
+                }
+            });
 
     /** Cached colour ramp of the legend bar, keyed by size and limits. */
     private transient BufferedImage rampImage;
@@ -323,86 +378,91 @@ public class HiCTrack extends AbstractTrack {
                 + "|" + dw + "x" + dh;
         final String key = matrixKey + "|" + overlaySignature() + "|" + renderFlipped;
 
-        if (cachedImage != null && key.equals(cacheKey)
-                && cachedImage.getWidth() == dw && cachedImage.getHeight() == dh) {
-            g.drawImage(cachedImage, rect.x, rect.y, w, h, null);
+        BufferedImage hit = frameCache.get(key);
+        if (hit != null && hit.getWidth() == dw && hit.getHeight() == dh) {
+            g.drawImage(hit, rect.x, rect.y, w, h, null);
         } else {
-            if (!key.equals(pendingKey)) {
-                pendingKey = key;
+            if (enqueueRender(key)) {
                 RENDER_POOL.submit(() -> {
-                    // Drop superseded requests: during a drag or zoom IGV fires many
-                    // repaints and only the latest one matters.
-                    if (!key.equals(pendingKey)) {
-                        return;
-                    }
-                    // Resolution has to match the zoom level, otherwise a whole-chromosome
-                    // view samples ~30 bins per pixel and the matrix looks striped.
-                    double bpPerPixel = (end - origin) / Math.max(1, w);
-                    if (forcedResolution > 0) {
-                        data.setBinSize(forcedResolution);
-                    } else {
-                        data.autoSelectBinSize(bpPerPixel, w);
-                    }
-
-                    BufferedImage base = matrixImage;
-                    double[] usedLimits = null;
-                    if (base == null || !matrixKey.equals(matrixImageKey)
-                            || base.getWidth() != dw || base.getHeight() != dh) {
-                        base = new BufferedImage(dw, dh, BufferedImage.TYPE_INT_RGB);
-                        if (renderMode == Mode.TRIANGLE) {
-                            usedLimits = HiCRenderer.paintTriangle(base, data, chr, origin, end,
-                                    renderDepth, renderRatio, minV, maxV, renderTransform,
-                                    renderPalette, anchors);
+                    boolean handedOff = false;
+                    try {
+                        // Another request for this exact view already replaced the frame (or
+                        // the track was unloaded); nothing left to do.
+                        if (!pendingKeys.contains(key)) {
+                            return;
+                        }
+                        // Resolution has to match the zoom level, otherwise a whole-chromosome
+                        // view samples ~30 bins per pixel and the matrix looks striped.
+                        double bpPerPixel = (end - origin) / Math.max(1, w);
+                        if (forcedResolution > 0) {
+                            data.setBinSize(forcedResolution);
                         } else {
-                            usedLimits = HiCRenderer.paintSquare(base, data, chr, origin, end,
-                                    minV, maxV, renderTransform, renderPalette, anchors);
+                            data.autoSelectBinSize(bpPerPixel, w);
                         }
-                        matrixImage = base;
-                        matrixImageKey = matrixKey;
+
+                        BufferedImage base = matrixCache.get(matrixKey);
+                        double[] usedLimits = null;
+                        if (base == null || base.getWidth() != dw || base.getHeight() != dh) {
+                            base = new BufferedImage(dw, dh, BufferedImage.TYPE_INT_RGB);
+                            if (renderMode == Mode.TRIANGLE) {
+                                usedLimits = HiCRenderer.paintTriangle(base, data, chr, origin, end,
+                                        renderDepth, renderRatio, minV, maxV, renderTransform,
+                                        renderPalette, anchors);
+                            } else {
+                                usedLimits = HiCRenderer.paintSquare(base, data, chr, origin, end,
+                                        minV, maxV, renderTransform, renderPalette, anchors);
+                            }
+                            matrixCache.put(matrixKey, base);
+                        }
+
+                        // Composite: matrix + overlays, so restyling only redraws the strokes.
+                        BufferedImage img = new BufferedImage(dw, dh, BufferedImage.TYPE_INT_RGB);
+                        Graphics2D composite = img.createGraphics();
+                        composite.drawImage(base, 0, 0, null);
+                        composite.dispose();
+                        paintDomainOverlays(img, chr, origin, end, dw, dh, renderMode, renderRatio);
+
+                        // Mirror the finished composite rather than the geometry. The matrix and
+                        // every overlay flip together, so a BED bound *after* flipping is aligned
+                        // automatically and HiCDomainOverlay needs no knowledge of the orientation.
+                        final BufferedImage frame;
+                        if (renderFlipped) {
+                            frame = new BufferedImage(dw, dh, BufferedImage.TYPE_INT_RGB);
+                            Graphics2D mirror = frame.createGraphics();
+                            mirror.drawImage(img, 0, dh, dw, -dh, null);
+                            mirror.dispose();
+                        } else {
+                            frame = img;
+                        }
+
+                        final double[] limitsForLegend = usedLimits;
+                        SwingUtilities.invokeLater(() -> {
+                            if (limitsForLegend != null) {
+                                // Publish the limits the image was actually drawn with, so the
+                                // legend never re-samples the matrix on the EDT (that sampling
+                                // inflates .hic blocks and used to stall the UI) and can never
+                                // disagree with the colours on screen.
+                                limitsCache.put(limitsKey(chr, origin, end, w), limitsForLegend);
+                            }
+                            frameCache.put(key, frame);
+                            lastFrame = frame;
+                            pendingKeys.remove(key);
+                            repaintSelf();
+                        });
+                        handedOff = true;
+                    } finally {
+                        if (!handedOff) {
+                            // Never leave a view marked as pending: after a supersede or a
+                            // failure it would never be rendered again.
+                            pendingKeys.remove(key);
+                        }
                     }
-
-                    // Composite: matrix + overlays, so restyling only redraws the strokes.
-                    BufferedImage img = new BufferedImage(dw, dh, BufferedImage.TYPE_INT_RGB);
-                    Graphics2D composite = img.createGraphics();
-                    composite.drawImage(base, 0, 0, null);
-                    composite.dispose();
-                    paintDomainOverlays(img, chr, origin, end, dw, dh, renderMode, renderRatio);
-
-                    // Mirror the finished composite rather than the geometry. The matrix and
-                    // every overlay flip together, so a BED bound *after* flipping is aligned
-                    // automatically and HiCDomainOverlay needs no knowledge of the orientation.
-                    final BufferedImage frame;
-                    if (renderFlipped) {
-                        frame = new BufferedImage(dw, dh, BufferedImage.TYPE_INT_RGB);
-                        Graphics2D mirror = frame.createGraphics();
-                        mirror.drawImage(img, 0, dh, dw, -dh, null);
-                        mirror.dispose();
-                    } else {
-                        frame = img;
-                    }
-
-                    final double[] limitsForLegend = usedLimits;
-                    SwingUtilities.invokeLater(() -> {
-                        if (limitsForLegend != null) {
-                            // Publish the limits the image was actually drawn with, so the
-                            // legend never re-samples the matrix on the EDT (that sampling
-                            // inflates .hic blocks and used to stall the UI) and can never
-                            // disagree with the colours on screen.
-                            cachedLimits = limitsForLegend;
-                            cachedLimitsKey = limitsKey(chr, origin, end);
-                        }
-                        cachedImage = frame;
-                        cacheKey = key;
-                        if (key.equals(pendingKey)) {
-                            pendingKey = null;
-                        }
-                        repaintSelf();
-                    });
                 });
             }
-            // Show the previous frame while the new one is being computed.
-            if (cachedImage != null) {
-                g.drawImage(cachedImage, rect.x, rect.y, w, h, null);
+            // Show the most recent finished frame while the new one is being computed.
+            BufferedImage fallback = lastFrame;
+            if (fallback != null) {
+                g.drawImage(fallback, rect.x, rect.y, w, h, null);
             }
         }
 
@@ -457,7 +517,7 @@ public class HiCTrack extends AbstractTrack {
         if (legendPosition == LegendPosition.NONE || data == null || rect.width < 80) {
             return;
         }
-        double[] limits = limitsFor(chr, origin, end);
+        double[] limits = limitsFor(chr, origin, end, rect.width);
         if (limits == null || !(limits[1] > limits[0])) {
             return;
         }
@@ -1399,15 +1459,13 @@ public class HiCTrack extends AbstractTrack {
         }
         domainOverlays.clear();
 
-        matrixImage = null;
-        matrixImageKey = null;
-        cachedImage = null;
-        cacheKey = null;
-        pendingKey = null;
+        frameCache.clear();
+        lastFrame = null;
+        pendingKeys.clear();
+        matrixCache.clear();
+        limitsCache.clear();
         rampImage = null;
         rampKey = "";
-        cachedLimits = null;
-        cachedLimitsKey = null;
 
         if (data != null) {
             try {
