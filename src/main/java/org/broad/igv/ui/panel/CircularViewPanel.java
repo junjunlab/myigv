@@ -765,8 +765,6 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     /** Load per-bin scores for bigWig/bedGraph tracks (background, cached). */
     private void ensureDataLoaded(Genome genome) {
         if (genome == null || ringTracks.isEmpty()) return;
-        final String frame = FrameManager.getDefaultFrame().getName();
-        final int zoom = FrameManager.getDefaultFrame().getZoom();
         for (Track t : ringTracks) {
             if (!(t instanceof DataTrack)) continue;
             for (String chr : genome.getLongChromosomeNames()) {
@@ -784,7 +782,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                             int st = i * binLen;
                             int en = Math.min(len, st + binLen);
                             if (st >= len) { bins[i] = Float.NaN; continue; }
-                            bins[i] = t.getRegionScore(chr, st, en, zoom, RegionScoreType.SCORE, frame);
+                            // zoom 0 + null frameName -> fresh fine-grained summary per bin
+                            // (avoids the coarse whole-genome summary / frame cache thrash that
+                            //  made every bin ~constant, so all bars were full height).
+                            bins[i] = t.getRegionScore(chr, st, en, 0, RegionScoreType.SCORE, null);
                         }
                     } catch (Throwable ex) {
                         java.util.Arrays.fill(bins, Float.NaN);
@@ -810,6 +811,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         boolean flat = (mx - mn) <= 1e-9f;
         double bandH = bandOuter - bandInner;
         String type = cfg.graphType == null ? "Bar" : cfg.graphType;
+        // IGV draws bars from a baseline at value 0 (scaled by the data range), not from min.
+        double baseR = flat ? bandInner : bandInner + bandH * clamp01((0.0 - mn) / (mx - mn));
 
         for (int i = 0; i < chrs.size(); i++) {
             float[] b = dataCache.get(track.getName() + "|" + chrs.get(i).name);
@@ -823,7 +826,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 for (int k = 0; k < n; k++) {
                     float v = b[k];
                     if (Float.isNaN(v) || Float.isInfinite(v)) { pen = false; continue; }
-                    double t = flat ? 1.0 : (v - mn) / (mx - mn);
+                    double t = flat ? 0.5 : (v - mn) / (mx - mn);
                     double a = f0 + span * ((k + 0.5) / n);
                     Point2D p = polar(cx, cy, bandInner + bandH * t, a);
                     if (!pen) { path.moveTo(p.getX(), p.getY()); pen = true; } else path.lineTo(p.getX(), p.getY());
@@ -848,8 +851,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     Point2D p = polar(cx, cy, bandInner + bandH * t, (a0 + a1) / 2.0);
                     g2.setColor(cfg.color);
                     g2.fill(new java.awt.geom.Ellipse2D.Double(p.getX() - 1.2, p.getY() - 1.2, 2.4, 2.4));
-                } else { // Bar: radial bar from the inner baseline outward (IGV wig style)
-                    fillArc(g2, cx, cy, bandInner, bandInner + Math.max(1.0, bandH * t), a0, a1, cfg.color);
+                } else { // Bar: from the value-0 baseline to the value radius (IGV wig style)
+                    double rBar = bandInner + bandH * t;
+                    fillArc(g2, cx, cy, Math.min(baseR, rBar), Math.max(baseR, rBar), a0, a1, cfg.color);
                 }
             }
         }
