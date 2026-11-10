@@ -92,6 +92,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public double  bandInner = 0.78;
         public double  bandOuter = 0.90;
         public double  gapDeg = 1.5;
+        /** When true, fill every chromosome with chromosomeColor (ignore cytoband stripes). */
+        public boolean solidColor = false;
+        /** Solid chromosome fill colour (used when solidColor; also the default for species w/o karyotype). */
+        public Color   chromosomeColor = new Color(93, 145, 190);
+        /** Chromosomes to show in "All" mode; empty = show all. */
+        public Set<String> shownChromosomes = new HashSet<>();
 
         public CircularSettings copy() {
             CircularSettings s = new CircularSettings();
@@ -100,6 +106,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.tickLabelSize = tickLabelSize; s.showChromosomeLabels = showChromosomeLabels;
             s.chromosomeLabelSize = chromosomeLabelSize; s.labelTangential = labelTangential;
             s.bandInner = bandInner; s.bandOuter = bandOuter; s.gapDeg = gapDeg;
+            s.solidColor = solidColor; s.chromosomeColor = chromosomeColor;
+            s.shownChromosomes = new HashSet<>(shownChromosomes);
             return s;
         }
 
@@ -214,11 +222,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             ig.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
             ig.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
             if (Globals.CHR_ALL.equals(chr)) {
-                List<ChrInfo> chrs = buildAll(genome, zoom);
+                List<ChrInfo> chrs = buildAll(genome, zoom, settings);
                 drawAll(ig, w, h, chrs, settings);
                 drawTrackRings(ig, w, h, chrs, settings);
             } else {
-                ChrInfo one = buildOne(genome, chr);
+                ChrInfo one = buildOne(genome, chr, settings);
                 if (one == null) drawMessage(ig, w, h, "Chromosome not found: " + chr);
                 else { drawSingle(ig, w, h, one, settings); drawTrackRingsSingle(ig, w, h, one, settings); }
             }
@@ -257,7 +265,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     private String chromosomeAt(int x, int y, Genome genome) {
-        List<ChrInfo> chrs = buildAll(genome, zoom);
+        List<ChrInfo> chrs = buildAll(genome, zoom, settings);
         if (chrs.isEmpty()) return null;
         int cx = getWidth() / 2, cy = getHeight() / 2;
         double R = Math.min(getWidth(), getHeight()) / 2.0 - MARGIN;
@@ -364,25 +372,29 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return PALETTE[idx];
     }
 
-    static List<ChrInfo> buildAll(Genome genome, Map<String, Double> zoomMap) {
+    static List<ChrInfo> buildAll(Genome genome, Map<String, Double> zoomMap, CircularSettings s) {
         List<ChrInfo> list = new ArrayList<>();
         for (String name : genome.getLongChromosomeNames()) {
             org.broad.igv.feature.Chromosome c = genome.getChromosome(name);
             if (c == null) continue;
             long len = c.getLength();
             if (len <= 0) continue;
+            if (s != null && s.shownChromosomes != null && !s.shownChromosomes.isEmpty()
+                    && !s.shownChromosomes.contains(name)) continue;
             double z = zoomMap != null ? zoomMap.getOrDefault(name, 1.0) : 1.0;
-            List<Cytoband> cyto = genome.getCytobands(name);
-            list.add(new ChrInfo(name, len, len * z, cyto, pickColor(name, cyto)));
+            List<Cytoband> cyto = (s != null && s.solidColor) ? null : genome.getCytobands(name);
+            Color color = (s != null && s.solidColor) ? s.chromosomeColor : pickColor(name, cyto);
+            list.add(new ChrInfo(name, len, len * z, cyto, color));
         }
         return list;
     }
 
-    static ChrInfo buildOne(Genome genome, String chr) {
+    static ChrInfo buildOne(Genome genome, String chr, CircularSettings s) {
         org.broad.igv.feature.Chromosome c = genome.getChromosome(chr);
         if (c == null) return null;
-        List<Cytoband> cyto = genome.getCytobands(chr);
-        return new ChrInfo(chr, c.getLength(), c.getLength(), cyto, pickColor(chr, cyto));
+        List<Cytoband> cyto = (s != null && s.solidColor) ? null : genome.getCytobands(chr);
+        Color color = (s != null && s.solidColor) ? s.chromosomeColor : pickColor(chr, cyto);
+        return new ChrInfo(chr, c.getLength(), c.getLength(), cyto, color);
     }
 
     // ------------------------------------------------------------------
@@ -464,7 +476,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         drawBandTicks(g2, cx, cy, rIn, rOut, 0.0, 1.0, chr.length, 360.0, s);
 
         drawCenteredText(g2, shortName(chr.name), cx, cy,
-                new Font("SansSerif", Font.BOLD, 18), Color.DARK_GRAY);
+                new Font("SansSerif", Font.BOLD, Math.max(10, s.chromosomeLabelSize + 6)), Color.DARK_GRAY);
     }
 
     // ------------------------------------------------------------------
@@ -577,6 +589,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             for (String chr : genome.getLongChromosomeNames()) {
                 org.broad.igv.feature.Chromosome c = genome.getChromosome(chr);
                 if (c == null) continue;
+                if (!settings.shownChromosomes.isEmpty() && !settings.shownChromosomes.contains(chr)) continue;
                 final String key = ft.getName() + "|" + chr;
                 if (featureCache.containsKey(key) || !pendingLoads.add(key)) continue;
                 final int len = c.getLength();

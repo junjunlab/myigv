@@ -35,7 +35,11 @@ import org.broad.igv.ui.util.ApplicationStatusBar;
 
 import javax.swing.*;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import org.broad.igv.feature.genome.Genome;
+import org.broad.igv.feature.genome.GenomeManager;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import javax.swing.plaf.basic.BasicBorders;
@@ -246,6 +250,10 @@ public class IGVContentPane extends JPanel {
         menu.add(cbTicks);
         menu.add(cbTickLabels);
         menu.add(cbChr);
+
+        JMenuItem chrSel = new JMenuItem("Chromosomes to show (All mode)…");
+        chrSel.addActionListener(e -> showChromosomeSelectionDialog(panel));
+        menu.add(chrSel);
         menu.addSeparator();
 
         JMenu ticksPos = new JMenu("Tick labels position");
@@ -284,6 +292,27 @@ public class IGVContentPane extends JPanel {
             }
         });
         menu.add(labelSize);
+
+        JMenuItem chrLabelSize = new JMenuItem("Chromosome label size…");
+        chrLabelSize.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel, "Chromosome label font size:", s.chromosomeLabelSize);
+            if (v != null) {
+                try { s.chromosomeLabelSize = Integer.parseInt(v.trim()); panel.refresh(); } catch (NumberFormatException ignore) { }
+            }
+        });
+        menu.add(chrLabelSize);
+        menu.addSeparator();
+
+        JCheckBoxMenuItem solid = new JCheckBoxMenuItem("Solid chromosome colour (override karyotype)", s.solidColor);
+        solid.addActionListener(e -> { s.solidColor = solid.isSelected(); panel.refresh(); });
+        menu.add(solid);
+
+        JMenuItem chrColour = new JMenuItem("Chromosome colour…");
+        chrColour.addActionListener(e -> {
+            Color picked = JColorChooser.showDialog(panel, "Chromosome colour", s.chromosomeColor);
+            if (picked != null) { s.chromosomeColor = picked; s.solidColor = true; panel.refresh(); }
+        });
+        menu.add(chrColour);
         menu.addSeparator();
 
         JMenuItem reset = new JMenuItem("Reset zoom");
@@ -303,6 +332,53 @@ public class IGVContentPane extends JPanel {
      * Populate the left data-column list with the currently loaded tracks.
      * Used by circular-involving layouts as the "imported data" column.
      */
+    /** Dialog to pick which chromosomes are shown in the "All" ring (checkbox list, all/none). */
+    private void showChromosomeSelectionDialog(CircularViewPanel panel) {
+        Genome genome = GenomeManager.getInstance().getCurrentGenome();
+        if (genome == null) return;
+        CircularViewPanel.CircularSettings s = panel.getSettings();
+        List<String> names = genome.getLongChromosomeNames();
+
+        JPanel listPanel = new JPanel();
+        listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
+        List<JCheckBox> boxes = new ArrayList<>();
+        boolean showAll = s.shownChromosomes == null || s.shownChromosomes.isEmpty();
+        for (String n : names) {
+            JCheckBox cb = new JCheckBox(n, showAll || s.shownChromosomes.contains(n));
+            boxes.add(cb);
+            listPanel.add(cb);
+        }
+
+        JScrollPane scroll = new JScrollPane(listPanel);
+        scroll.setPreferredSize(new Dimension(240, Math.min(420, 26 * Math.max(4, names.size()) + 12)));
+
+        JPanel content = new JPanel(new BorderLayout());
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
+        JButton all = new JButton("Select all");
+        all.addActionListener(a -> boxes.forEach(b -> b.setSelected(true)));
+        JButton none = new JButton("Clear");
+        none.addActionListener(a -> boxes.forEach(b -> b.setSelected(false)));
+        buttons.add(all);
+        buttons.add(none);
+        content.add(buttons, BorderLayout.NORTH);
+        content.add(scroll, BorderLayout.CENTER);
+
+        int r = JOptionPane.showConfirmDialog(panel, content, "Chromosomes to show (All mode)",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (r != JOptionPane.OK_OPTION) return;
+
+        Set<String> selected = new HashSet<>();
+        for (int i = 0; i < boxes.size(); i++) if (boxes.get(i).isSelected()) selected.add(names.get(i));
+        if (selected.isEmpty()) {
+            JOptionPane.showMessageDialog(panel, "Select at least one chromosome.",
+                    "No chromosome selected", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        s.shownChromosomes.clear();
+        if (selected.size() < names.size()) s.shownChromosomes.addAll(selected);  // all -> empty (= show all)
+        panel.refresh();
+    }
+
     public void refreshDataColumn() {
         if (igv == null) return;
         List<Track> tracks = igv.getAllTracks();
