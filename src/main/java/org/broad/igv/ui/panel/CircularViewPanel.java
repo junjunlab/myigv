@@ -1202,11 +1202,16 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     ? Math.min(link.color.getAlpha(), s.linkAlpha) : s.linkAlpha;
             g2.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), alpha));
 
-            if (s.linkRibbon) {
-                // Filled band: end cap along the arc, bezier across, second cap, bezier back.
-                // Tiny anchors are widened to a visible minimum, otherwise the band is sub-pixel.
-                double[] e1 = widen(a1s, a1e, s.linkRibbonMinDeg);
-                double[] e2 = widen(a2s, a2e, s.linkRibbonMinDeg);
+            // A ribbon's width at each end is that interval's OWN width: a single-point end
+            // collapses to a point (the band tapers to a line there), an interval end keeps its
+            // arc width. Both ends being points means a band would have no area at all, so we
+            // fall back to a stroked chord.
+            boolean point1 = link.end1 - link.start1 <= 1;
+            boolean point2 = link.end2 - link.start2 <= 1;
+
+            if (s.linkRibbon && !(point1 && point2)) {
+                double[] e1 = ribbonEnd(a1s, a1e, point1, s.linkRibbonMinDeg);
+                double[] e2 = ribbonEnd(a2s, a2e, point2, s.linkRibbonMinDeg);
                 double b2a = s.linkTwist ? e2[0] : e2[1];
                 double b2b = s.linkTwist ? e2[1] : e2[0];
                 Path2D.Double path = new Path2D.Double();
@@ -1261,15 +1266,27 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return sector[0] + (sector[1] - sector[0]) * t;
     }
 
-    /** Widen a degenerate angular interval to at least {@code minDeg} degrees, keeping its centre. */
-    private static double[] widen(double a0, double a1, double minDeg) {
-        double widthDeg = (a1 - a0) * 360.0;
-        if (minDeg <= 0 || widthDeg >= minDeg) {
-            return new double[]{a0, a1};
-        }
-        double half = minDeg / 720.0;
+    /**
+     * Angular extent of one ribbon end.
+     * <ul>
+     *   <li>a single-point anchor (start == end) collapses to zero width, so the band tapers to
+     *       a line at that end;</li>
+     *   <li>a real interval keeps its own arc width;</li>
+     *   <li>an interval that is still sub-pixel on the ring is widened to {@code minDeg}, so it
+     *       does not vanish.</li>
+     * </ul>
+     */
+    private static double[] ribbonEnd(double a0, double a1, boolean point, double minDeg) {
         double mid = (a0 + a1) / 2.0;
-        return new double[]{mid - half, mid + half};
+        if (point) {
+            return new double[]{mid, mid};
+        }
+        double widthDeg = (a1 - a0) * 360.0;
+        if (minDeg > 0 && widthDeg < minDeg) {
+            double half = minDeg / 720.0;
+            return new double[]{mid - half, mid + half};
+        }
+        return new double[]{a0, a1};
     }
 
     private static Integer resolveSector(Map<String, Integer> index, String name) {
