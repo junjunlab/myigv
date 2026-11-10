@@ -131,11 +131,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
     // ---- feature tracks drawn as concentric bands inside the ideogram ----
     private final List<Track> ringTracks = new ArrayList<>();
+    private final Set<String> hiddenRingTracks = new HashSet<>();
     private final Map<String, TrackRingConfig> ringConfig = new HashMap<>();
     private final Map<String, List<Feature>> featureCache = new ConcurrentHashMap<>();
     private final Set<String> pendingLoads = ConcurrentHashMap.newKeySet();
     private final Map<String, Integer> loadAttempts = new HashMap<>();
     private final Map<String, Long> lastAttemptMs = new HashMap<>();
+    private final Map<String, Boolean> trackLoaded = new HashMap<>();
     private javax.swing.Timer retryTimer;
     private final ExecutorService featureLoader = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "circular-feature-loader");
@@ -163,14 +165,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         retryTimer = new javax.swing.Timer(1500, e -> {
             if (ringTracks.isEmpty()) return;
             Genome g = GenomeManager.getInstance().getCurrentGenome();
-            if (g == null) return;
-            for (Track t : ringTracks) {
-                if (!(t instanceof FeatureTrack)) continue;
-                for (String chr : g.getLongChromosomeNames()) {
-                    if (!settings.shownChromosomes.isEmpty() && !settings.shownChromosomes.contains(chr)) continue;
-                    if (!featureCache.containsKey(t.getName() + "|" + chr)) { invalidateRing(); return; }
-                }
-            }
+            if (g != null) ensureFeaturesLoaded(g);   // submissions only; data arrival triggers repaint
         });
         retryTimer.setRepeats(true);
         retryTimer.start();
@@ -218,6 +213,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int gid = System.identityHashCode(genome);
         if (gid != lastGenomeId) {
             zoom.clear(); featureCache.clear(); pendingLoads.clear();
+            loadAttempts.clear(); lastAttemptMs.clear(); trackLoaded.clear();
             lastGenomeId = gid; ringKey = null;
         }
 
@@ -592,10 +588,24 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     /** Tracks to render as concentric feature bands (set by IGVContentPane from the Data Tracks list). */
     public void setRingTracks(List<Track> tracks) {
         ringTracks.clear();
-        if (tracks != null) ringTracks.addAll(tracks);
+        if (tracks != null) {
+            for (Track t : tracks) if (!hiddenRingTracks.contains(t.getName())) ringTracks.add(t);
+        }
         log.info("Circular ring feature tracks: " + ringTracks.size());
         ringKey = null;
         repaint();
+    }
+
+    /** Remove a track from the ring (e.g. the RefSeq gene track) without unloading it. */
+    public void removeRingTrack(String name) {
+        hiddenRingTracks.add(name);
+        ringTracks.removeIf(t -> name.equals(t.getName()));
+        invalidateRing();
+    }
+
+    /** Allow all removed tracks back onto the ring (caller then calls refreshDataColumn). */
+    public void clearHiddenRingTracks() {
+        hiddenRingTracks.clear();
     }
 
     /** Per-track ring band config (created with defaults on first use). */
@@ -622,12 +632,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 if (last != null && now - last < 1200) continue;      // cooldown between retries
                 lastAttemptMs.put(key, now);
                 int attempts = loadAttempts.merge(key, 1, Integer::sum);
-                final boolean giveUp = attempts >= 20;
+                final boolean giveUp = attempts >= 120;
                 final int len = c.getLength();
                 pendingLoads.add(key);
-                // Run on the EDT: IGV feature sources are loaded/used on the EDT; calling from a
-                // foreign thread can return empty or throw before the track's data is ready.
-                SwingUtilities.invokeLater(() -> {
+                // Background thread (not EDT): the first getFeatures on a remote refGene source may
+                // block while it downloads/parses the whole file — must not freeze the UI.
+                featureLoader.submit(() -> {
                     // Try the genome's chromosome name, then the "chr"-stripped/added alias,
                     // so annotation tracks with a different naming convention still resolve.
                     List<Feature> list = tryFetch(ft, chr, len);
@@ -641,11 +651,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     if (!list.isEmpty()) {
                         featureCache.put(key, list);
                         loadAttempts.remove(key);
+                        trackLoaded.put(ft.getName(), Boolean.TRUE);
                         log.info("circular features " + key + " = " + list.size());
-                    } else if (giveUp) {
-                        featureCache.put(key, Collections.emptyList());       // no data on this chr
-                        log.info("circular features " + key + " = 0 (give up)");
+                    } else if (Boolean.TRUE.equals(trackLoaded.get(ft.getName())) || giveUp) {
+                        // Track has produced data for some chromosome (so this chr genuinely has
+                        // none), or we've retried long enough -> cache empty.
+                        featureCache.put(key, Collections.emptyList());
+                        log.info("circular features " + key + " = 0");
                     }
+                    // else: track data not ready yet -> leave uncached; the retry timer retries.
                     // else: leave uncached so the retry timer tries again (track may still be loading)
                     pendingLoads.remove(key);
                     SwingUtilities.invokeLater(this::invalidateRing);
@@ -676,11 +690,6 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double bandOuter = cursor;
             double bandInner = bandOuter - cfg.heightPx;
             if (bandInner < 24) break;
-            g2.setColor(new Color(238, 238, 238));
-            g2.fill(annularPath(cx, cy, bandInner, bandOuter, 0.0, 1.0));
-            g2.setColor(new Color(205, 205, 205));
-            g2.setStroke(new BasicStroke(0.6f));
-            g2.draw(annularPath(cx, cy, bandInner, bandOuter, 0.0, 1.0));
             drawFeatures(g2, cx, cy, bandInner, bandOuter, chrs, sec, (FeatureTrack) t, cfg);
             cursor = bandInner - 5;
         }
@@ -700,11 +709,6 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor, bandInner = bandOuter - cfg.heightPx;
             if (bandInner < 24) break;
-            g2.setColor(new Color(238, 238, 238));
-            g2.fill(annularPath(cx, cy, bandInner, bandOuter, 0.0, 1.0));
-            g2.setColor(new Color(205, 205, 205));
-            g2.setStroke(new BasicStroke(0.6f));
-            g2.draw(annularPath(cx, cy, bandInner, bandOuter, 0.0, 1.0));
             drawFeatures(g2, cx, cy, bandInner, bandOuter, chrs, sec, (FeatureTrack) t, cfg);
             cursor = bandInner - 5;
         }

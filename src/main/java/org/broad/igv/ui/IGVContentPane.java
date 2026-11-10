@@ -254,6 +254,10 @@ public class IGVContentPane extends JPanel {
         JMenuItem chrSel = new JMenuItem("Chromosomes to show (All mode)…");
         chrSel.addActionListener(e -> showChromosomeSelectionDialog(panel));
         menu.add(chrSel);
+
+        JMenuItem showAllRing = new JMenuItem("Show all ring tracks");
+        showAllRing.addActionListener(e -> { panel.clearHiddenRingTracks(); refreshDataColumn(); });
+        menu.add(showAllRing);
         menu.addSeparator();
 
         JMenu ticksPos = new JMenu("Tick labels position");
@@ -420,6 +424,11 @@ public class IGVContentPane extends JPanel {
         JCheckBoxMenuItem expanded = new JCheckBoxMenuItem("Expanded (stack features)", cfg.expanded);
         expanded.addActionListener(a -> { cfg.expanded = expanded.isSelected(); circularDrawingArea.invalidateRing(); });
         menu.add(expanded);
+
+        menu.addSeparator();
+        JMenuItem removeRing = new JMenuItem("Remove track from ring");
+        removeRing.addActionListener(a -> circularDrawingArea.removeRingTrack(track.getName()));
+        menu.add(removeRing);
 
         menu.show(dataColumnList, e.getX(), e.getY());
     }
