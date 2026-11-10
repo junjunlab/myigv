@@ -222,6 +222,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 if (one == null) drawMessage(ig, w, h, "Chromosome not found: " + chr);
                 else { drawSingle(ig, w, h, one, settings); drawTrackRingsSingle(ig, w, h, one, settings); }
             }
+            if (!pendingLoads.isEmpty()) {
+                ig.setColor(new Color(120, 120, 120));
+                ig.setFont(new Font("SansSerif", Font.PLAIN, 11));
+                ig.drawString("Loading features… (" + pendingLoads.size() + ")", 10, h - 10);
+            }
             ig.dispose();
             ringKey = key;
         }
@@ -342,6 +347,23 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     //  Genome -> ChrInfo list
     // ------------------------------------------------------------------
 
+    /** Clear, saturated palette for species without cytoband (karyotype) data. */
+    private static final Color[] PALETTE = {
+            new Color(93, 145, 190), new Color(222, 126, 80), new Color(119, 167, 109),
+            new Color(196, 120, 160), new Color(180, 160, 105), new Color(150, 140, 190),
+            new Color(215, 140, 140), new Color(110, 160, 160), new Color(190, 170, 90),
+            new Color(120, 130, 180), new Color(210, 110, 130), new Color(140, 170, 120),
+            new Color(170, 140, 90), new Color(120, 150, 180), new Color(200, 160, 170),
+            new Color(130, 160, 130)
+    };
+
+    /** Cytoband data -> circlize grayscale ideogram; no data -> distinct solid palette colour. */
+    public static Color pickColor(String name, List<Cytoband> cyto) {
+        if (cyto != null && !cyto.isEmpty()) return ChromosomeColors.getColor(name);
+        int idx = Math.floorMod(name == null ? 0 : name.hashCode(), PALETTE.length);
+        return PALETTE[idx];
+    }
+
     static List<ChrInfo> buildAll(Genome genome, Map<String, Double> zoomMap) {
         List<ChrInfo> list = new ArrayList<>();
         for (String name : genome.getLongChromosomeNames()) {
@@ -350,8 +372,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             long len = c.getLength();
             if (len <= 0) continue;
             double z = zoomMap != null ? zoomMap.getOrDefault(name, 1.0) : 1.0;
-            list.add(new ChrInfo(name, len, len * z, genome.getCytobands(name),
-                    ChromosomeColors.getColor(name)));
+            List<Cytoband> cyto = genome.getCytobands(name);
+            list.add(new ChrInfo(name, len, len * z, cyto, pickColor(name, cyto)));
         }
         return list;
     }
@@ -359,8 +381,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     static ChrInfo buildOne(Genome genome, String chr) {
         org.broad.igv.feature.Chromosome c = genome.getChromosome(chr);
         if (c == null) return null;
-        return new ChrInfo(chr, c.getLength(), c.getLength(), genome.getCytobands(chr),
-                ChromosomeColors.getColor(chr));
+        List<Cytoband> cyto = genome.getCytobands(chr);
+        return new ChrInfo(chr, c.getLength(), c.getLength(), cyto, pickColor(chr, cyto));
     }
 
     // ------------------------------------------------------------------
@@ -559,17 +581,30 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 if (featureCache.containsKey(key) || !pendingLoads.add(key)) continue;
                 final int len = c.getLength();
                 featureLoader.submit(() -> {
-                    List<Feature> list;
-                    try {
-                        list = ft.getFeatures(chr, 0, len);
-                    } catch (Throwable ex) {
-                        list = Collections.emptyList();
+                    // Try the genome's chromosome name, then the "chr"-stripped/added alias,
+                    // so annotation tracks with a different naming convention still resolve.
+                    List<Feature> list = tryFetch(ft, chr, len);
+                    if (list.isEmpty()) {
+                        String alt = chr.startsWith("chr") ? chr.substring(3) : "chr" + chr;
+                        if (!alt.equals(chr)) {
+                            List<Feature> l2 = tryFetch(ft, alt, len);
+                            if (!l2.isEmpty()) list = l2;
+                        }
                     }
                     featureCache.put(key, list);
                     pendingLoads.remove(key);
                     SwingUtilities.invokeLater(this::invalidateRing);
                 });
             }
+        }
+    }
+
+    private static List<Feature> tryFetch(FeatureTrack ft, String chr, int len) {
+        try {
+            List<Feature> l = ft.getFeatures(chr, 0, len);
+            return l != null ? l : Collections.emptyList();
+        } catch (Throwable ex) {
+            return Collections.emptyList();
         }
     }
 
