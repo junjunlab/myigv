@@ -239,7 +239,7 @@ public class IGVContentPane extends JPanel {
         pos.addActionListener(e -> { s.tickLabelsOutside = pos.getSelectedIndex() == 0; panel.refresh(); });
         bar.add(pos);
 
-        bar.add(new JLabel("Labels:"));
+        bar.add(new JLabel("Numbers:"));
         JComboBox<String> orient = new JComboBox<>(new String[]{"Tangential", "Radial"});
         orient.setSelectedIndex(s.labelTangential ? 0 : 1);
         orient.addActionListener(e -> { s.labelTangential = orient.getSelectedIndex() == 0; panel.refresh(); });
@@ -250,6 +250,12 @@ public class IGVContentPane extends JPanel {
         sp.setMaximumSize(new Dimension(90, 28));
         sp.addChangeListener(e -> { s.tickSpacingMb = ((Number) sp.getValue()).doubleValue(); panel.refresh(); });
         bar.add(sp);
+
+        bar.add(new JLabel("Label size:"));
+        JSpinner spFont = new JSpinner(new SpinnerNumberModel(s.tickLabelSize, 4, 24, 1));
+        spFont.setMaximumSize(new Dimension(56, 28));
+        spFont.addChangeListener(e -> { s.tickLabelSize = ((Number) spFont.getValue()).intValue(); panel.refresh(); });
+        bar.add(spFont);
 
         JCheckBox chrLbl = new JCheckBox("Chr labels", s.showChromosomeLabels);
         chrLbl.addActionListener(e -> { s.showChromosomeLabels = chrLbl.isSelected(); panel.refresh(); });

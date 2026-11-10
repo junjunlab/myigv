@@ -268,7 +268,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         p.add(row("Tick spacing (Mb, 0 = auto):", spSpace));
         p.add(row("Tick label size:", spTickSize));
         p.add(row("Chromosome label size:", spChrSize));
-        p.add(row("Label orientation:", cbOrient));
+        p.add(row("Chromosome number orientation:", cbOrient));
         p.add(row("Band inner radius (0–1):", spInner));
         p.add(row("Band outer radius (0–1):", spOuter));
         p.add(row("Gap between chromosomes (°):", spGap));
@@ -452,9 +452,22 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                                       CircularSettings s) {
         if (!s.showTicks && !s.showTickLabels) return;
         if (spanDeg < 1.0) return;
-        long step = s.tickStepBp(length);
+
+        // Tick interval follows the available arc: a zoomed chromosome (large spanDeg) gets
+        // finer ticks, a tiny one gets coarser — so labels stay ~70px apart ("reasonable ruler").
+        long step;
+        if (s.tickSpacingMb > 0) {
+            step = Math.max(1, Math.round(s.tickSpacingMb * 1_000_000.0));
+        } else {
+            double midR = (rIn + rOut) / 2.0;
+            double arcPx = arcLength(midR, spanDeg);
+            int targetTicks = Math.max(2, (int) Math.round(arcPx / 70.0));
+            step = niceStep(length, targetTicks);
+        }
         double span = fEnd - fStart;
         Font tickFont = new Font("SansSerif", Font.PLAIN, s.tickLabelSize);
+        // angular spacing between adjacent ticks (used to decide if labels fit)
+        double stepDeg = spanDeg * ((double) step / Math.max(1, length));
 
         for (long p = 0; p <= length; p += step) {
             double f = fStart + span * ((double) p / length);
@@ -467,11 +480,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             }
 
             if (s.showTickLabels) {
+                // Coordinate labels are ALWAYS tangential — radial coordinate text crosses the
+                // band and collides with neighbours. The "Radial" option only rotates the
+                // chromosome numbers (see drawAll), which is the standard circular-genome look.
                 double labelR = s.tickLabelsOutside ? (rOut + 8) : (rIn - 8);
-                String txt = mbLabel(p);
+                String txt = tickLabel(p, step);            // Mb / kb / bp by interval
                 int tw = g2.getFontMetrics(tickFont).stringWidth(txt);
-                if (arcLength(labelR, spanDeg) < tw + 10) continue;
-                drawLabelText(g2, cx, cy, labelR, f, txt, tickFont, new Color(70, 70, 70), s.labelTangential);
+                if (arcLength(labelR, stepDeg) < tw + 6) continue;   // adjacent labels would collide
+                drawTangentialText(g2, cx, cy, labelR, f, txt, tickFont, new Color(70, 70, 70));
             }
         }
     }
@@ -603,6 +619,19 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double mb = bp / 1_000_000.0;
         if (mb >= 10) return String.format("%.0fMb", mb);
         return String.format("%.1fMb", mb).replace(".0Mb", "Mb");
+    }
+
+    /** Format a tick label using a unit chosen from the tick interval (Mb / kb / bp). */
+    static String tickLabel(long bp, long step) {
+        if (step >= 1_000_000L) {
+            double v = bp / 1_000_000.0;
+            return (step % 1_000_000L == 0) ? String.format("%.0fMb", v) : String.format("%.1fMb", v);
+        } else if (step >= 1_000L) {
+            double v = bp / 1_000.0;
+            return (step % 1_000L == 0) ? String.format("%.0fkb", v) : String.format("%.1fkb", v);
+        } else {
+            return bp + "bp";
+        }
     }
 
     static String formatMb(long bp) { return mbLabel(bp); }
