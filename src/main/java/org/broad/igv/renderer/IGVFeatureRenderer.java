@@ -212,34 +212,22 @@ public class IGVFeatureRenderer extends FeatureRenderer {
                 // Add directional arrows and exons, if there is room.
                 int pixelYCenter = trackRectangle.y + NORMAL_STRAND_Y_OFFSET / 2;
 
-                // Respect the per-track "Show Arrows" toggle (default on to preserve IGV behaviour).
-                boolean showArrows = !(track instanceof FeatureTrack) || ((FeatureTrack) track).isShowArrows();
-
                 if (hasExons) {
                     if ((pixelWidth < 3)) {
                         drawFeatureBounds(pixelStart, pixelEnd, pixelYCenter, g2D);
                     } else {
                         drawExons(feature, pixelYCenter, context, g2D, trackRectangle, displayMode,
-                                alternateExonColor, track.getColor(), track.getAltColor(), showArrows);
+                                alternateExonColor, track.getColor(), track.getAltColor());
                     }
                 } else {
 
-                    boolean stranded = feature.getStrand() == Strand.POSITIVE || feature.getStrand() == Strand.NEGATIVE;
+                    // If there is room create a gap between this feature and the next
+                    drawFeatureBlock(pixelStart, pixelEnd, pixelThickStart, pixelThickEnd, pixelYCenter, g2D);
 
-                    if (showArrows && displayMode != Track.DisplayMode.SQUISHED && stranded && pixelWidth < 6) {
-                        // Feature is too narrow for an in-block arrow; draw a fixed-size
-                        // directional chevron (">" for +, "<" for -) so strand is visible
-                        // at any zoom level.
-                        drawStrandMarker(feature.getStrand(), (pixelStart + pixelEnd) / 2, pixelYCenter, g2D);
-                    } else {
-                        // If there is room create a gap between this feature and the next
-                        drawFeatureBlock(pixelStart, pixelEnd, pixelThickStart, pixelThickEnd, pixelYCenter, g2D);
-
-                        if (showArrows && displayMode != Track.DisplayMode.SQUISHED) {
-                            Graphics2D arrowGraphics = context.getGraphic2DForColor(Color.WHITE);
-                            drawStrandArrows(feature.getStrand(), pixelStart, pixelEnd, pixelYCenter, 0,
-                                    displayMode, trackRectangle, arrowGraphics);
-                        }
+                    if (displayMode != Track.DisplayMode.SQUISHED) {
+                        Graphics2D arrowGraphics = context.getGraphic2DForColor(Color.WHITE);
+                        drawStrandArrows(feature.getStrand(), pixelStart, pixelEnd, pixelYCenter, 0,
+                                displayMode, trackRectangle, arrowGraphics);
                     }
 
                     // This is ugly, but alternatives are probably worse
@@ -387,7 +375,7 @@ public class IGVFeatureRenderer extends FeatureRenderer {
 
     protected void drawExons(IGVFeature gene, int yOffset, RenderContext context,
                              Graphics2D g2D, Rectangle trackRectangle, Track.DisplayMode mode,
-                             boolean alternateExonColor, Color color1, Color color2, boolean showArrows) {
+                             boolean alternateExonColor, Color color1, Color color2) {
 
         Graphics2D exonNumberGraphics = (Graphics2D) g2D.create();
 
@@ -473,9 +461,7 @@ public class IGVFeatureRenderer extends FeatureRenderer {
                     && lastExonEndX >= maxLineEndX) {
                 drawConnectingLine(lastExonEndX, lastY, pStart, curYOffset, exon.getStrand(), blockGraphics);
                 double angle = Math.atan(-(curYOffset - lastY) / ((pStart - lastExonEndX) + 1e-12));
-                if (showArrows) {
-                    drawStrandArrows(gene.getStrand(), lastExonEndX, pStart, lastY, angle, mode, trackRectangle, blockGraphics);
-                }
+                drawStrandArrows(gene.getStrand(), lastExonEndX, pStart, lastY, angle, mode, trackRectangle, blockGraphics);
                 maxLineEndX = Math.max(maxLineEndX, pStart);
             }
             lastExonEndX = pEnd;
@@ -541,10 +527,8 @@ public class IGVFeatureRenderer extends FeatureRenderer {
                 }
 
                 Graphics2D whiteArrowGraphics = context.getGraphic2DForColor(Color.white);
-                if (showArrows) {
-                    drawStrandArrows(gene.getStrand(), pStart + ARROW_SPACING / 2, pEnd, curYOffset, 0, mode,
-                            trackRectangle, whiteArrowGraphics);
-                }
+                drawStrandArrows(gene.getStrand(), pStart + ARROW_SPACING / 2, pEnd, curYOffset, 0, mode,
+                        trackRectangle, whiteArrowGraphics);
 
                 if (locationScale < 0.25) {
                     labelAminoAcids(pStart, fontGraphics, theOrigin, context, gene, locationScale,
@@ -628,30 +612,6 @@ public class IGVFeatureRenderer extends FeatureRenderer {
             g.drawLine(ii, 0, ii + sz, -asz);
         }
 
-    }
-
-    /**
-     * Draw a compact, fixed-size directional chevron centred on {@code x}.  Used for features
-     * that are too narrow (under ~6px) to host the repeating in-block arrows, so the strand
-     * direction remains visible at any zoom level.  Positive strand renders ">", negative "<".
-     */
-    protected void drawStrandMarker(Strand strand, int x, int yCenter, Graphics2D g2D) {
-        if (strand != Strand.POSITIVE && strand != Strand.NEGATIVE) {
-            return;
-        }
-        Graphics2D g = (Graphics2D) g2D.create();
-        int halfHeight = 4;   // half vertical extent of the chevron
-        int depth = 4;        // horizontal depth of the arrowhead
-        if (strand == Strand.POSITIVE) {
-            // ">" pointing right
-            g.drawLine(x - depth, yCenter - halfHeight, x, yCenter);
-            g.drawLine(x - depth, yCenter + halfHeight, x, yCenter);
-        } else {
-            // "<" pointing left
-            g.drawLine(x + depth, yCenter - halfHeight, x, yCenter);
-            g.drawLine(x + depth, yCenter + halfHeight, x, yCenter);
-        }
-        g.dispose();
     }
 
     final private int drawFeatureName(String name,
