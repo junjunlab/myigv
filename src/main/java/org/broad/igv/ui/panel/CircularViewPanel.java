@@ -99,6 +99,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public double  bandInner = 0.78;
         public double  bandOuter = 0.90;
         public double  gapDeg = 1.5;
+        /** When true, all data tracks share one Y range (group scale); default each track scales itself. */
+        public boolean ySharedAcrossTracks = false;
         /** When true, fill every chromosome with chromosomeColor (ignore cytoband stripes). */
         public boolean solidColor = false;
         /** Solid chromosome fill colour (used when solidColor; also the default for species w/o karyotype). */
@@ -115,6 +117,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.labelTangential = labelTangential;
             s.bandInner = bandInner; s.bandOuter = bandOuter; s.gapDeg = gapDeg;
             s.solidColor = solidColor; s.chromosomeColor = chromosomeColor;
+            s.ySharedAcrossTracks = ySharedAcrossTracks;
             s.shownChromosomes = new HashSet<>(shownChromosomes);
             return s;
         }
@@ -726,12 +729,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (R <= 20) return;
         double cursor = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx) - 5;
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
+        float[] shared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         for (Track t : ringTracks) {                       // order == top->bottom == outer->inner
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor;
             double bandInner = bandOuter - cfg.heightPx;
             if (bandInner < 24) break;
-            drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg);
+            drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg, shared);
             cursor = bandInner - 5;
         }
     }
@@ -745,22 +749,23 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         List<ChrInfo> chrs = Collections.singletonList(chr);
         List<double[]> sec = new ArrayList<>();
         sec.add(new double[]{0.0, 1.0, 360.0});
+        float[] shared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         for (Track t : ringTracks) {
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor, bandInner = bandOuter - cfg.heightPx;
             if (bandInner < 24) break;
-            drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg);
+            drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg, shared);
             cursor = bandInner - 5;
         }
     }
 
     /** Dispatch one track to the right ring renderer (BED/feature -> marks; bigWig/bedGraph -> heatmap). */
     private void drawOneRing(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
-                             List<ChrInfo> chrs, List<double[]> sec, Track t, TrackRingConfig cfg) {
+                             List<ChrInfo> chrs, List<double[]> sec, Track t, TrackRingConfig cfg, float[] shared) {
         if (t instanceof FeatureTrack) {
             drawFeatures(g2, cx, cy, bandInner, bandOuter, chrs, sec, (FeatureTrack) t, cfg);
         } else if (t instanceof DataTrack) {
-            drawDataRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, (DataTrack) t, cfg);
+            drawDataRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, (DataTrack) t, cfg, shared);
         }
     }
 
@@ -800,16 +805,33 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         }
     }
 
+    /** Shared Y range across ALL data tracks and the given chromosomes (group scale). */
+    private float[] computeSharedYRange(List<ChrInfo> chrs) {
+        float mn = Float.POSITIVE_INFINITY, mx = Float.NEGATIVE_INFINITY;
+        for (Track t : ringTracks) {
+            if (!(t instanceof DataTrack)) continue;
+            for (ChrInfo c : chrs) {
+                float[] b = dataCache.get(t.getName() + "|" + c.name);
+                if (b == null) continue;
+                for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < mn) mn = v; if (v > mx) mx = v; }
+            }
+        }
+        return mn == Float.POSITIVE_INFINITY ? null : new float[]{mn, mx};
+    }
+
     /** Draw a continuous data track (bigWig/bedGraph) as Bar / Point / Line / Heatmap. */
     private void drawDataRing(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
-                              List<ChrInfo> chrs, List<double[]> sec, Track track, TrackRingConfig cfg) {
+                              List<ChrInfo> chrs, List<double[]> sec, Track track, TrackRingConfig cfg, float[] shared) {
         double bandH = bandOuter - bandInner;
         String type = cfg.graphType == null ? "Bar" : cfg.graphType;
-        boolean global = cfg.globalYScale;
+        boolean global = cfg.globalYScale || shared != null;
 
         // Global Y-range: one min/max across all displayed chromosomes (optional).
         float gmn = Float.POSITIVE_INFINITY, gmx = Float.NEGATIVE_INFINITY;
-        if (global) {
+        if (shared != null) {
+            gmn = shared[0];
+            gmx = shared[1];
+        } else if (global) {
             for (ChrInfo c : chrs) {
                 float[] b = dataCache.get(track.getName() + "|" + c.name);
                 if (b == null) continue;

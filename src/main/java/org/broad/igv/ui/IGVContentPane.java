@@ -297,6 +297,18 @@ public class IGVContentPane extends JPanel {
         rad.addActionListener(e -> { s.labelTangential = false; panel.refresh(); });
         numOrient.add(tang); numOrient.add(rad);
         menu.add(numOrient);
+
+        JMenu yscale = new JMenu("Multi-sample Y axis");
+        ButtonGroup ybg = new ButtonGroup();
+        JRadioButtonMenuItem ySelf = new JRadioButtonMenuItem("Per sample (default)", !s.ySharedAcrossTracks);
+        ySelf.addActionListener(e -> { s.ySharedAcrossTracks = false; panel.refresh(); });
+        JRadioButtonMenuItem yGroup = new JRadioButtonMenuItem("Shared (group)", s.ySharedAcrossTracks);
+        yGroup.addActionListener(e -> { s.ySharedAcrossTracks = true; panel.refresh(); });
+        ybg.add(ySelf);
+        ybg.add(yGroup);
+        yscale.add(ySelf);
+        yscale.add(yGroup);
+        menu.add(yscale);
         menu.addSeparator();
 
         JMenuItem spacing = new JMenuItem("Tick spacing (Mb)…");
