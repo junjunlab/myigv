@@ -57,8 +57,8 @@ public class IGVContentPane extends JPanel {
     private JPanel circularPanel;
     private JPanel dataColumnPanel;
     private JList<String> dataColumnList;
+    private JPanel circularDrawingArea;
     private JSplitPane viewSplitPane;
-    private JSplitPane outerSplitPane;
     private Component currentCenter;
     private boolean showHorizontalView = true;
     private boolean showCircularView = false;
@@ -93,21 +93,29 @@ public class IGVContentPane extends JPanel {
 
         mainPanel = new MainPanel(igv);
 
-        // Circular (ring) view placeholder.  Blank for now -- not drawn yet.
-        circularPanel = new JPanel(new BorderLayout());
-        circularPanel.setBackground(new Color(245, 245, 245));
-        circularPanel.setBorder(BorderFactory.createTitledBorder("Circular View"));
-        JLabel circularPlaceholder = new JLabel("Circular view — not drawn yet", SwingConstants.CENTER);
-        circularPlaceholder.setForeground(Color.GRAY);
-        circularPanel.add(circularPlaceholder, BorderLayout.CENTER);
-
-        // Left "data column" panel (used whenever the circular view is shown).
-        // Lists imported tracks; placeholder for now, later used to pick tracks for the ring.
+        // Left "data column" inside the circular view panel: lists imported tracks.
+        // Reserved for picking tracks to draw on the ring (placeholder for now).
         dataColumnPanel = new JPanel(new BorderLayout());
         dataColumnPanel.setBorder(BorderFactory.createTitledBorder("Data Tracks"));
         dataColumnList = new JList<>();
         dataColumnList.setBackground(new Color(248, 248, 248));
         dataColumnPanel.add(new JScrollPane(dataColumnList), BorderLayout.CENTER);
+
+        // Drawing area of the circular view (blank placeholder for now).
+        circularDrawingArea = new JPanel(new BorderLayout());
+        circularDrawingArea.setBackground(new Color(245, 245, 245));
+        JLabel circularPlaceholder = new JLabel("Circular view — not drawn yet", SwingConstants.CENTER);
+        circularPlaceholder.setForeground(Color.GRAY);
+        circularDrawingArea.add(circularPlaceholder, BorderLayout.CENTER);
+
+        // Circular view panel = [Data Tracks column | drawing area].  The Data Tracks
+        // column lives inside the circular panel, on its left.
+        JSplitPane circularSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, dataColumnPanel, circularDrawingArea);
+        configureSplit(circularSplit, 0.2);
+
+        circularPanel = new JPanel(new BorderLayout());
+        circularPanel.setBorder(BorderFactory.createTitledBorder("Circular View"));
+        circularPanel.add(circularSplit, BorderLayout.CENTER);
 
         updateViewLayout();
 
@@ -173,24 +181,23 @@ public class IGVContentPane extends JPanel {
             remove(currentCenter);
         }
         if (showHorizontalView && showCircularView) {
-            // Four-column layout: data column | horizontal view | circular view.
-            // The horizontal view keeps IGV's original appearance (name column + data area together).
+            // Horizontal view (intact, IGV's original look) on the left, circular panel
+            // on the right. The circular panel internally holds the Data Tracks column
+            // (its left) and the drawing area (its right) — see circularSplit in ctor.
+            refreshDataColumn();
             viewSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, mainPanel, circularPanel);
             configureSplit(viewSplitPane, 0.7);
-            outerSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, dataColumnPanel, viewSplitPane);
-            configureSplit(outerSplitPane, 0.18);
-            add(outerSplitPane, BorderLayout.CENTER);
-            currentCenter = outerSplitPane;
+            add(viewSplitPane, BorderLayout.CENTER);
+            currentCenter = viewSplitPane;
         } else if (showHorizontalView) {
             add(mainPanel, BorderLayout.CENTER);
             currentCenter = mainPanel;
         } else if (showCircularView) {
-            // Only circular: data column (imported tracks) | circular drawing panel.
+            // Only circular: the circular panel (Data Tracks column | drawing area) fills
+            // the whole center. The horizontal view is hidden.
             refreshDataColumn();
-            viewSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, dataColumnPanel, circularPanel);
-            configureSplit(viewSplitPane, 0.18);
-            add(viewSplitPane, BorderLayout.CENTER);
-            currentCenter = viewSplitPane;
+            add(circularPanel, BorderLayout.CENTER);
+            currentCenter = circularPanel;
         } else {
             add(mainPanel, BorderLayout.CENTER);
             currentCenter = mainPanel;
