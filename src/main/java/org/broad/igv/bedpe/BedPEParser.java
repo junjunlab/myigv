@@ -464,6 +464,49 @@ public class BedPEParser {
         return strNum != null && strNum.trim().matches("-?\\d+(\\.\\d+)?");
     }
 
+    /**
+     * Cheap content probe: does the first data line look like a Circos link / BEDPE row
+     * ({@code chr1 start1 end1 chr2 start2 end2 ...})? Used to route such a file away from the
+     * single-interval BED codec when it is opened through the normal "Load from File" path.
+     * <p>Columns 4 and 6 of a BED / peak file are a name and a strand, so those never match.
+     * The probe reuses {@link #openBedPEReader}, so UTF-8 and UTF-16 (with or without BOM) are
+     * handled exactly as they are for {@link #parse}.</p>
+     */
+    public static boolean looksLikeBedPE(ResourceLocator locator, Genome genome) {
+        try (BufferedReader br = openBedPEReader(locator)) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                line = cleanLine(line);
+                if (isBlankLine(line)) {
+                    continue;
+                }
+                if (line.startsWith("#") || line.startsWith("track")
+                        || line.startsWith("browser")) {
+                    continue;
+                }
+                String[] f = Globals.tabPattern.split(line, -1);
+                if (f.length < 6) {
+                    return false;
+                }
+                for (int i : new int[]{1, 2, 4, 5}) {
+                    if (!f[i].trim().matches("\\d+")) {
+                        return false;
+                    }
+                }
+                if (f[0].trim().matches("\\d+") || f[3].trim().matches("\\d+")) {
+                    return false;
+                }
+                // The second locus must name a chromosome we know about, which rules out most
+                // other 6+ column tab tables.
+                String chr2 = genome == null ? f[3].trim() : genome.getCanonicalChrName(f[3].trim());
+                return chr2 != null && !chr2.trim().isEmpty();
+            }
+        } catch (Exception e) {
+            // Unreadable / not text: leave the caller on its default path.
+        }
+        return false;
+    }
+
     public static class Dataset {
 
         public DatasetType type;

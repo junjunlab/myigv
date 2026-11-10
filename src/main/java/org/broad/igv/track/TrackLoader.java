@@ -165,6 +165,15 @@ public class TrackLoader {
                 }
             }
 
+            if ("bed".equals(format) && !locator.isDataUrl()
+                    && BedPEParser.looksLikeBedPE(locator, genome)) {
+                // A "chr1 start1 end1 chr2 start2 end2" table is a Circos link / BEDPE file, not a
+                // single-interval BED. Treating it as BEDPE means it becomes an interaction track
+                // and is therefore also drawn as links in the circular view.
+                format = "bedpe";
+                locator.setFormat(format);
+            }
+
             if (format.equals("tbi")) {
                 MessageUtils.showMessage("<html><b>Error:</b>File type '.tbi' is not recognized.  If this is a 'tabix' index <br>" +
                         " load the associated gzipped file, which should have an extension of '.gz'");

@@ -27,7 +27,6 @@ package org.broad.igv.ui;
 
 import org.broad.igv.logging.*;
 import org.broad.igv.bedpe.BedPEFeature;
-import org.broad.igv.bedpe.BedPEParser;
 import org.broad.igv.bedpe.InteractionTrack;
 import org.broad.igv.ui.commandbar.IGVCommandBar;
 import org.broad.igv.ui.panel.CircularViewPanel;
@@ -37,11 +36,10 @@ import org.broad.igv.track.DataTrack;
 import org.broad.igv.track.FeatureTrack;
 import org.broad.igv.track.Track;
 import org.broad.igv.ui.util.ApplicationStatusBar;
-import org.broad.igv.util.ResourceLocator;
 
 import javax.swing.*;
-import javax.swing.filechooser.FileNameExtensionFilter;
-import java.io.File;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -124,6 +122,10 @@ public class IGVContentPane extends JPanel {
         });
         // Ctrl / Shift click to select multiple tracks; the popup applies to all selected.
         dataColumnList.setSelectionMode(javax.swing.ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+        // Drag a row to reorder it. The list order is the ring order: top row = outermost band.
+        dataColumnList.setDragEnabled(true);
+        dataColumnList.setDropMode(javax.swing.DropMode.INSERT);
+        dataColumnList.setTransferHandler(new TrackReorderHandler());
 
         // Drawing area of the circular view: live ring genome plot (ideogram of the
         // selected chromosome, or all chromosomes when the view is "All").
@@ -410,14 +412,8 @@ public class IGVContentPane extends JPanel {
     public static void addLinkItems(JPopupMenu popup, CircularViewPanel panel) {
         CircularViewPanel.CircularSettings s = panel.getSettings();
 
-        JMenuItem loadLinks = new JMenuItem("Load links (BEDPE / Circos)…");
-        loadLinks.addActionListener(e -> loadCircularLinks(panel));
-        popup.add(loadLinks);
-
-        JMenuItem clearLinks = new JMenuItem("Clear links (" + panel.getRingLinkCount() + " loaded)");
-        clearLinks.addActionListener(e -> { panel.clearRingLinks(); panel.refresh(); });
-        popup.add(clearLinks);
-
+        // Links are loaded through the normal File > Load from File path: a BEDPE / Circos link
+        // file becomes an interaction track, which the circular view picks up automatically.
         popup.add(linkCheck("Show links", s.showLinks,
                 v -> { s.showLinks = v; panel.refresh(); }));
         popup.addSeparator();
@@ -545,112 +541,80 @@ public class IGVContentPane extends JPanel {
     }
 
     /**
-     * Load a Circos-link / BEDPE file straight into the circular view. No track is created and
-     * the file's extension does not matter: we call {@link BedPEParser#parse} directly, which
-     * detects UTF-8 / UTF-16 (with or without BOM), canonicalises chromosome names and skips
-     * malformed rows. Routing the file through {@code TrackLoader} instead would send a
-     * {@code .bed} / {@code .links} file to the plain BED codec, which silently drops the links.
+     * Drag a row in the Data Tracks list to change its position. The list order is the ring
+     * order (top row = outermost band), so the circular view is refreshed immediately.
      */
-    private static void loadCircularLinks(CircularViewPanel panel) {
-        JFileChooser chooser = new JFileChooser();
-        chooser.setDialogTitle("Load Circos links (BEDPE / links file)");
-        chooser.setFileFilter(new FileNameExtensionFilter(
-                "Links / BEDPE (*.bed, *.bedpe, *.links, *.txt, *.gz)",
-                "bed", "bedpe", "links", "txt", "gz"));
-        if (chooser.showOpenDialog(panel) != JFileChooser.APPROVE_OPTION) {
-            return;
+    private class TrackReorderHandler extends TransferHandler {
+
+        private final DataFlavor flavor = new DataFlavor(Integer.class, "data-track-index");
+        private int draggedIndex = -1;
+
+        @Override
+        public int getSourceActions(JComponent c) {
+            return MOVE;
         }
 
-        File file = chooser.getSelectedFile();
-        Genome genome = GenomeManager.getInstance().getCurrentGenome();
-        try {
-            BedPEParser.Dataset dataset =
-                    BedPEParser.parse(new ResourceLocator(file.getAbsolutePath()), genome);
-
-            List<CircularViewPanel.RingLink> links = new ArrayList<>();
-            for (BedPEFeature f : dataset.features) {
-                CircularViewPanel.RingLink link = new CircularViewPanel.RingLink(
-                        f.chr1, f.start1, f.end1, f.chr2, f.start2, f.end2);
-                link.score = f.getScore();
-                link.color = f.getColor();
-                link.thickness = Math.max(0, f.getThickness());
-                link.label = f.chr1 + ":" + f.start1 + "-" + f.end1
-                        + "  \u2194  " + f.chr2 + ":" + f.start2 + "-" + f.end2;
-                if (f.columnValues != null) {
-                    // Circos puts per-link options in the 7th column, e.g.
-                    // "color=blue,thickness=5p,z=10".  BedPEParser stores every raw column.
-                    parseLinkOptions(f.columnValues.get("col7"), link);
+        @Override
+        protected Transferable createTransferable(JComponent c) {
+            draggedIndex = dataColumnList.getSelectedIndex();
+            return new Transferable() {
+                @Override
+                public DataFlavor[] getTransferDataFlavors() {
+                    return new DataFlavor[]{flavor};
                 }
-                links.add(link);
-            }
 
-            panel.setRingLinks(links);
-            panel.refresh();
-            JOptionPane.showMessageDialog(panel,
-                    "Loaded " + links.size() + " link(s) from " + file.getName(),
-                    "Circular links", JOptionPane.INFORMATION_MESSAGE);
-        } catch (Exception ex) {
-            log.error("Failed to load circular links from " + file, ex);
-            JOptionPane.showMessageDialog(panel,
-                    "Could not load links from " + file.getName() + "\n" + ex.getMessage(),
-                    "Circular links", JOptionPane.ERROR_MESSAGE);
-        }
-    }
+                @Override
+                public boolean isDataFlavorSupported(DataFlavor f) {
+                    return flavor.equals(f);
+                }
 
-    /**
-     * Parse the Circos 7th-column option string ({@code key=value,key=value}) and apply the
-     * subset that affects drawing. Unknown keys and unparseable values are ignored, matching
-     * Circos' tolerance of values such as {@code thickness=5p}.
-     */
-    private static void parseLinkOptions(String options, CircularViewPanel.RingLink link) {
-        if (options == null || options.indexOf('=') < 0) {
-            return;
+                @Override
+                public Object getTransferData(DataFlavor f) {
+                    return draggedIndex;
+                }
+            };
         }
-        for (String part : options.split("[,\\s]+")) {
-            int eq = part.indexOf('=');
-            if (eq <= 0) continue;
-            String key = part.substring(0, eq).trim().toLowerCase();
-            String value = part.substring(eq + 1).trim();
+
+        @Override
+        public boolean canImport(TransferSupport support) {
+            return support.isDrop() && support.isDataFlavorSupported(flavor);
+        }
+
+        @Override
+        public boolean importData(TransferSupport support) {
+            if (!canImport(support)) return false;
             try {
-                switch (key) {
-                    case "color":
-                    case "colour": {
-                        Color c = parseColour(value);
-                        if (c != null) link.color = c;
-                        break;
-                    }
-                    case "thickness":
-                        link.thickness = Math.round(Float.parseFloat(value.replace("p", "")));
-                        break;
-                    case "z":
-                        link.z = Double.parseDouble(value);
-                        break;
-                    case "score":
-                        link.score = Double.parseDouble(value);
-                        break;
-                    default:
-                        break;
-                }
-            } catch (NumberFormatException ignore) {
-                // Circos allows units ("5p"); values we cannot parse simply keep their default.
+                int from = (Integer) support.getTransferable().getTransferData(flavor);
+                JList.DropLocation drop = (JList.DropLocation) support.getDropLocation();
+                int to = drop.getIndex();
+                if (from < 0) return false;
+                if (to > from) to--;      // the row is removed before the insert position applies
+                if (to == from) return true;
+                moveDataTrack(from, to);
+                return true;
+            } catch (Exception e) {
+                log.error("Could not reorder data tracks", e);
+                return false;
             }
         }
     }
 
-    /** Circos colour names plus {@code #rrggbb} and {@code r,g,b}. */
-    private static Color parseColour(String value) {
-        if (value == null || value.isEmpty()) return null;
-        String v = value.trim();
-        try {
-            if (v.startsWith("#")) return Color.decode(v);
-            if (v.matches("\\d{1,3},\\d{1,3},\\d{1,3}")) {
-                String[] p = v.split(",");
-                return new Color(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2]));
-            }
-            return (Color) Color.class.getField(v.toLowerCase()).get(null);
-        } catch (Exception e) {
-            return null;
+    /** Move a track within the data column, keeping the ring band order in sync. */
+    private void moveDataTrack(int from, int to) {
+        if (from < 0 || from >= dataColumnTracks.size()) return;
+        to = Math.max(0, Math.min(dataColumnTracks.size() - 1, to));
+        Track moved = dataColumnTracks.remove(from);
+        dataColumnTracks.add(to, moved);
+
+        DefaultListModel<String> model = new DefaultListModel<>();
+        for (Track t : dataColumnTracks) {
+            model.addElement(t.getDisplayName());
         }
+        dataColumnList.setModel(model);
+        dataColumnList.setSelectedIndex(to);
+
+        // Ring bands follow the list order, outer -> inner.
+        circularDrawingArea.setRingTracks(new ArrayList<>(dataColumnTracks));
     }
 
     /**
