@@ -1225,16 +1225,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             if (ribbon) {
                 double[] e1 = ribbonEnd(a1s, a1e, point1, s.linkRibbonMinDeg);
                 double[] e2 = ribbonEnd(a2s, a2e, point2, s.linkRibbonMinDeg);
-                double b2a = s.linkTwist ? e2[0] : e2[1];
-                double b2b = s.linkTwist ? e2[1] : e2[0];
-                Path2D.Double path = new Path2D.Double();
-                Point2D start = polar(cx, cy, rEnd, e1[0]);
-                path.moveTo(start.getX(), start.getY());
-                appendArc(path, cx, cy, rEnd, e1[0], e1[1], 8);
-                appendQuad(path, cx, cy, rEnd, b2a, qx, qy);
-                appendArc(path, cx, cy, rEnd, b2a, b2b, 8);
-                appendQuad(path, cx, cy, rEnd, e1[0], qx, qy);
-                path.closePath();
+
+                // Building the band from two beziers that share one control point makes both
+                // edges converge on that point, so the ribbon pinches to a needle at its apex.
+                // Instead sample the centreline and offset it by a linearly interpolated
+                // half-width: the silhouette stays a smooth wedge (an arc), and a point end
+                // tapers to a small rounded tip rather than a spike.
+                Path2D.Double path = s.linkTwist
+                        ? twistedRibbon(cx, cy, rEnd, e1, e2, qx, qy)
+                        : ribbonBand(cx, cy, rEnd, e1[0], e1[1], e2[0], e2[1], qx, qy);
                 g2.fill(path);
                 if (s.linkRibbonStroke && s.linkRibbonStrokeThickness > 0) {
                     // A tapered band is only a few pixels wide mid-span; the outline keeps that
@@ -1250,15 +1249,16 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                         link.thickness > 0 ? link.thickness : s.linkThickness,
                         BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 if (s.linkCrest > 0 && s.linkBezierRadius > 0) {
-                    // crest: two extra control points on the end radials, meeting at the
-                    // bezier control point in the middle -> perpendicular entry at both ends.
+                    // crest: control points on the end radials make the curve leave the ideogram
+                    // perpendicularly. One cubic stays tangent-continuous through the apex, while
+                    // two joined quadratics leave a visible kink there.
                     double rCrest = rEnd - Math.abs(rBez - rEnd) * clamp01(s.linkCrest);
                     Point2D c1 = polar(cx, cy, rCrest, a1);
                     Point2D c2 = polar(cx, cy, rCrest, a2);
                     Path2D.Double path = new Path2D.Double();
                     path.moveTo(p1.getX(), p1.getY());
-                    path.quadTo(c1.getX(), c1.getY(), qx, qy);
-                    path.quadTo(c2.getX(), c2.getY(), p2.getX(), p2.getY());
+                    path.curveTo(c1.getX(), c1.getY(), c2.getX(), c2.getY(),
+                            p2.getX(), p2.getY());
                     g2.draw(path);
                 } else if (s.linkBezierRadius > 0) {
                     g2.draw(new QuadCurve2D.Double(
@@ -1309,6 +1309,73 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             return new double[]{mid - half, mid + half};
         }
         return new double[]{a0, a1};
+    }
+
+    /**
+     * Filled ribbon with a linearly tapering width: sample the quadratic centreline from the
+     * first interval's midpoint to the second's and offset each sample by an interpolated
+     * half-width. Unlike two beziers sharing one control point, this never pinches to a needle.
+     *
+     * @param a1s,a1e angular extent of the first interval
+     * @param a2s,a2e angular extent of the second interval
+     * @param qx,qy   bezier control point (already purity-adjusted)
+     */
+    private static Path2D.Double ribbonBand(double cx, double cy, double rEnd,
+                                            double a1s, double a1e,
+                                            double a2s, double a2e,
+                                            double qx, double qy) {
+        Point2D p0 = polar(cx, cy, rEnd, (a1s + a1e) / 2.0);
+        Point2D p2 = polar(cx, cy, rEnd, (a2s + a2e) / 2.0);
+
+        // Half-width in pixels = half the arc length the interval covers at the end radius.
+        // A floor of 0.5 px keeps a single-point end a rounded tip instead of a spike.
+        double h1 = Math.max(0.5, Math.abs(a1e - a1s) * Math.PI * rEnd);
+        double h2 = Math.max(0.5, Math.abs(a2e - a2s) * Math.PI * rEnd);
+
+        final int steps = 64;
+        double[] lx = new double[steps + 1], ly = new double[steps + 1];
+        double[] rx = new double[steps + 1], ry = new double[steps + 1];
+
+        for (int i = 0; i <= steps; i++) {
+            double t = i / (double) steps;
+            double mt = 1 - t;
+            double px = mt * mt * p0.getX() + 2 * mt * t * qx + t * t * p2.getX();
+            double py = mt * mt * p0.getY() + 2 * mt * t * qy + t * t * p2.getY();
+            double dx = 2 * mt * (qx - p0.getX()) + 2 * t * (p2.getX() - qx);
+            double dy = 2 * mt * (qy - p0.getY()) + 2 * t * (p2.getY() - qy);
+            double len = Math.hypot(dx, dy);
+            if (len < 1e-9) {
+                dx = p2.getX() - p0.getX();
+                dy = p2.getY() - p0.getY();
+                len = Math.max(1e-9, Math.hypot(dx, dy));
+            }
+            double nx = -dy / len, ny = dx / len;
+            double h = h1 + (h2 - h1) * t;
+            lx[i] = px + nx * h; ly[i] = py + ny * h;
+            rx[i] = px - nx * h; ry[i] = py - ny * h;
+        }
+
+        Path2D.Double path = new Path2D.Double();
+        path.moveTo(lx[0], ly[0]);
+        for (int i = 1; i <= steps; i++) path.lineTo(lx[i], ly[i]);
+        for (int i = steps; i >= 0; i--) path.lineTo(rx[i], ry[i]);
+        path.closePath();
+        return path;
+    }
+
+    /** Ribbon whose second end's edges are swapped, so the band crosses itself (Circos twist). */
+    private static Path2D.Double twistedRibbon(double cx, double cy, double rEnd,
+                                               double[] e1, double[] e2,
+                                               double qx, double qy) {
+        Path2D.Double path = new Path2D.Double();
+        Point2D start = polar(cx, cy, rEnd, e1[0]);
+        path.moveTo(start.getX(), start.getY());
+        appendArc(path, cx, cy, rEnd, e1[0], e1[1], 8);
+        appendQuad(path, cx, cy, rEnd, e2[0], qx, qy);
+        appendArc(path, cx, cy, rEnd, e2[0], e2[1], 8);
+        appendQuad(path, cx, cy, rEnd, e1[0], qx, qy);
+        path.closePath();
+        return path;
     }
 
     private static Integer resolveSector(Map<String, Integer> index, String name) {
