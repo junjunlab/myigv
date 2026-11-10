@@ -114,9 +114,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
         public boolean showLinks = true;
         /** Filled band (Circos {@code ribbon=yes}) instead of a stroked curve. */
-        public boolean linkRibbon = false;
+        public boolean linkRibbon = true;
         /** Swap which end of the second interval the ribbon's edges connect to (Circos {@code twist}). */
-        public boolean linkTwist = false;
+        public boolean linkTwist = true;
         /** Radial position of the link ends, as a fraction of the ideogram inner radius. */
         public double  linkRadius = 0.95;
         /** Radial position of the bezier control point, as a fraction of the link end radius.
@@ -1270,9 +1270,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 // Instead sample the centreline and offset it by a linearly interpolated
                 // half-width: the silhouette stays a smooth wedge (an arc), and a point end
                 // tapers to a small rounded tip rather than a spike.
-                Path2D.Double path = s.linkTwist
-                        ? twistedRibbon(cx, cy, rEnd, e1, e2, qx, qy)
-                        : ribbonBand(cx, cy, rEnd, e1[0], e1[1], e2[0], e2[1], qx, qy);
+                Path2D.Double path = ribbonBand(cx, cy, rEnd, e1[0], e1[1], e2[0], e2[1],
+                        qx, qy, s.linkTwist);
                 g2.fill(path);
                 if (s.linkRibbonStroke && s.linkRibbonStrokeThickness > 0) {
                     // A tapered band is only a few pixels wide mid-span; the outline keeps that
@@ -1362,7 +1361,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     private static Path2D.Double ribbonBand(double cx, double cy, double rEnd,
                                             double a1s, double a1e,
                                             double a2s, double a2e,
-                                            double qx, double qy) {
+                                            double qx, double qy,
+                                            boolean twist) {
         Point2D p0 = polar(cx, cy, rEnd, (a1s + a1e) / 2.0);
         Point2D p2 = polar(cx, cy, rEnd, (a2s + a2e) / 2.0);
 
@@ -1390,29 +1390,18 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             }
             double nx = -dy / len, ny = dx / len;
             double h = h1 + (h2 - h1) * t;
-            lx[i] = px + nx * h; ly[i] = py + ny * h;
-            rx[i] = px - nx * h; ry[i] = py - ny * h;
+            // A twist rotates the cross-section through 180 degrees along the length: the band
+            // narrows to a waist at mid-span and reopens on the other side. That is a smooth
+            // twist, unlike swapping the four corners, which leaves a spike.
+            double off = twist ? h * Math.cos(Math.PI * t) : h;
+            lx[i] = px + nx * off; ly[i] = py + ny * off;
+            rx[i] = px - nx * off; ry[i] = py - ny * off;
         }
 
         Path2D.Double path = new Path2D.Double();
         path.moveTo(lx[0], ly[0]);
         for (int i = 1; i <= steps; i++) path.lineTo(lx[i], ly[i]);
         for (int i = steps; i >= 0; i--) path.lineTo(rx[i], ry[i]);
-        path.closePath();
-        return path;
-    }
-
-    /** Ribbon whose second end's edges are swapped, so the band crosses itself (Circos twist). */
-    private static Path2D.Double twistedRibbon(double cx, double cy, double rEnd,
-                                               double[] e1, double[] e2,
-                                               double qx, double qy) {
-        Path2D.Double path = new Path2D.Double();
-        Point2D start = polar(cx, cy, rEnd, e1[0]);
-        path.moveTo(start.getX(), start.getY());
-        appendArc(path, cx, cy, rEnd, e1[0], e1[1], 8);
-        appendQuad(path, cx, cy, rEnd, e2[0], qx, qy);
-        appendArc(path, cx, cy, rEnd, e2[0], e2[1], 8);
-        appendQuad(path, cx, cy, rEnd, e1[0], qx, qy);
         path.closePath();
         return path;
     }

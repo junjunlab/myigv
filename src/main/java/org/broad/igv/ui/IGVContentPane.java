@@ -611,13 +611,19 @@ public class IGVContentPane extends JPanel {
 
         DefaultListModel<String> model = new DefaultListModel<>();
         for (Track t : dataColumnTracks) {
-            model.addElement(t.getDisplayName());
+            model.addElement(rowLabel(t));
         }
         dataColumnList.setModel(model);
         dataColumnList.setSelectedIndex(to);
 
         // Ring bands follow the list order, outer -> inner.
         circularDrawingArea.setRingTracks(new ArrayList<>(dataColumnTracks));
+    }
+
+    /** Row label for the data column; hidden ring tracks are marked so removal is visible. */
+    private String rowLabel(Track t) {
+        String label = t.getDisplayName();
+        return circularDrawingArea.isRingTrackHidden(t.getName()) ? label + "   (hidden)" : label;
     }
 
     /**
@@ -678,7 +684,7 @@ public class IGVContentPane extends JPanel {
         dataColumnTracks.clear();
         if (tracks != null) {
             for (Track t : tracks) {
-                model.addElement(t.getDisplayName());
+                model.addElement(rowLabel(t));
                 dataColumnTracks.add(t);
             }
         }
@@ -758,11 +764,17 @@ public class IGVContentPane extends JPanel {
             String manyLinks = linkNames.size() > 1 ? " (" + linkNames.size() + " tracks)" : "";
             JMenuItem removeLinks = new JMenuItem("Remove track from ring" + manyLinks);
             removeLinks.addActionListener(a -> {
-                for (String name : linkNames) {
-                    circularDrawingArea.removeRingTrack(name);
+                try {
+                    for (String name : linkNames) {
+                        circularDrawingArea.removeRingTrack(name);
+                    }
+                    refreshDataColumn();
+                    circularDrawingArea.refresh();
+                    log.info("Removed links track(s) " + linkNames
+                            + "; links remaining=" + circularDrawingArea.getRingLinkCount());
+                } catch (Exception ex) {
+                    log.error("Failed to remove links track from ring", ex);
                 }
-                refreshDataColumn();
-                circularDrawingArea.refresh();
             });
             menu.add(removeLinks);
             menu.addSeparator();
@@ -876,11 +888,21 @@ public class IGVContentPane extends JPanel {
         menu.addSeparator();
         JMenuItem removeRing = new JMenuItem("Remove track from ring" + many);
         removeRing.addActionListener(a -> {
-            for (String name : ringNames) {
-                circularDrawingArea.removeRingTrack(name);
+            try {
+                for (String name : ringNames) {
+                    circularDrawingArea.removeRingTrack(name);
+                }
+                // A mixed selection can also contain interaction tracks, which contribute links.
+                for (String name : linkNames) {
+                    circularDrawingArea.removeRingTrack(name);
+                }
+                refreshDataColumn();
+                circularDrawingArea.refresh();
+                log.info("Removed from ring: bands=" + ringNames + " links=" + linkNames
+                        + "; links remaining=" + circularDrawingArea.getRingLinkCount());
+            } catch (Exception ex) {
+                log.error("Failed to remove track from ring", ex);
             }
-            refreshDataColumn();
-            circularDrawingArea.refresh();
         });
         menu.add(removeRing);
 
