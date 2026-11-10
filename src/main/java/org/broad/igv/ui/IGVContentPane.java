@@ -219,11 +219,17 @@ public class IGVContentPane extends JPanel {
             refreshDataColumn();
             viewSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, mainPanel, circularPanel);
             configureSplit(viewSplitPane, 0.5);
-            viewSplitPane.setDividerLocation(0.5);   // 50/50 by default, no manual drag needed
             add(viewSplitPane, BorderLayout.CENTER);
             currentCenter = viewSplitPane;
-            // Re-apply after the frame has laid out (proportional divider needs a real width).
-            SwingUtilities.invokeLater(() -> viewSplitPane.setDividerLocation(0.5));
+            // Set an ABSOLUTE half position immediately: a proportional setDividerLocation(0.5)
+            // on a not-yet-sized pane lands at 0 and then jumps to 0.5 on layout — the
+            // "starts small then pops to half" effect. Use the real width when known.
+            int availW = getWidth();
+            if (availW > 0) {
+                viewSplitPane.setDividerLocation(availW / 2);
+            } else {
+                SwingUtilities.invokeLater(() -> viewSplitPane.setDividerLocation(0.5));
+            }
         } else if (showHorizontalView) {
             add(mainPanel, BorderLayout.CENTER);
             currentCenter = mainPanel;
