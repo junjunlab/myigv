@@ -240,6 +240,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public boolean globalYScale = false;
         /** Non-null = this track shares a Y range with tracks of the same group id (group scale). */
         public String yGroup = null;
+        /** When true and yGroup is set, the group's Y range is computed PER SECTOR (per gene), so
+         *  each gene is scaled independently across the samples in the group instead of one global
+         *  range that pulls weak genes down. */
+        public boolean yGroupPerGene = false;
     }
 
     /**
@@ -1154,13 +1158,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
+        java.util.Map<String, java.util.Map<String, float[]>> perGeneGroups = needPerGeneGroups(chrs);
         for (Track t : ringTracks) {                       // order == top->bottom == outer->inner
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor;
             double bandInner = bandOuter - cfg.heightPx;
             if (bandInner < 24) break;
-            float[] shared = cfg.yGroup != null ? groups.get(cfg.yGroup) : globalShared;
-            drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg, shared);
+            drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg,
+                    sharedRangeFor(cfg, globalShared, groups, perGeneGroups));
             cursor = bandInner - 5;
         }
     }
@@ -1176,23 +1181,50 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         sec.add(new double[]{0.0, 1.0, 360.0});
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
+        java.util.Map<String, java.util.Map<String, float[]>> perGeneGroups = needPerGeneGroups(chrs);
         for (Track t : ringTracks) {
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor, bandInner = bandOuter - cfg.heightPx;
             if (bandInner < 24) break;
-            float[] shared = cfg.yGroup != null ? groups.get(cfg.yGroup) : globalShared;
-            drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg, shared);
+            drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg,
+                    sharedRangeFor(cfg, globalShared, groups, perGeneGroups));
             cursor = bandInner - 5;
+        }
+    }
+
+    /** Per-gene group ranges, computed only when some track has {@code yGroupPerGene} on. */
+    private java.util.Map<String, java.util.Map<String, float[]>> needPerGeneGroups(List<ChrInfo> chrs) {
+        for (Track t : ringTracks) {
+            TrackRingConfig c = getRingConfig(t.getName());
+            if (c.yGroup != null && c.yGroupPerGene) return computeGroupRangesPerGene(chrs);
+        }
+        return null;
+    }
+
+    /** Build the per-track Y-range function from the global / group / per-gene-group ranges. */
+    private java.util.function.Function<ChrInfo, float[]> sharedRangeFor(TrackRingConfig cfg,
+            float[] globalShared, java.util.Map<String, float[]> groups,
+            java.util.Map<String, java.util.Map<String, float[]>> perGeneGroups) {
+        if (cfg.yGroup != null && cfg.yGroupPerGene) {
+            final java.util.Map<String, float[]> pg = perGeneGroups != null ? perGeneGroups.get(cfg.yGroup) : null;
+            return c -> (pg != null) ? pg.get(c.name) : null;
+        } else if (cfg.yGroup != null) {
+            final float[] gr = groups.get(cfg.yGroup);
+            return c -> gr;
+        } else {
+            final float[] gs = globalShared;
+            return c -> gs;
         }
     }
 
     /** Dispatch one track to the right ring renderer (BED/feature -> marks; bigWig/bedGraph -> heatmap). */
     private void drawOneRing(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
-                             List<ChrInfo> chrs, List<double[]> sec, Track t, TrackRingConfig cfg, float[] shared) {
+                             List<ChrInfo> chrs, List<double[]> sec, Track t, TrackRingConfig cfg,
+                             java.util.function.Function<ChrInfo, float[]> sharedRange) {
         if (t instanceof FeatureTrack) {
             drawFeatures(g2, cx, cy, bandInner, bandOuter, chrs, sec, (FeatureTrack) t, cfg);
         } else if (t instanceof DataTrack) {
-            drawDataRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, (DataTrack) t, cfg, shared);
+            drawDataRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, (DataTrack) t, cfg, sharedRange);
         }
     }
 
@@ -1322,25 +1354,47 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return map;
     }
 
+    /** Per-gene group ranges: group id -> (sector key -> min/max across all tracks in the group
+     *  for that sector). Used when {@link TrackRingConfig#yGroupPerGene} is on, so each gene is
+     *  scaled independently instead of being pulled down by a single genome-wide group range. */
+    private java.util.Map<String, java.util.Map<String, float[]>> computeGroupRangesPerGene(List<ChrInfo> chrs) {
+        java.util.Map<String, java.util.Map<String, float[]>> map = new java.util.HashMap<>();
+        for (Track t : ringTracks) {
+            if (!(t instanceof DataTrack)) continue;
+            TrackRingConfig cfg = getRingConfig(t.getName());
+            if (cfg.yGroup == null) continue;
+            java.util.Map<String, float[]> perGene = map.computeIfAbsent(cfg.yGroup, k -> new java.util.HashMap<>());
+            for (ChrInfo c : chrs) {
+                float[] b = binsFor(t, c);
+                if (b == null) continue;
+                String ck = c.name;   // per-SECTOR key: gene name in gene mode, chromosome in All mode
+                float[] r = perGene.get(ck);
+                if (r == null) { r = new float[]{Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY}; perGene.put(ck, r); }
+                for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < r[0]) r[0] = v; if (v > r[1]) r[1] = v; }
+            }
+        }
+        return map;
+    }
+
     /** Draw a continuous data track (bigWig/bedGraph) as Bar / Point / Line / Heatmap. */
     private void drawDataRing(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
-                              List<ChrInfo> chrs, List<double[]> sec, Track track, TrackRingConfig cfg, float[] shared) {
+                              List<ChrInfo> chrs, List<double[]> sec, Track track, TrackRingConfig cfg,
+                              java.util.function.Function<ChrInfo, float[]> sharedRange) {
         double bandH = bandOuter - bandInner;
         String type = cfg.graphType == null ? "Bar" : cfg.graphType;
-        boolean global = cfg.globalYScale || shared != null;
 
-        // Global Y-range: one min/max across all displayed chromosomes (optional).
-        float gmn = Float.POSITIVE_INFINITY, gmx = Float.NEGATIVE_INFINITY;
-        if (shared != null) {
-            gmn = shared[0];
-            gmx = shared[1];
-        } else if (global) {
+        // Track-level global Y-range (cfg.globalYScale): one min/max across all displayed
+        // chromosomes from this track's own bins, used only when no shared/group range overrides.
+        float[] globalRange = null;
+        if (cfg.globalYScale && sharedRange == null) {
+            float gmn = Float.POSITIVE_INFINITY, gmx = Float.NEGATIVE_INFINITY;
             for (ChrInfo c : chrs) {
                 float[] b = binsFor(track, c);
                 if (b == null) continue;
                 for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < gmn) gmn = v; if (v > gmx) gmx = v; }
             }
             if (gmn == Float.POSITIVE_INFINITY) return;
+            globalRange = new float[]{gmn, gmx};
         }
 
         for (int i = 0; i < chrs.size(); i++) {
@@ -1352,9 +1406,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double f0 = sec.get(i)[0], span = sec.get(i)[1] - f0;
             int n = b.length;
 
-            // Y range: per-chromosome (default) or global.
+            // Y range: shared/group (per gene or global), track-global, or per-chromosome.
             float mn, mx;
-            if (global) { mn = gmn; mx = gmx; }
+            float[] sr = (sharedRange != null) ? sharedRange.apply(c) : globalRange;
+            if (sr != null) { mn = sr[0]; mx = sr[1]; }
             else {
                 mn = Float.POSITIVE_INFINITY; mx = Float.NEGATIVE_INFINITY;
                 for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < mn) mn = v; if (v > mx) mx = v; }

@@ -867,21 +867,30 @@ public class IGVContentPane extends JPanel {
             JRadioButtonMenuItem ySelf = new JRadioButtonMenuItem(
                     "Self scale (default)", dcfg.yGroup == null);
             ySelf.addActionListener(a -> {
-                for (CircularViewPanel.TrackRingConfig c : dataCfgs) c.yGroup = null;
+                for (CircularViewPanel.TrackRingConfig c : dataCfgs) { c.yGroup = null; c.yGroupPerGene = false; }
                 circularDrawingArea.invalidateRing();
             });
             JRadioButtonMenuItem yGroupItem = new JRadioButtonMenuItem(
                     "Group scale (selected" + (dataCfgs.size() > 1 ? ", " + dataCfgs.size() + " tracks" : "") + ")",
-                    dcfg.yGroup != null);
+                    dcfg.yGroup != null && !dcfg.yGroupPerGene);
             yGroupItem.addActionListener(a -> {
                 String gid = "g" + System.nanoTime();
-                for (CircularViewPanel.TrackRingConfig c : dataCfgs) c.yGroup = gid;
+                for (CircularViewPanel.TrackRingConfig c : dataCfgs) { c.yGroup = gid; c.yGroupPerGene = false; }
+                circularDrawingArea.invalidateRing();
+            });
+            JRadioButtonMenuItem yGroupPerGene = new JRadioButtonMenuItem(
+                    "Group scale each gene panel", dcfg.yGroup != null && dcfg.yGroupPerGene);
+            yGroupPerGene.addActionListener(a -> {
+                String gid = "g" + System.nanoTime();
+                for (CircularViewPanel.TrackRingConfig c : dataCfgs) { c.yGroup = gid; c.yGroupPerGene = true; }
                 circularDrawingArea.invalidateRing();
             });
             ysg.add(ySelf);
             ysg.add(yGroupItem);
+            ysg.add(yGroupPerGene);
             yscale.add(ySelf);
             yscale.add(yGroupItem);
+            yscale.add(yGroupPerGene);
             menu.add(yscale);
         }
 
