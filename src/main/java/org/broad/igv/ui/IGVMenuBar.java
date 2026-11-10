@@ -734,6 +734,39 @@ public class IGVMenuBar extends JMenuBar implements IGVEventObserver {
         menuItems.add(MenuAndToolbarUtils.createMenuItem(menuAction));
 
         menuItems.add(new JSeparator());
+
+        // ----- Horizontal / circular view toggles -----
+        menuAction = new MenuAction("水平展示", null, KeyEvent.VK_H) {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JCheckBoxMenuItem mi = (JCheckBoxMenuItem) e.getSource();
+                IGVContentPane cp = igv.getContentPane();
+                if (!mi.isSelected() && !cp.isShowCircularView()) {
+                    mi.setSelected(true);
+                    MessageUtils.showMessage("至少保留一种展示方式（水平或环形）。");
+                    return;
+                }
+                cp.setShowHorizontalView(mi.isSelected());
+            }
+        };
+        menuItems.add(MenuAndToolbarUtils.createMenuItem(menuAction, igv.getContentPane().isShowHorizontalView()));
+
+        menuAction = new MenuAction("环形展示", null, KeyEvent.VK_C) {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JCheckBoxMenuItem mi = (JCheckBoxMenuItem) e.getSource();
+                IGVContentPane cp = igv.getContentPane();
+                if (!mi.isSelected() && !cp.isShowHorizontalView()) {
+                    mi.setSelected(true);
+                    MessageUtils.showMessage("至少保留一种展示方式（水平或环形）。");
+                    return;
+                }
+                cp.setShowCircularView(mi.isSelected());
+            }
+        };
+        menuItems.add(MenuAndToolbarUtils.createMenuItem(menuAction, igv.getContentPane().isShowCircularView()));
+
+        menuItems.add(new JSeparator());
         menuItems.add(new HistoryMenu("Go to"));
 
 

@@ -49,6 +49,15 @@ public class IGVContentPane extends JPanel {
     private MainPanel mainPanel;
     private ApplicationStatusBar statusBar;
 
+    // Horizontal / circular view toggles.  "horizontal" is the existing linear
+    // genome browser (MainPanel); "circular" is a placeholder panel that is not
+    // drawn yet (reserved for the ring view).  Both can be shown at once.
+    private JPanel circularPanel;
+    private JSplitPane viewSplitPane;
+    private Component currentCenter;
+    private boolean showHorizontalView = true;
+    private boolean showCircularView = false;
+
     private IGV igv;
 
     /**
@@ -78,7 +87,23 @@ public class IGVContentPane extends JPanel {
 
 
         mainPanel = new MainPanel(igv);
-        add(mainPanel, BorderLayout.CENTER);
+
+        // Circular (ring) view placeholder.  Blank for now -- not drawn yet.
+        circularPanel = new JPanel(new BorderLayout());
+        circularPanel.setBackground(new Color(245, 245, 245));
+        circularPanel.setBorder(BorderFactory.createTitledBorder("环形视图（占位）"));
+        JLabel circularPlaceholder = new JLabel("环形视图占位区 — 暂未绘制", SwingConstants.CENTER);
+        circularPlaceholder.setForeground(Color.GRAY);
+        circularPanel.add(circularPlaceholder, BorderLayout.CENTER);
+
+        // Horizontal split: left = horizontal (linear) genome browser, right = circular placeholder.
+        viewSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, mainPanel, circularPanel);
+        viewSplitPane.setDividerSize(4);
+        viewSplitPane.setResizeWeight(0.7);
+        viewSplitPane.setOneTouchExpandable(false);
+        viewSplitPane.setContinuousLayout(true);
+
+        updateViewLayout();
 
         statusBar = new ApplicationStatusBar();
         statusBar.setDebugGraphicsOptions(javax.swing.DebugGraphics.NONE_OPTION);
@@ -110,6 +135,51 @@ public class IGVContentPane extends JPanel {
     public ApplicationStatusBar getStatusBar() {
 
         return statusBar;
+    }
+
+    public boolean isShowHorizontalView() {
+        return showHorizontalView;
+    }
+
+    public void setShowHorizontalView(boolean showHorizontalView) {
+        this.showHorizontalView = showHorizontalView;
+        updateViewLayout();
+    }
+
+    public boolean isShowCircularView() {
+        return showCircularView;
+    }
+
+    public void setShowCircularView(boolean showCircularView) {
+        this.showCircularView = showCircularView;
+        updateViewLayout();
+    }
+
+    /**
+     * Rebuild the center region according to the horizontal / circular view toggles:
+     *  - both on  -> horizontal (left) + circular placeholder (right) side by side
+     *  - only horizontal -> horizontal fills the center
+     *  - only circular  -> circular placeholder fills the center
+     * The window is never left empty.
+     */
+    public void updateViewLayout() {
+        if (currentCenter != null) {
+            remove(currentCenter);
+        }
+        if (showHorizontalView && showCircularView) {
+            viewSplitPane.setLeftComponent(mainPanel);
+            viewSplitPane.setRightComponent(circularPanel);
+            add(viewSplitPane, BorderLayout.CENTER);
+            currentCenter = viewSplitPane;
+        } else if (showHorizontalView) {
+            add(mainPanel, BorderLayout.CENTER);
+            currentCenter = mainPanel;
+        } else {
+            add(circularPanel, BorderLayout.CENTER);
+            currentCenter = circularPanel;
+        }
+        revalidate();
+        repaint();
     }
 
 }
