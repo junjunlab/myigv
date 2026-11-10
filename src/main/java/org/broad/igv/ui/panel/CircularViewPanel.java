@@ -142,6 +142,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** Cap on the number of links drawn per frame (Circos {@code record_limit}). */
         public int     linkRecordLimit = 5000;
         public boolean linkColorByChromosome = false;
+        /** Anchor links inside the stacked ring bands instead of on top of them. */
+        public boolean linkEndsInsideTracks = true;
 
         public CircularSettings copy() {
             CircularSettings s = new CircularSettings();
@@ -164,6 +166,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.linkColor = linkColor; s.linkAlpha = linkAlpha;
             s.linkThickness = linkThickness; s.linkRecordLimit = linkRecordLimit;
             s.linkColorByChromosome = linkColorByChromosome;
+            s.linkEndsInsideTracks = linkEndsInsideTracks;
             return s;
         }
 
@@ -393,14 +396,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 drawAll(ig, w, h, chrs, settings);
                 drawTrackRings(ig, w, h, chrs, settings);
                 // Links are an independent z-layer drawn last, like Circos, so they sit on top.
-                drawLinks(ig, w, h, chrs, allLinks(), settings);
+                drawLinks(ig, w, h, chrs, allLinks(), settings, linkAnchorRadius(w, h, settings));
             } else {
                 ChrInfo one = buildOne(genome, chr, settings);
                 if (one == null) drawMessage(ig, w, h, "Chromosome not found: " + chr);
                 else {
                     drawSingle(ig, w, h, one, settings);
                     drawTrackRingsSingle(ig, w, h, one, settings);
-                    drawLinks(ig, w, h, Collections.singletonList(one), allLinks(), settings);
+                    drawLinks(ig, w, h, Collections.singletonList(one), allLinks(), settings,
+                            linkAnchorRadius(w, h, settings));
                 }
             }
             if (!pendingLoads.isEmpty()) {
@@ -775,6 +779,30 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         hiddenRingTracks.clear();
     }
 
+    /** True when the user removed this track from the ring (it stays loaded, just is not drawn). */
+    public boolean isRingTrackHidden(String name) {
+        return name != null && hiddenRingTracks.contains(name);
+    }
+
+    /**
+     * Radius of the free space left after stacking every ring band, so links can be drawn inside
+     * the data tracks instead of on top of them. Returns &lt;= 0 to mean "no ring tracks, fall
+     * back to the ideogram inner radius".
+     */
+    private double linkAnchorRadius(int w, int h, CircularSettings s) {
+        if (!s.linkEndsInsideTracks || ringTracks.isEmpty()) return -1;
+        double R = Math.min(w, h) / 2.0 - MARGIN;
+        if (R <= 20) return -1;
+        double cursor = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx) - 5;
+        for (Track t : ringTracks) {
+            TrackRingConfig cfg = getRingConfig(t.getName());
+            double bandInner = cursor - cfg.heightPx;
+            if (bandInner < 24) break;
+            cursor = bandInner - 5;
+        }
+        return cursor > 24 ? cursor : -1;
+    }
+
     /** Per-track ring band config (created with defaults on first use). */
     public TrackRingConfig getRingConfig(String trackName) {
         return ringConfig.computeIfAbsent(trackName, k -> new TrackRingConfig());
@@ -1132,6 +1160,16 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      */
     public static void drawLinks(Graphics2D g2, int w, int h, List<ChrInfo> chrs,
                                  List<RingLink> links, CircularSettings s) {
+        drawLinks(g2, w, h, chrs, links, s, -1);
+    }
+
+    /**
+     * @param innerLimitR when &gt; 0, links are anchored at this radius (the free space inside
+     *                    the stacked ring bands) instead of just inside the ideogram, so they
+     *                    never cover already-drawn data tracks.
+     */
+    public static void drawLinks(Graphics2D g2, int w, int h, List<ChrInfo> chrs,
+                                 List<RingLink> links, CircularSettings s, double innerLimitR) {
         if (s == null) s = new CircularSettings();
         if (!s.showLinks || links == null || links.isEmpty() || chrs == null || chrs.isEmpty()) return;
 
@@ -1141,7 +1179,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
         double rOut = R * s.bandOuter;
         double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
-        double rEnd = Math.max(8.0, rIn * s.linkRadius);
+        double baseR = innerLimitR > 0 ? innerLimitR : rIn;
+        double rEnd = Math.max(8.0, baseR * s.linkRadius);
         double rBez = rEnd * s.linkBezierRadius;
 
         List<double[]> sec = computeSectors(chrs, s.gapDeg);

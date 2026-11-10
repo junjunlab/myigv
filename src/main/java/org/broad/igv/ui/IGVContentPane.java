@@ -416,6 +416,9 @@ public class IGVContentPane extends JPanel {
         // file becomes an interaction track, which the circular view picks up automatically.
         popup.add(linkCheck("Show links", s.showLinks,
                 v -> { s.showLinks = v; panel.refresh(); }));
+
+        popup.add(linkCheck("Draw inside data tracks", s.linkEndsInsideTracks,
+                v -> { s.linkEndsInsideTracks = v; panel.refresh(); }));
         popup.addSeparator();
 
         popup.add(linkCheck("Ribbon (filled bands)", s.linkRibbon,
@@ -688,6 +691,7 @@ public class IGVContentPane extends JPanel {
         List<CircularViewPanel.RingLink> autoLinks = new ArrayList<>();
         for (Track t : dataColumnTracks) {
             if (!(t instanceof InteractionTrack)) continue;
+            if (circularDrawingArea.isRingTrackHidden(t.getName())) continue;
             List<BedPEFeature> features = ((InteractionTrack) t).getAllFeatures();
             if (features == null) continue;
             for (BedPEFeature f : features) {
@@ -717,11 +721,18 @@ public class IGVContentPane extends JPanel {
         final java.util.List<CircularViewPanel.TrackRingConfig> featureCfgs = new ArrayList<>();
         final java.util.List<CircularViewPanel.TrackRingConfig> dataCfgs = new ArrayList<>();
         final java.util.List<String> ringNames = new ArrayList<>();
+        final java.util.List<String> linkNames = new ArrayList<>();
         for (int si : sel) {
             if (si < 0 || si >= dataColumnTracks.size()) continue;
             Track t = dataColumnTracks.get(si);
-            // Only FeatureTrack / DataTrack are drawn on the ring. Other tracks in the list
-            // (e.g. the reference sequence) have no ring band, so they get no ring options.
+            // An interaction track *is* the links layer, so the only ring option it needs is
+            // removal; there is no band to size or recolour.
+            if (t instanceof InteractionTrack) {
+                linkNames.add(t.getName());
+                continue;
+            }
+            // Only FeatureTrack / DataTrack are drawn as bands on the ring. Other tracks in the
+            // list (e.g. the reference sequence) have no ring band, so they get no ring options.
             if (!(t instanceof FeatureTrack) && !(t instanceof DataTrack)) continue;
             CircularViewPanel.TrackRingConfig c =
                     circularDrawingArea.getRingConfig(t.getName());
@@ -731,13 +742,34 @@ public class IGVContentPane extends JPanel {
             else dataCfgs.add(c);
         }
 
-        if (cfgs.isEmpty()) {
+        if (cfgs.isEmpty() && linkNames.isEmpty()) {
             // Nothing selected is rendered on the ring; only the shared link actions apply.
             JPopupMenu onlyLinks = new JPopupMenu();
             JMenu linksMenu = new JMenu("Links");
             addLinkItems(linksMenu.getPopupMenu(), circularDrawingArea);
             onlyLinks.add(linksMenu);
             onlyLinks.show(dataColumnList, e.getX(), e.getY());
+            return;
+        }
+
+        if (cfgs.isEmpty()) {
+            // Only interaction tracks selected: they contribute links, so allow removing those.
+            JPopupMenu menu = new JPopupMenu();
+            String manyLinks = linkNames.size() > 1 ? " (" + linkNames.size() + " tracks)" : "";
+            JMenuItem removeLinks = new JMenuItem("Remove track from ring" + manyLinks);
+            removeLinks.addActionListener(a -> {
+                for (String name : linkNames) {
+                    circularDrawingArea.removeRingTrack(name);
+                }
+                refreshDataColumn();
+                circularDrawingArea.refresh();
+            });
+            menu.add(removeLinks);
+            menu.addSeparator();
+            JMenu linksMenu = new JMenu("Links");
+            addLinkItems(linksMenu.getPopupMenu(), circularDrawingArea);
+            menu.add(linksMenu);
+            menu.show(dataColumnList, e.getX(), e.getY());
             return;
         }
 
@@ -847,6 +879,8 @@ public class IGVContentPane extends JPanel {
             for (String name : ringNames) {
                 circularDrawingArea.removeRingTrack(name);
             }
+            refreshDataColumn();
+            circularDrawingArea.refresh();
         });
         menu.add(removeRing);
 
