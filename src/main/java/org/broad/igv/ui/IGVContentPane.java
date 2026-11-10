@@ -26,14 +26,20 @@
 package org.broad.igv.ui;
 
 import org.broad.igv.logging.*;
+import org.broad.igv.bedpe.BedPEFeature;
+import org.broad.igv.bedpe.BedPEParser;
+import org.broad.igv.bedpe.InteractionTrack;
 import org.broad.igv.ui.commandbar.IGVCommandBar;
 import org.broad.igv.ui.panel.CircularViewPanel;
 import org.broad.igv.ui.panel.MainPanel;
 import org.broad.igv.ui.panel.TrackPanel;
 import org.broad.igv.track.Track;
 import org.broad.igv.ui.util.ApplicationStatusBar;
+import org.broad.igv.util.ResourceLocator;
 
 import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -288,6 +294,126 @@ public class IGVContentPane extends JPanel {
         menu.add(showAllRing);
         menu.addSeparator();
 
+        // ---- Circos links (bezier chords / ribbons between two genomic intervals) ----
+        JMenuItem loadLinks = new JMenuItem("Load links (BEDPE / Circos)…");
+        loadLinks.addActionListener(e -> loadCircularLinks(panel));
+
+        JMenuItem clearLinks = new JMenuItem("Clear links");
+        clearLinks.addActionListener(e -> { panel.clearRingLinks(); panel.refresh(); });
+
+        JCheckBoxMenuItem cbLinks = new JCheckBoxMenuItem("Show links", s.showLinks);
+        cbLinks.addActionListener(e -> { s.showLinks = cbLinks.isSelected(); panel.refresh(); });
+
+        JMenu linkApp = new JMenu("Link appearance");
+        linkApp.add(linkCheck("Ribbon (filled bands)", s.linkRibbon,
+                v -> { s.linkRibbon = v; panel.refresh(); }));
+        linkApp.add(linkCheck("Twist ribbons", s.linkTwist,
+                v -> { s.linkTwist = v; panel.refresh(); }));
+        linkApp.add(linkCheck("Colour by chromosome", s.linkColorByChromosome,
+                v -> { s.linkColorByChromosome = v; panel.refresh(); }));
+        linkApp.addSeparator();
+
+        JMenuItem linkColour = new JMenuItem("Colour…");
+        linkColour.addActionListener(e -> {
+            Color c = JColorChooser.showDialog(this, "Link colour", s.linkColor);
+            if (c != null) { s.linkColor = c; panel.refresh(); }
+        });
+        linkApp.add(linkColour);
+
+        JMenuItem linkThickness = new JMenuItem("Thickness… (" + s.linkThickness + ")");
+        linkThickness.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(this, "Link thickness (px):", s.linkThickness);
+            if (v != null) {
+                try { s.linkThickness = Math.max(0.1f, Float.parseFloat(v.trim())); panel.refresh(); }
+                catch (NumberFormatException ignore) { }
+            }
+        });
+        linkApp.add(linkThickness);
+
+        JMenuItem linkAlpha = new JMenuItem("Opacity (0-255)… (" + s.linkAlpha + ")");
+        linkAlpha.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(this, "Link opacity (0-255):", s.linkAlpha);
+            if (v != null) {
+                try {
+                    s.linkAlpha = Math.max(0, Math.min(255, Integer.parseInt(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        linkApp.add(linkAlpha);
+        linkApp.addSeparator();
+
+        JMenuItem linkRadius = new JMenuItem("End radius (0-1)… (" + s.linkRadius + ")");
+        linkRadius.setToolTipText("Fraction of the ideogram inner radius. Lower it to keep links clear of the data rings.");
+        linkRadius.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(this,
+                    "Link end radius, as a fraction of the ideogram inner radius (0.05-1):", s.linkRadius);
+            if (v != null) {
+                try {
+                    s.linkRadius = Math.max(0.05, Math.min(1.0, Double.parseDouble(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        linkApp.add(linkRadius);
+
+        JMenuItem linkBez = new JMenuItem("Bezier radius (0-1)… (" + s.linkBezierRadius + ")");
+        linkBez.setToolTipText("Circos bezier_radius: radial position of the curve's control point. 0 = straight chord.");
+        linkBez.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(this,
+                    "Bezier control radius (0 = straight chord):", s.linkBezierRadius);
+            if (v != null) {
+                try {
+                    s.linkBezierRadius = Math.max(0.0, Math.min(1.0, Double.parseDouble(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        linkApp.add(linkBez);
+
+        JMenuItem linkCrest = new JMenuItem("Crest (0-1)… (" + s.linkCrest + ")");
+        linkCrest.setToolTipText("Circos crest: makes links meet the ideogram perpendicularly. 0 disables.");
+        linkCrest.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(this, "Crest (0 disables):", s.linkCrest);
+            if (v != null) {
+                try {
+                    s.linkCrest = Math.max(0.0, Math.min(1.0, Double.parseDouble(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        linkApp.add(linkCrest);
+
+        JMenuItem linkMinWidth = new JMenuItem("Min ribbon width (deg)… (" + s.linkRibbonMinDeg + ")");
+        linkMinWidth.setToolTipText("Widens ribbon ends so links with tiny anchors stay visible.");
+        linkMinWidth.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(this,
+                    "Minimum ribbon end width, in degrees:", s.linkRibbonMinDeg);
+            if (v != null) {
+                try {
+                    s.linkRibbonMinDeg = Math.max(0, Double.parseDouble(v.trim()));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        linkApp.add(linkMinWidth);
+
+        JMenuItem linkMax = new JMenuItem("Max links… (" + s.linkRecordLimit + ")");
+        linkMax.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(this, "Maximum links to draw:", s.linkRecordLimit);
+            if (v != null) {
+                try { s.linkRecordLimit = Math.max(1, Integer.parseInt(v.trim())); panel.refresh(); }
+                catch (NumberFormatException ignore) { }
+            }
+        });
+        linkApp.add(linkMax);
+
+        menu.add(loadLinks);
+        menu.add(clearLinks);
+        menu.add(cbLinks);
+        menu.add(linkApp);
+        menu.addSeparator();
+
         JMenu ticksPos = new JMenu("Tick labels position");
         JRadioButtonMenuItem outside = new JRadioButtonMenuItem("Outside (above band)", s.tickLabelsOutside);
         JRadioButtonMenuItem inside = new JRadioButtonMenuItem("Inside (below band)", !s.tickLabelsOutside);
@@ -381,6 +507,124 @@ public class IGVContentPane extends JPanel {
         return bar;
     }
 
+    /** Small helper: a checkbox menu item wired to a setter callback. */
+    private static JCheckBoxMenuItem linkCheck(String text, boolean initial,
+                                               java.util.function.Consumer<Boolean> setter) {
+        JCheckBoxMenuItem item = new JCheckBoxMenuItem(text, initial);
+        item.addActionListener(e -> setter.accept(item.isSelected()));
+        return item;
+    }
+
+    /**
+     * Load a Circos-link / BEDPE file straight into the circular view. No track is created and
+     * the file's extension does not matter: we call {@link BedPEParser#parse} directly, which
+     * detects UTF-8 / UTF-16 (with or without BOM), canonicalises chromosome names and skips
+     * malformed rows. Routing the file through {@code TrackLoader} instead would send a
+     * {@code .bed} / {@code .links} file to the plain BED codec, which silently drops the links.
+     */
+    private void loadCircularLinks(CircularViewPanel panel) {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Load Circos links (BEDPE / links file)");
+        chooser.setFileFilter(new FileNameExtensionFilter(
+                "Links / BEDPE (*.bed, *.bedpe, *.links, *.txt, *.gz)",
+                "bed", "bedpe", "links", "txt", "gz"));
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        File file = chooser.getSelectedFile();
+        Genome genome = GenomeManager.getInstance().getCurrentGenome();
+        try {
+            BedPEParser.Dataset dataset =
+                    BedPEParser.parse(new ResourceLocator(file.getAbsolutePath()), genome);
+
+            List<CircularViewPanel.RingLink> links = new ArrayList<>();
+            for (BedPEFeature f : dataset.features) {
+                CircularViewPanel.RingLink link = new CircularViewPanel.RingLink(
+                        f.chr1, f.start1, f.end1, f.chr2, f.start2, f.end2);
+                link.score = f.getScore();
+                link.color = f.getColor();
+                link.thickness = Math.max(0, f.getThickness());
+                link.label = f.chr1 + ":" + f.start1 + "-" + f.end1
+                        + "  \u2194  " + f.chr2 + ":" + f.start2 + "-" + f.end2;
+                if (f.columnValues != null) {
+                    // Circos puts per-link options in the 7th column, e.g.
+                    // "color=blue,thickness=5p,z=10".  BedPEParser stores every raw column.
+                    parseLinkOptions(f.columnValues.get("col7"), link);
+                }
+                links.add(link);
+            }
+
+            panel.setRingLinks(links);
+            panel.refresh();
+            resetStatusMessage();
+            JOptionPane.showMessageDialog(this,
+                    "Loaded " + links.size() + " link(s) from " + file.getName(),
+                    "Circular links", JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception ex) {
+            log.error("Failed to load circular links from " + file, ex);
+            JOptionPane.showMessageDialog(this,
+                    "Could not load links from " + file.getName() + "\n" + ex.getMessage(),
+                    "Circular links", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /**
+     * Parse the Circos 7th-column option string ({@code key=value,key=value}) and apply the
+     * subset that affects drawing. Unknown keys and unparseable values are ignored, matching
+     * Circos' tolerance of values such as {@code thickness=5p}.
+     */
+    private static void parseLinkOptions(String options, CircularViewPanel.RingLink link) {
+        if (options == null || options.indexOf('=') < 0) {
+            return;
+        }
+        for (String part : options.split("[,\\s]+")) {
+            int eq = part.indexOf('=');
+            if (eq <= 0) continue;
+            String key = part.substring(0, eq).trim().toLowerCase();
+            String value = part.substring(eq + 1).trim();
+            try {
+                switch (key) {
+                    case "color":
+                    case "colour": {
+                        Color c = parseColour(value);
+                        if (c != null) link.color = c;
+                        break;
+                    }
+                    case "thickness":
+                        link.thickness = Math.round(Float.parseFloat(value.replace("p", "")));
+                        break;
+                    case "z":
+                        link.z = Double.parseDouble(value);
+                        break;
+                    case "score":
+                        link.score = Double.parseDouble(value);
+                        break;
+                    default:
+                        break;
+                }
+            } catch (NumberFormatException ignore) {
+                // Circos allows units ("5p"); values we cannot parse simply keep their default.
+            }
+        }
+    }
+
+    /** Circos colour names plus {@code #rrggbb} and {@code r,g,b}. */
+    private static Color parseColour(String value) {
+        if (value == null || value.isEmpty()) return null;
+        String v = value.trim();
+        try {
+            if (v.startsWith("#")) return Color.decode(v);
+            if (v.matches("\\d{1,3},\\d{1,3},\\d{1,3}")) {
+                String[] p = v.split(",");
+                return new Color(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2]));
+            }
+            return (Color) Color.class.getField(v.toLowerCase()).get(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     /**
      * Populate the left data-column list with the currently loaded tracks.
      * Used by circular-involving layouts as the "imported data" column.
@@ -446,6 +690,24 @@ public class IGVContentPane extends JPanel {
         if (model.isEmpty()) model.addElement("(no tracks loaded)");
         dataColumnList.setModel(model);
         circularDrawingArea.setRingTracks(new ArrayList<>(dataColumnTracks));   // ordered top->bottom
+
+        // Any interaction track that is already loaded also feeds the circular links, so a
+        // normal ".bedpe" import shows up on the ring without a second load step.
+        List<CircularViewPanel.RingLink> autoLinks = new ArrayList<>();
+        for (Track t : dataColumnTracks) {
+            if (!(t instanceof InteractionTrack)) continue;
+            List<BedPEFeature> features = ((InteractionTrack) t).getAllFeatures();
+            if (features == null) continue;
+            for (BedPEFeature f : features) {
+                CircularViewPanel.RingLink link = new CircularViewPanel.RingLink(
+                        f.chr1, f.start1, f.end1, f.chr2, f.start2, f.end2);
+                link.score = f.getScore();
+                link.color = f.getColor();
+                link.thickness = Math.max(0, f.getThickness());
+                autoLinks.add(link);
+            }
+        }
+        circularDrawingArea.setTrackLinks(autoLinks);
     }
 
     /** Right-click popup on the data column: per-track ring band height + collapse/expand. */

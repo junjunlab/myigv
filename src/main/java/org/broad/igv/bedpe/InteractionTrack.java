@@ -49,6 +49,11 @@ public class InteractionTrack extends AbstractTrack {
     // TODO -- for jbrowse experiment
     private List<BedPEFeature> allFeatures;
 
+    /** All parsed features. Used by the circular view to render these as links. */
+    public List<BedPEFeature> getAllFeatures() {
+        return allFeatures == null ? java.util.Collections.emptyList() : allFeatures;
+    }
+
 
     enum Direction {UP, DOWN}
 

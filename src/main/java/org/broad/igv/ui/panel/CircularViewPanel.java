@@ -37,8 +37,10 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseWheelEvent;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Line2D;
 import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
+import java.awt.geom.QuadCurve2D;
 import java.awt.image.BufferedImage;
 import htsjdk.tribble.Feature;
 import org.broad.igv.track.DataTrack;
@@ -108,6 +110,32 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** Chromosomes to show in "All" mode; empty = show all. */
         public Set<String> shownChromosomes = new HashSet<>();
 
+        // ---- Circos-style "links": bezier chords / ribbons joining two genomic intervals ----
+
+        public boolean showLinks = true;
+        /** Filled band (Circos {@code ribbon=yes}) instead of a stroked curve. */
+        public boolean linkRibbon = false;
+        /** Swap which end of the second interval the ribbon's edges connect to (Circos {@code twist}). */
+        public boolean linkTwist = false;
+        /** Radial position of the link ends, as a fraction of the ideogram inner radius. */
+        public double  linkRadius = 0.95;
+        /** Radial position of the bezier control point, as a fraction of the link end radius.
+         *  Values &lt;= 0 draw a straight chord (Circos {@code bezier_radius=0}). */
+        public double  linkBezierRadius = 0.25;
+        /** 1 = control point purely radial (curves hug the circle), 0 = pulled to the Cartesian midpoint. */
+        public double  linkBezierPurity = 0.75;
+        /** Extra control points that make links meet the ideogram perpendicularly; 0 disables. */
+        public double  linkCrest = 0.5;
+        /** Minimum angular width (degrees) of a ribbon end. Real BEDPE anchors are only a few kb,
+         *  which is sub-pixel on a whole-genome ring, so ribbons would be invisible without this. */
+        public double  linkRibbonMinDeg = 0.15;
+        public Color   linkColor = new Color(40, 90, 170);
+        public int     linkAlpha = 110;
+        public float   linkThickness = 1.2f;
+        /** Cap on the number of links drawn per frame (Circos {@code record_limit}). */
+        public int     linkRecordLimit = 5000;
+        public boolean linkColorByChromosome = false;
+
         public CircularSettings copy() {
             CircularSettings s = new CircularSettings();
             s.showTicks = showTicks; s.showTickLabels = showTickLabels;
@@ -119,6 +147,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.solidColor = solidColor; s.chromosomeColor = chromosomeColor;
             s.ySharedAcrossTracks = ySharedAcrossTracks;
             s.shownChromosomes = new HashSet<>(shownChromosomes);
+            s.showLinks = showLinks; s.linkRibbon = linkRibbon; s.linkTwist = linkTwist;
+            s.linkRadius = linkRadius; s.linkBezierRadius = linkBezierRadius;
+            s.linkBezierPurity = linkBezierPurity; s.linkCrest = linkCrest;
+            s.linkRibbonMinDeg = linkRibbonMinDeg;
+            s.linkColor = linkColor; s.linkAlpha = linkAlpha;
+            s.linkThickness = linkThickness; s.linkRecordLimit = linkRecordLimit;
+            s.linkColorByChromosome = linkColorByChromosome;
             return s;
         }
 
@@ -167,6 +202,72 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public boolean globalYScale = false;
         /** Non-null = this track shares a Y range with tracks of the same group id (group scale). */
         public String yGroup = null;
+    }
+
+    /**
+     * One Circos link: an interval on {@code chr1} joined to an interval on {@code chr2}.
+     * Field order matches the Circos link file layout
+     * ({@code chr1 start1 end1 chr2 start2 end2 [options]}), which is also the first six
+     * columns of a BEDPE file.
+     */
+    public static class RingLink {
+        public final String chr1, chr2;
+        public final int start1, end1, start2, end2;
+        public double score = 0;
+        /** Draw order: larger z is painted on top (Circos {@code z}). */
+        public double z = 0;
+        /** Per-link colour; null means "use {@link CircularSettings#linkColor}". */
+        public Color color;
+        /** Per-link thickness; 0 means "use {@link CircularSettings#linkThickness}". */
+        public int thickness = 0;
+        /** Tooltip text, may be null. */
+        public String label;
+
+        public RingLink(String chr1, int start1, int end1, String chr2, int start2, int end2) {
+            this.chr1 = chr1;
+            this.start1 = start1;
+            this.end1 = end1;
+            this.chr2 = chr2;
+            this.start2 = start2;
+            this.end2 = end2;
+        }
+    }
+
+    // Two sources so that refreshing the track list never discards user-loaded links.
+    private final List<RingLink> fileLinks = new ArrayList<>();    // from "Load links…"
+    private final List<RingLink> trackLinks = new ArrayList<>();   // auto-collected from InteractionTracks
+
+    /** Replace the user-loaded links (from a Circos / BEDPE file). */
+    public void setRingLinks(List<RingLink> links) {
+        fileLinks.clear();
+        if (links != null) fileLinks.addAll(links);
+        invalidateRing();
+        log.info("Circular links: " + fileLinks.size() + " user link(s)");
+    }
+
+    /** Replace the links auto-collected from loaded interaction tracks. */
+    public void setTrackLinks(List<RingLink> links) {
+        trackLinks.clear();
+        if (links != null) trackLinks.addAll(links);
+        invalidateRing();
+    }
+
+    public void clearRingLinks() {
+        fileLinks.clear();
+        trackLinks.clear();
+        invalidateRing();
+    }
+
+    public int getRingLinkCount() {
+        return fileLinks.size() + trackLinks.size();
+    }
+
+    private List<RingLink> allLinks() {
+        if (trackLinks.isEmpty()) return new ArrayList<>(fileLinks);
+        List<RingLink> all = new ArrayList<>(fileLinks.size() + trackLinks.size());
+        all.addAll(fileLinks);
+        all.addAll(trackLinks);
+        return all;
     }
 
     public CircularViewPanel() {
@@ -281,10 +382,16 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 List<ChrInfo> chrs = buildAll(genome, zoom, settings);
                 drawAll(ig, w, h, chrs, settings);
                 drawTrackRings(ig, w, h, chrs, settings);
+                // Links are an independent z-layer drawn last, like Circos, so they sit on top.
+                drawLinks(ig, w, h, chrs, allLinks(), settings);
             } else {
                 ChrInfo one = buildOne(genome, chr, settings);
                 if (one == null) drawMessage(ig, w, h, "Chromosome not found: " + chr);
-                else { drawSingle(ig, w, h, one, settings); drawTrackRingsSingle(ig, w, h, one, settings); }
+                else {
+                    drawSingle(ig, w, h, one, settings);
+                    drawTrackRingsSingle(ig, w, h, one, settings);
+                    drawLinks(ig, w, h, Collections.singletonList(one), allLinks(), settings);
+                }
             }
             if (!pendingLoads.isEmpty()) {
                 ig.setColor(new Color(120, 120, 120));
@@ -467,6 +574,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
     public static void drawSingleChromosome(Graphics2D g2, int w, int h, ChrInfo chr) {
         drawSingle(g2, w, h, chr, new CircularSettings());
+    }
+
+    public static void drawSingleChromosome(Graphics2D g2, int w, int h, ChrInfo chr,
+                                            CircularSettings s) {
+        drawSingle(g2, w, h, chr, s);
     }
 
     public static void drawAllChromosomes(Graphics2D g2, int w, int h, List<ChrInfo> chrs, CircularSettings s) {
@@ -983,6 +1095,205 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 }
             }
         }
+    }
+
+    // ------------------------------------------------------------------
+    //  Circos-style links
+    // ------------------------------------------------------------------
+
+    /**
+     * Draw Circos {@code <links>}. Each link joins an interval on chr1 to an interval on chr2
+     * with a quadratic Bezier that bows toward the centre of the ring:
+     *
+     * <ul>
+     *   <li>the two ends sit on {@code settings.linkRadius} (a fraction of the ideogram inner
+     *       radius), so they never overlap the ideogram;</li>
+     *   <li>the single control point sits on the angle bisector at {@code linkBezierRadius},
+     *       which is Circos' {@code bezier_radius}; {@code linkBezierPurity} lerps it toward
+     *       the Cartesian midpoint so short links do not over-bend;</li>
+     *   <li>{@code linkCrest} adds the two extra control points that make the curve leave the
+     *       ideogram radially instead of at a tangent;</li>
+     *   <li>{@code linkRibbon} replaces the stroke with a filled band whose end width is the
+     *       arc length of each interval (Circos {@code ribbon=yes}).</li>
+     * </ul>
+     *
+     * <p>Static so the headless render probe can verify it, exactly like
+     * {@link #drawFeatureBand}.</p>
+     */
+    public static void drawLinks(Graphics2D g2, int w, int h, List<ChrInfo> chrs,
+                                 List<RingLink> links, CircularSettings s) {
+        if (s == null) s = new CircularSettings();
+        if (!s.showLinks || links == null || links.isEmpty() || chrs == null || chrs.isEmpty()) return;
+
+        int cx = w / 2, cy = h / 2;
+        double R = Math.min(w, h) / 2.0 - MARGIN;
+        if (R <= 20) return;
+
+        double rOut = R * s.bandOuter;
+        double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
+        double rEnd = Math.max(8.0, rIn * s.linkRadius);
+        double rBez = rEnd * s.linkBezierRadius;
+
+        List<double[]> sec = computeSectors(chrs, s.gapDeg);
+
+        // Chromosome name -> sector index, tolerant of "chr" prefixes and genome aliases.
+        Map<String, Integer> index = new HashMap<>();
+        Genome genome = GenomeManager.getInstance().getCurrentGenome();
+        for (int i = 0; i < chrs.size(); i++) {
+            String name = chrs.get(i).name;
+            index.put(name, i);
+            index.put(shortName(name), i);
+            if (genome != null) {
+                String canonical = genome.getCanonicalChrName(name);
+                if (canonical != null) index.put(canonical, i);
+            }
+        }
+
+        // z-depth: larger z painted last (on top), stable for equal z.
+        List<RingLink> ordered = new ArrayList<>(links);
+        ordered.sort((a, b) -> Double.compare(a.z, b.z));
+
+        Stroke oldStroke = g2.getStroke();
+        Paint oldPaint = g2.getPaint();
+        Object oldAA = g2.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        int drawn = 0;
+        for (RingLink link : ordered) {
+            if (drawn >= s.linkRecordLimit) break;
+
+            Integer i1 = resolveSector(index, link.chr1);
+            Integer i2 = resolveSector(index, link.chr2);
+            if (i1 == null || i2 == null) continue;   // one end on a hidden chromosome
+
+            double[] sector1 = sec.get(i1), sector2 = sec.get(i2);
+            double len1 = Math.max(1, chrs.get(i1).length);
+            double len2 = Math.max(1, chrs.get(i2).length);
+
+            double a1s = bpToFrac(link.start1, len1, sector1);
+            double a1e = bpToFrac(link.end1, len1, sector1);
+            double a2s = bpToFrac(link.start2, len2, sector2);
+            double a2e = bpToFrac(link.end2, len2, sector2);
+            if (a1e < a1s) { double t = a1s; a1s = a1e; a1e = t; }
+            if (a2e < a2s) { double t = a2s; a2s = a2e; a2e = t; }
+
+            double a1 = (a1s + a1e) / 2.0;
+            double a2 = (a2s + a2e) / 2.0;
+            // Shortest way round: never route the curve across the 12 o'clock seam.
+            double d = a2 - a1;
+            d -= Math.rint(d);
+            double aMid = a1 + d / 2.0;
+
+            Point2D p1 = polar(cx, cy, rEnd, a1);
+            Point2D p2 = polar(cx, cy, rEnd, a2);
+            Point2D q = polar(cx, cy, rBez, aMid);
+
+            // bezier_radius_purity: blend the radial control point toward the chord midpoint.
+            double purity = clamp01(s.linkBezierPurity);
+            double mx = (p1.getX() + p2.getX()) / 2.0;
+            double my = (p1.getY() + p2.getY()) / 2.0;
+            double qx = q.getX() * purity + mx * (1 - purity);
+            double qy = q.getY() * purity + my * (1 - purity);
+
+            Color base = link.color != null
+                    ? link.color
+                    : (s.linkColorByChromosome ? pickColor(chrs.get(i1).name, null) : s.linkColor);
+            int alpha = link.color != null
+                    ? Math.min(link.color.getAlpha(), s.linkAlpha) : s.linkAlpha;
+            g2.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), alpha));
+
+            if (s.linkRibbon) {
+                // Filled band: end cap along the arc, bezier across, second cap, bezier back.
+                // Tiny anchors are widened to a visible minimum, otherwise the band is sub-pixel.
+                double[] e1 = widen(a1s, a1e, s.linkRibbonMinDeg);
+                double[] e2 = widen(a2s, a2e, s.linkRibbonMinDeg);
+                double b2a = s.linkTwist ? e2[0] : e2[1];
+                double b2b = s.linkTwist ? e2[1] : e2[0];
+                Path2D.Double path = new Path2D.Double();
+                Point2D start = polar(cx, cy, rEnd, e1[0]);
+                path.moveTo(start.getX(), start.getY());
+                appendArc(path, cx, cy, rEnd, e1[0], e1[1], 8);
+                appendQuad(path, cx, cy, rEnd, b2a, qx, qy);
+                appendArc(path, cx, cy, rEnd, b2a, b2b, 8);
+                appendQuad(path, cx, cy, rEnd, e1[0], qx, qy);
+                path.closePath();
+                g2.fill(path);
+            } else {
+                g2.setStroke(new BasicStroke(
+                        link.thickness > 0 ? link.thickness : s.linkThickness,
+                        BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                if (s.linkCrest > 0 && s.linkBezierRadius > 0) {
+                    // crest: two extra control points on the end radials, meeting at the
+                    // bezier control point in the middle -> perpendicular entry at both ends.
+                    double rCrest = rEnd - Math.abs(rBez - rEnd) * clamp01(s.linkCrest);
+                    Point2D c1 = polar(cx, cy, rCrest, a1);
+                    Point2D c2 = polar(cx, cy, rCrest, a2);
+                    Path2D.Double path = new Path2D.Double();
+                    path.moveTo(p1.getX(), p1.getY());
+                    path.quadTo(c1.getX(), c1.getY(), qx, qy);
+                    path.quadTo(c2.getX(), c2.getY(), p2.getX(), p2.getY());
+                    g2.draw(path);
+                } else if (s.linkBezierRadius > 0) {
+                    g2.draw(new QuadCurve2D.Double(
+                            p1.getX(), p1.getY(), qx, qy, p2.getX(), p2.getY()));
+                } else {
+                    g2.draw(new Line2D.Double(p1, p2));
+                }
+            }
+            drawn++;
+        }
+
+        g2.setStroke(oldStroke);
+        g2.setPaint(oldPaint);
+        if (oldAA != null) {
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAA);
+        }
+
+        if (drawn == 0) {
+            log.info("Circular links: 0 of " + links.size()
+                    + " visible (their chromosomes are not currently shown)");
+        }
+    }
+
+    /** bp -> fraction of the whole circle, clamped inside one chromosome sector. */
+    private static double bpToFrac(long bp, double chrLength, double[] sector) {
+        double t = clamp01(bp / chrLength);
+        return sector[0] + (sector[1] - sector[0]) * t;
+    }
+
+    /** Widen a degenerate angular interval to at least {@code minDeg} degrees, keeping its centre. */
+    private static double[] widen(double a0, double a1, double minDeg) {
+        double widthDeg = (a1 - a0) * 360.0;
+        if (minDeg <= 0 || widthDeg >= minDeg) {
+            return new double[]{a0, a1};
+        }
+        double half = minDeg / 720.0;
+        double mid = (a0 + a1) / 2.0;
+        return new double[]{mid - half, mid + half};
+    }
+
+    private static Integer resolveSector(Map<String, Integer> index, String name) {
+        if (name == null) return null;
+        Integer i = index.get(name);
+        if (i != null) return i;
+        String alt = name.startsWith("chr") ? name.substring(3) : "chr" + name;
+        i = index.get(alt);
+        if (i != null) return i;
+        return index.get(shortName(name));
+    }
+
+    private static void appendArc(Path2D.Double path, double cx, double cy, double r,
+                                  double f0, double f1, int steps) {
+        for (int i = 1; i <= steps; i++) {
+            Point2D p = polar(cx, cy, r, f0 + (f1 - f0) * i / (double) steps);
+            path.lineTo(p.getX(), p.getY());
+        }
+    }
+
+    private static void appendQuad(Path2D.Double path, double cx, double cy, double r,
+                                   double fTo, double qx, double qy) {
+        Point2D to = polar(cx, cy, r, fTo);
+        path.quadTo(qx, qy, to.getX(), to.getY());
     }
 
     private static double clamp01(double v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
