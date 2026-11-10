@@ -1513,8 +1513,30 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             }
         }
 
-        drawStrandArrows(g2, cx, cy, rMid, a, b, strandDir(bf),
-                Math.min(8.0, Math.max(2.0, availH * 0.34)), color);
+        // Direction chevrons sit on the thin intron lines between exons — exactly like IGV's
+        // linear view (IGVFeatureRenderer draws ">>>"/"<<<" on the connecting lines) — instead of
+        // being stamped across the whole transcript (which put them on top of the exon blocks).
+        drawIntronArrows(g2, cx, cy, rMid, f0, span, c, exons, strandDir(bf),
+                Math.min(3.2, Math.max(1.4, availH * 0.16)), color);
+    }
+
+    /** Direction chevrons on the intron lines (between consecutive exons), matching IGV's linear
+     *  gene rendering where the strand markers sit on the thin connecting lines. */
+    private static void drawIntronArrows(Graphics2D g2, double cx, double cy, double r,
+                                         double f0, double span, ChrInfo c,
+                                         List<Exon> exons, int dir, double size, Color color) {
+        if (dir == 0 || size <= 0 || exons == null || exons.size() < 2) return;
+        List<Exon> sorted = new ArrayList<>(exons);
+        sorted.sort(java.util.Comparator.comparingLong(Exon::getStart));
+        for (int i = 0; i + 1 < sorted.size(); i++) {
+            long gs = sorted.get(i).getEnd();
+            long ge = sorted.get(i + 1).getStart();
+            if (ge <= gs) continue;
+            double ga = f0 + span * c.viewFrac(gs);
+            double gb = f0 + span * c.viewFrac(ge);
+            if (arcLength(r, (gb - ga) * 360.0) < 5) continue;   // intron too short for a chevron
+            drawStrandArrows(g2, cx, cy, r, ga, gb, dir, size, color);
+        }
     }
 
     private static long clamp(long v, long lo, long hi) { return v < lo ? lo : (v > hi ? hi : v); }
