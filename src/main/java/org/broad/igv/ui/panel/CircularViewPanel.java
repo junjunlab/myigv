@@ -129,13 +129,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** Minimum angular width (degrees) of a ribbon end. Real BEDPE anchors are only a few kb,
          *  which is sub-pixel on a whole-genome ring, so ribbons would be invisible without this. */
         public double  linkRibbonMinDeg = 0.15;
-        /** Ribbons are filled areas, so they need more opacity than stroked links to read well. */
-        public int     linkRibbonAlpha = 170;
+        /** Ribbons are filled areas, so they need more opacity than stroked links to read well.
+         *  255 = fully opaque, which is the default (transparency 0). */
+        public int     linkRibbonAlpha = 255;
         /** Outline the ribbon: keeps the thin middle of a tapered band visible (Circos stroke_*). */
         public boolean linkRibbonStroke = true;
         public float   linkRibbonStrokeThickness = 0.6f;
         public Color   linkColor = new Color(40, 90, 170);
-        public int     linkAlpha = 110;
+        /** Alpha 0-255. 255 = fully opaque, which is the default (transparency 0). */
+        public int     linkAlpha = 255;
         public float   linkThickness = 1.2f;
         /** Cap on the number of links drawn per frame (Circos {@code record_limit}). */
         public int     linkRecordLimit = 5000;

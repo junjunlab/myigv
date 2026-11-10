@@ -330,12 +330,15 @@ public class IGVContentPane extends JPanel {
         });
         linkApp.add(linkThickness);
 
-        JMenuItem linkAlpha = new JMenuItem("Opacity (0-255)… (" + s.linkAlpha + ")");
+        JMenuItem linkAlpha = new JMenuItem("Link transparency (0 = solid)… (" + (255 - s.linkAlpha) + ")");
+        linkAlpha.setToolTipText("0 draws solid links; raise it to let overlapping links show through.");
         linkAlpha.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(this, "Link opacity (0-255):", s.linkAlpha);
+            String v = JOptionPane.showInputDialog(this,
+                    "Link transparency (0 = solid, 255 = invisible):", 255 - s.linkAlpha);
             if (v != null) {
                 try {
-                    s.linkAlpha = Math.max(0, Math.min(255, Integer.parseInt(v.trim())));
+                    int t = Math.max(0, Math.min(255, Integer.parseInt(v.trim())));
+                    s.linkAlpha = 255 - t;
                     panel.refresh();
                 } catch (NumberFormatException ignore) { }
             }
@@ -398,13 +401,15 @@ public class IGVContentPane extends JPanel {
         });
         linkApp.add(linkMinWidth);
 
-        JMenuItem ribbonAlpha = new JMenuItem("Ribbon opacity (0-255)… (" + s.linkRibbonAlpha + ")");
-        ribbonAlpha.setToolTipText("Filled ribbons need more opacity than thin links to read well.");
+        JMenuItem ribbonAlpha = new JMenuItem("Ribbon transparency (0 = solid)… (" + (255 - s.linkRibbonAlpha) + ")");
+        ribbonAlpha.setToolTipText("0 draws solid ribbons; raise it to let overlaps show through.");
         ribbonAlpha.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(this, "Ribbon opacity (0-255):", s.linkRibbonAlpha);
+            String v = JOptionPane.showInputDialog(this,
+                    "Ribbon transparency (0 = solid, 255 = invisible):", 255 - s.linkRibbonAlpha);
             if (v != null) {
                 try {
-                    s.linkRibbonAlpha = Math.max(0, Math.min(255, Integer.parseInt(v.trim())));
+                    int t = Math.max(0, Math.min(255, Integer.parseInt(v.trim())));
+                    s.linkRibbonAlpha = 255 - t;
                     panel.refresh();
                 } catch (NumberFormatException ignore) { }
             }
