@@ -398,6 +398,22 @@ public class IGVContentPane extends JPanel {
         });
         linkApp.add(linkMinWidth);
 
+        JMenuItem ribbonAlpha = new JMenuItem("Ribbon opacity (0-255)… (" + s.linkRibbonAlpha + ")");
+        ribbonAlpha.setToolTipText("Filled ribbons need more opacity than thin links to read well.");
+        ribbonAlpha.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(this, "Ribbon opacity (0-255):", s.linkRibbonAlpha);
+            if (v != null) {
+                try {
+                    s.linkRibbonAlpha = Math.max(0, Math.min(255, Integer.parseInt(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        linkApp.add(ribbonAlpha);
+
+        linkApp.add(linkCheck("Outline ribbons", s.linkRibbonStroke,
+                v -> { s.linkRibbonStroke = v; panel.refresh(); }));
+
         JMenuItem linkMax = new JMenuItem("Max links… (" + s.linkRecordLimit + ")");
         linkMax.addActionListener(e -> {
             String v = JOptionPane.showInputDialog(this, "Maximum links to draw:", s.linkRecordLimit);

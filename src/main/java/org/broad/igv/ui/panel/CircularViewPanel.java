@@ -129,6 +129,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** Minimum angular width (degrees) of a ribbon end. Real BEDPE anchors are only a few kb,
          *  which is sub-pixel on a whole-genome ring, so ribbons would be invisible without this. */
         public double  linkRibbonMinDeg = 0.15;
+        /** Ribbons are filled areas, so they need more opacity than stroked links to read well. */
+        public int     linkRibbonAlpha = 170;
+        /** Outline the ribbon: keeps the thin middle of a tapered band visible (Circos stroke_*). */
+        public boolean linkRibbonStroke = true;
+        public float   linkRibbonStrokeThickness = 0.6f;
         public Color   linkColor = new Color(40, 90, 170);
         public int     linkAlpha = 110;
         public float   linkThickness = 1.2f;
@@ -151,6 +156,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.linkRadius = linkRadius; s.linkBezierRadius = linkBezierRadius;
             s.linkBezierPurity = linkBezierPurity; s.linkCrest = linkCrest;
             s.linkRibbonMinDeg = linkRibbonMinDeg;
+            s.linkRibbonAlpha = linkRibbonAlpha;
+            s.linkRibbonStroke = linkRibbonStroke;
+            s.linkRibbonStrokeThickness = linkRibbonStrokeThickness;
             s.linkColor = linkColor; s.linkAlpha = linkAlpha;
             s.linkThickness = linkThickness; s.linkRecordLimit = linkRecordLimit;
             s.linkColorByChromosome = linkColorByChromosome;
@@ -1198,9 +1206,6 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             Color base = link.color != null
                     ? link.color
                     : (s.linkColorByChromosome ? pickColor(chrs.get(i1).name, null) : s.linkColor);
-            int alpha = link.color != null
-                    ? Math.min(link.color.getAlpha(), s.linkAlpha) : s.linkAlpha;
-            g2.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), alpha));
 
             // A ribbon's width at each end is that interval's OWN width: a single-point end
             // collapses to a point (the band tapers to a line there), an interval end keeps its
@@ -1208,8 +1213,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             // fall back to a stroked chord.
             boolean point1 = link.end1 - link.start1 <= 1;
             boolean point2 = link.end2 - link.start2 <= 1;
+            boolean ribbon = s.linkRibbon && !(point1 && point2);
 
-            if (s.linkRibbon && !(point1 && point2)) {
+            // Filled areas read much lighter than thin strokes, so ribbons get their own opacity.
+            int alpha = Math.min(link.color != null ? link.color.getAlpha() : 255,
+                    ribbon ? s.linkRibbonAlpha : s.linkAlpha);
+            g2.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), alpha));
+
+            if (ribbon) {
                 double[] e1 = ribbonEnd(a1s, a1e, point1, s.linkRibbonMinDeg);
                 double[] e2 = ribbonEnd(a2s, a2e, point2, s.linkRibbonMinDeg);
                 double b2a = s.linkTwist ? e2[0] : e2[1];
@@ -1223,6 +1234,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 appendQuad(path, cx, cy, rEnd, e1[0], qx, qy);
                 path.closePath();
                 g2.fill(path);
+                if (s.linkRibbonStroke && s.linkRibbonStrokeThickness > 0) {
+                    // A tapered band is only a few pixels wide mid-span; the outline keeps that
+                    // thin section from washing out against the white background.
+                    int strokeAlpha = Math.min(255, alpha + 85);
+                    g2.setStroke(new BasicStroke(s.linkRibbonStrokeThickness,
+                            BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    g2.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), strokeAlpha));
+                    g2.draw(path);
+                }
             } else {
                 g2.setStroke(new BasicStroke(
                         link.thickness > 0 ? link.thickness : s.linkThickness,
