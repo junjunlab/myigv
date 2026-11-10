@@ -3,8 +3,8 @@
 > A customized IGV genome browser: offline annotations, multi-gene panels, GTF-based gene search, auto-indexing and per-panel autoscale.
 
 **myigv** 基于 [IGV 2.19.8](https://github.com/igvteam/igv) 定制，保留 IGV 的全部能力，并针对
-**离线使用**、**多基因对比**与 **Hi-C 染色质构象**三个高频场景做了增强。
-适用于 RNA-seq / ChIP-seq / bigWig / Hi-C 等常见可视化。
+**离线使用**、**多基因对比**、**Hi-C 染色质构象**与 **SSH/SFTP 远程数据**四个高频场景做了增强。
+适用于 RNA-seq / ChIP-seq / bigWig / Hi-C 等常见可视化，也能直接读取服务器上的文件。
 
 ---
 
@@ -27,6 +27,8 @@
 | 13 | **Hi-C 矩阵轨道** | 直读 HiCExplorer `.h5`、cooler `.cool` / `.mcool`、Juicer `.hic`（均支持 `.gz` 包裹），三角形或方形显示，多分辨率随缩放自动切换 |
 | 14 | **TAD 轮廓叠加** | 把 BED 直接画在矩阵上，每个文件独立的线宽、线型、颜色、填充 |
 | 15 | **BEDPE 弧线轨道** | loops / arcs 可视化，圆形、椭圆、贝塞尔三种弧型可选 |
+| 16 | **SSH/SFTP 远程浏览** | 连接 SSH 服务器、浏览远程目录，直接读取其中的轨道（含 Hi-C）；凭据用系统级加密保存 |
+| 17 | **BED 显示箭头** | Feature 轨道右键一键开关，按正负链画方向箭头；缺链信息时弹出提示 |
 
 ---
 
@@ -194,6 +196,32 @@ TAD / domain 的 BED 可以直接画在 Hi-C 热图上，不用在矩阵和 BED 
 - **多文件**：一个 BEDPE 对应一条轨道，多条轨道各自保存样式（弧高模式、弧型、颜色互不影响）。
 - 解析器兼容 **UTF-16LE/BE 带 BOM** 的文件（Windows 下 `Out-File` 的默认编码），
   也接受只有前 6 列（chrom1/start1/end1/chrom2/start2/end2）的极简写法。
+
+## 16. SSH / SFTP 远程数据
+
+不用先把服务器上的文件下载到本地，myigv 可以直连 SSH 服务器、浏览远程目录并**直接读取**其中的轨道：
+
+- **入口**：菜单 **File → Load from SSH Server...**（快捷键 `H`）。
+- **连接**：`Saved` 里可选已保存的服务器；填 `Host` / `Port` / `User` / `Password` 后点 **Test connection** 验证，
+  连接成功后打开远程文件浏览器。
+- **浏览与加载**：文件浏览器用 **Up** 返回上级、双击目录进入；选中一个或多个文件点 **Open** 即加载为轨道。
+  读取走 SFTP 随机访问，支持需要 seek 的格式（BAM/CRAM、bigWig、Hi-C `.cool`/`.mcool`/`.hic` 等）。
+- **凭据**：连接信息保存在 myigv 数据目录的 `ssh-servers.json`，密码用**系统级加密**
+  （Windows DPAPI / macOS 钥匙串），不落明文。
+- **代理兼容**：SSH 默认**显式直连**，即使开启系统代理/VPN 也不会被 HTTP 代理劫持握手
+  （修复了 `-Djava.net.useSystemProxies=true` 下 `connection is closed by foreign host` 的问题）；
+  确需走代理的场景可加 `-Dmyigv.ssh.useSystemProxy=true`。
+
+## 17. Feature 轨道「显示箭头」
+
+BED / GFF 等 Feature 轨道可在右键菜单里按正负链显示方向箭头：
+
+- 右键轨道 → **Show Arrows**（**默认关闭**），勾选后按每个 feature 的 `strand` 画方向箭头。
+- **窄位点**（当前缩放下不足约 6 像素，例如 CTCF 位点）画**定长方向小箭头**：正链 `>`、负链 `<`，
+  任何缩放级别都看得见；**较宽的位点**则在色块内画重复的白色小箭头。
+- **链信息校验**：若文件的链信息列不是合法的 `+` / `-`（解析后全部为「无链」），勾选 `Show Arrows` 时会弹框
+  提示「链信息不符」，避免误以为渲染出错。
+- 取消勾选即恢复普通色块显示。
 
 ---
 
