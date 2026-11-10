@@ -33,6 +33,8 @@ import org.broad.igv.ui.commandbar.IGVCommandBar;
 import org.broad.igv.ui.panel.CircularViewPanel;
 import org.broad.igv.ui.panel.MainPanel;
 import org.broad.igv.ui.panel.TrackPanel;
+import org.broad.igv.track.DataTrack;
+import org.broad.igv.track.FeatureTrack;
 import org.broad.igv.track.Track;
 import org.broad.igv.ui.util.ApplicationStatusBar;
 import org.broad.igv.util.ResourceLocator;
@@ -748,11 +750,33 @@ public class IGVContentPane extends JPanel {
 
         final int[] sel = dataColumnList.getSelectedIndices();
         final java.util.List<CircularViewPanel.TrackRingConfig> cfgs = new ArrayList<>();
+        final java.util.List<CircularViewPanel.TrackRingConfig> featureCfgs = new ArrayList<>();
+        final java.util.List<CircularViewPanel.TrackRingConfig> dataCfgs = new ArrayList<>();
+        final java.util.List<String> ringNames = new ArrayList<>();
         for (int si : sel) {
-            if (si >= 0 && si < dataColumnTracks.size())
-                cfgs.add(circularDrawingArea.getRingConfig(dataColumnTracks.get(si).getName()));
+            if (si < 0 || si >= dataColumnTracks.size()) continue;
+            Track t = dataColumnTracks.get(si);
+            // Only FeatureTrack / DataTrack are drawn on the ring. Other tracks in the list
+            // (e.g. the reference sequence) have no ring band, so they get no ring options.
+            if (!(t instanceof FeatureTrack) && !(t instanceof DataTrack)) continue;
+            CircularViewPanel.TrackRingConfig c =
+                    circularDrawingArea.getRingConfig(t.getName());
+            cfgs.add(c);
+            ringNames.add(t.getName());
+            if (t instanceof FeatureTrack) featureCfgs.add(c);
+            else dataCfgs.add(c);
         }
-        if (cfgs.isEmpty()) return;
+
+        if (cfgs.isEmpty()) {
+            // Nothing selected is rendered on the ring; only the shared link actions apply.
+            JPopupMenu onlyLinks = new JPopupMenu();
+            JMenu linksMenu = new JMenu("Links");
+            addLinkItems(linksMenu.getPopupMenu(), circularDrawingArea);
+            onlyLinks.add(linksMenu);
+            onlyLinks.show(dataColumnList, e.getX(), e.getY());
+            return;
+        }
+
         final CircularViewPanel.TrackRingConfig cfg = cfgs.get(0);
         final int n = cfgs.size();
         final String many = n > 1 ? " (" + n + " tracks)" : "";
@@ -771,63 +795,77 @@ public class IGVContentPane extends JPanel {
         });
         menu.add(height);
 
-        JCheckBoxMenuItem expanded = new JCheckBoxMenuItem("Expanded (stack features)", cfg.expanded);
-        expanded.addActionListener(a -> {
-            for (CircularViewPanel.TrackRingConfig c : cfgs) c.expanded = expanded.isSelected();
-            circularDrawingArea.invalidateRing();
-        });
-        menu.add(expanded);
-
-        JMenu graph = new JMenu("Graph type");
-        ButtonGroup gg = new ButtonGroup();
-        for (String tp : new String[]{"Bar", "Point", "Line", "Heatmap"}) {
-            JRadioButtonMenuItem mi = new JRadioButtonMenuItem(tp, tp.equals(cfg.graphType));
-            mi.addActionListener(a -> {
-                for (CircularViewPanel.TrackRingConfig c : cfgs) c.graphType = tp;
+        // "Expanded" only means something for feature tracks: it stacks overlapping features.
+        if (!featureCfgs.isEmpty()) {
+            JCheckBoxMenuItem expanded = new JCheckBoxMenuItem(
+                    "Expanded (stack features)", featureCfgs.get(0).expanded);
+            expanded.addActionListener(a -> {
+                for (CircularViewPanel.TrackRingConfig c : featureCfgs) c.expanded = expanded.isSelected();
                 circularDrawingArea.invalidateRing();
             });
-            gg.add(mi);
-            graph.add(mi);
+            menu.add(expanded);
         }
-        menu.add(graph);
 
-        JMenu yaxis = new JMenu("Y-axis range");
-        ButtonGroup yg = new ButtonGroup();
-        JRadioButtonMenuItem yPer = new JRadioButtonMenuItem("Per chromosome (default)", !cfg.globalYScale);
-        yPer.addActionListener(a -> {
-            for (CircularViewPanel.TrackRingConfig c : cfgs) c.globalYScale = false;
-            circularDrawingArea.invalidateRing();
-        });
-        JRadioButtonMenuItem yGlobal = new JRadioButtonMenuItem("All chromosomes (unified)", cfg.globalYScale);
-        yGlobal.addActionListener(a -> {
-            for (CircularViewPanel.TrackRingConfig c : cfgs) c.globalYScale = true;
-            circularDrawingArea.invalidateRing();
-        });
-        yg.add(yPer);
-        yg.add(yGlobal);
-        yaxis.add(yPer);
-        yaxis.add(yGlobal);
-        menu.add(yaxis);
+        // Graph type and the two Y-axis options only apply to numeric data tracks
+        // (bigWig / bedGraph); a BED or gene track has no values to scale or plot.
+        if (!dataCfgs.isEmpty()) {
+            final CircularViewPanel.TrackRingConfig dcfg = dataCfgs.get(0);
 
-        JMenu yscale = new JMenu("Y-axis scale (multi-sample)");
-        ButtonGroup ysg = new ButtonGroup();
-        JRadioButtonMenuItem ySelf = new JRadioButtonMenuItem("Self scale (default)", cfg.yGroup == null);
-        ySelf.addActionListener(a -> {
-            for (CircularViewPanel.TrackRingConfig c : cfgs) c.yGroup = null;
-            circularDrawingArea.invalidateRing();
-        });
-        JRadioButtonMenuItem yGroupItem = new JRadioButtonMenuItem(
-                "Group scale (selected" + (n > 1 ? ", " + n + " tracks" : "") + ")", cfg.yGroup != null);
-        yGroupItem.addActionListener(a -> {
-            String gid = "g" + System.nanoTime();
-            for (CircularViewPanel.TrackRingConfig c : cfgs) c.yGroup = gid;
-            circularDrawingArea.invalidateRing();
-        });
-        ysg.add(ySelf);
-        ysg.add(yGroupItem);
-        yscale.add(ySelf);
-        yscale.add(yGroupItem);
-        menu.add(yscale);
+            JMenu graph = new JMenu("Graph type");
+            ButtonGroup gg = new ButtonGroup();
+            for (String tp : new String[]{"Bar", "Point", "Line", "Heatmap"}) {
+                JRadioButtonMenuItem mi = new JRadioButtonMenuItem(tp, tp.equals(dcfg.graphType));
+                mi.addActionListener(a -> {
+                    for (CircularViewPanel.TrackRingConfig c : dataCfgs) c.graphType = tp;
+                    circularDrawingArea.invalidateRing();
+                });
+                gg.add(mi);
+                graph.add(mi);
+            }
+            menu.add(graph);
+
+            JMenu yaxis = new JMenu("Y-axis range");
+            ButtonGroup yg = new ButtonGroup();
+            JRadioButtonMenuItem yPer = new JRadioButtonMenuItem(
+                    "Per chromosome (default)", !dcfg.globalYScale);
+            yPer.addActionListener(a -> {
+                for (CircularViewPanel.TrackRingConfig c : dataCfgs) c.globalYScale = false;
+                circularDrawingArea.invalidateRing();
+            });
+            JRadioButtonMenuItem yGlobal = new JRadioButtonMenuItem(
+                    "All chromosomes (unified)", dcfg.globalYScale);
+            yGlobal.addActionListener(a -> {
+                for (CircularViewPanel.TrackRingConfig c : dataCfgs) c.globalYScale = true;
+                circularDrawingArea.invalidateRing();
+            });
+            yg.add(yPer);
+            yg.add(yGlobal);
+            yaxis.add(yPer);
+            yaxis.add(yGlobal);
+            menu.add(yaxis);
+
+            JMenu yscale = new JMenu("Y-axis scale (multi-sample)");
+            ButtonGroup ysg = new ButtonGroup();
+            JRadioButtonMenuItem ySelf = new JRadioButtonMenuItem(
+                    "Self scale (default)", dcfg.yGroup == null);
+            ySelf.addActionListener(a -> {
+                for (CircularViewPanel.TrackRingConfig c : dataCfgs) c.yGroup = null;
+                circularDrawingArea.invalidateRing();
+            });
+            JRadioButtonMenuItem yGroupItem = new JRadioButtonMenuItem(
+                    "Group scale (selected" + (dataCfgs.size() > 1 ? ", " + dataCfgs.size() + " tracks" : "") + ")",
+                    dcfg.yGroup != null);
+            yGroupItem.addActionListener(a -> {
+                String gid = "g" + System.nanoTime();
+                for (CircularViewPanel.TrackRingConfig c : dataCfgs) c.yGroup = gid;
+                circularDrawingArea.invalidateRing();
+            });
+            ysg.add(ySelf);
+            ysg.add(yGroupItem);
+            yscale.add(ySelf);
+            yscale.add(yGroupItem);
+            menu.add(yscale);
+        }
 
         JMenuItem colorItem = new JMenuItem("Colour…");
         colorItem.addActionListener(a -> {
@@ -842,9 +880,8 @@ public class IGVContentPane extends JPanel {
         menu.addSeparator();
         JMenuItem removeRing = new JMenuItem("Remove track from ring" + many);
         removeRing.addActionListener(a -> {
-            for (int si : sel) {
-                if (si >= 0 && si < dataColumnTracks.size())
-                    circularDrawingArea.removeRingTrack(dataColumnTracks.get(si).getName());
+            for (String name : ringNames) {
+                circularDrawingArea.removeRingTrack(name);
             }
         });
         menu.add(removeRing);
