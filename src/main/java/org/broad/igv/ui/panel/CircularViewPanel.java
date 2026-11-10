@@ -30,10 +30,15 @@ import org.broad.igv.event.IGVEventObserver;
 import org.broad.igv.feature.BasicFeature;
 import org.broad.igv.feature.Cytoband;
 import org.broad.igv.feature.Exon;
+import org.broad.igv.feature.FeatureDB;
+import htsjdk.tribble.NamedFeature;
 import org.broad.igv.feature.Strand;
 import org.broad.igv.feature.genome.Genome;
 import org.broad.igv.feature.genome.GenomeManager;
 import org.broad.igv.Globals;
+import org.broad.igv.ui.IGV;
+import org.broad.igv.lists.GeneList;
+import org.broad.igv.session.Session;
 import org.broad.igv.util.ChromosomeColors;
 
 import javax.swing.*;
@@ -147,6 +152,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public boolean linkColorByChromosome = false;
         /** Anchor links inside the stacked ring bands instead of on top of them. */
         public boolean linkEndsInsideTracks = true;
+        /** Flank (bp) added to each gene interval in gene-list mode so sectors aren't edge-to-edge. */
+        public int     geneFlankBp = 2000;
 
         public CircularSettings copy() {
             CircularSettings s = new CircularSettings();
@@ -170,6 +177,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.linkThickness = linkThickness; s.linkRecordLimit = linkRecordLimit;
             s.linkColorByChromosome = linkColorByChromosome;
             s.linkEndsInsideTracks = linkEndsInsideTracks;
+            s.geneFlankBp = geneFlankBp;
             return s;
         }
 
@@ -196,6 +204,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     private final Set<String> hiddenRingTracks = new HashSet<>();
     private final Map<String, TrackRingConfig> ringConfig = new HashMap<>();
     private final Map<String, List<Feature>> featureCache = new ConcurrentHashMap<>();
+    /** Resolved gene features for the current gene-list mode, keyed by gene name. */
+    private final Map<String, List<Feature>> geneFeatures = new HashMap<>();
     private final Set<String> pendingLoads = ConcurrentHashMap.newKeySet();
     private final Map<String, float[]> dataCache = new ConcurrentHashMap<>();   // bigWig/bedGraph bins
     private final Set<String> dataPending = ConcurrentHashMap.newKeySet();
@@ -368,7 +378,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
         int gid = System.identityHashCode(genome);
         if (gid != lastGenomeId) {
-            zoom.clear(); rangeZoom.clear(); featureCache.clear(); pendingLoads.clear();
+            zoom.clear(); rangeZoom.clear(); featureCache.clear(); geneFeatures.clear(); pendingLoads.clear();
             loadAttempts.clear(); lastAttemptMs.clear(); trackLoaded.clear();
             dataCache.clear(); dataPending.clear();
             lastGenomeId = gid; ringKey = null;
@@ -390,7 +400,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int bw = Math.max(1, (int) Math.ceil(w * sx));
         int bh = Math.max(1, (int) Math.ceil(h * sy));
 
-        String key = gid + "|" + chr + "|" + bw + "x" + bh;
+        // Gene-list mode takes priority: one sector per gene from the session's current gene list.
+        boolean geneMode = FrameManager.isGeneListMode();
+        String geneSig = "";
+        if (geneMode) {
+            GeneList gl = IGV.getInstance().getSession().getCurrentGeneList();
+            if (gl != null && gl.getLoci() != null) geneSig = "|G" + gl.getLoci().hashCode();
+        }
+        String key = gid + "|" + chr + "|" + bw + "x" + bh + geneSig;
         if (!key.equals(ringKey) || ringImage == null) {
             ringImage = new BufferedImage(bw, bh, BufferedImage.TYPE_INT_ARGB);
             Graphics2D ig = ringImage.createGraphics();
@@ -399,7 +416,18 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             ig.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             ig.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
             ig.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
-            if (Globals.CHR_ALL.equals(chr)) {
+            geneFeatures.clear();
+            if (geneMode) {
+                // One sector per gene; each sector draws its gene's structure (UTR/CDS) even with
+                // no gene track loaded, plus any data tracks anchored to the gene's chromosome.
+                List<ChrInfo> geneChrs = buildGenes(genome, zoom, rangeZoom, settings, geneFeatures);
+                if (geneChrs.isEmpty()) {
+                    drawMessage(ig, w, h, "Gene list empty or no genes recognised");
+                } else {
+                    drawAll(ig, w, h, geneChrs, settings);
+                    drawTrackRings(ig, w, h, geneChrs, settings);
+                }
+            } else if (Globals.CHR_ALL.equals(chr)) {
                 List<ChrInfo> chrs = buildAll(genome, zoom, rangeZoom, settings);
                 drawAll(ig, w, h, chrs, settings);
                 drawTrackRings(ig, w, h, chrs, settings);
@@ -450,6 +478,32 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double theta = Math.atan2(e.getX() - cx, -(e.getY() - cy));
         double frac = theta / (2 * Math.PI);
         if (frac < 0) frac += 1.0;
+
+        if (FrameManager.isGeneListMode()) {
+            // Gene-list mode: zoom the gene sector under the cursor. Ctrl widens/narrows the
+            // sector's arc (like All mode); Shift narrows/widens the visible bp window, anchored
+            // at the cursor (like single-chromosome mode). One gene = one sector.
+            geneFeatures.clear();
+            List<ChrInfo> gchrs = buildGenes(genome, zoom, rangeZoom, settings, geneFeatures);
+            if (gchrs.isEmpty()) return;
+            String target = chromosomeAt(e.getX(), e.getY(), gchrs);
+            if (target == null) return;
+            int idx = indexOf(gchrs, target);
+            if (idx < 0) return;
+            if (ctrl) {
+                double z = zoom.getOrDefault(target, 1.0);
+                z = Math.max(0.25, Math.min(25.0, z * (zoomIn ? 1.12 : 1.0 / 1.12)));
+                zoom.put(target, z);
+            } else {
+                List<double[]> sec = computeSectors(gchrs, settings.gapDeg);
+                double f0 = sec.get(idx)[0], f1 = sec.get(idx)[1];
+                double t = f1 > f0 ? (frac - f0) / (f1 - f0) : 0.5;
+                zoomRange(gchrs.get(idx), Math.max(0, Math.min(1, t)), zoomIn);
+            }
+            ringKey = null;
+            repaint();
+            return;
+        }
 
         if (Globals.CHR_ALL.equals(frameChr)) {
             List<ChrInfo> chrs = buildAll(genome, zoom, rangeZoom, settings);
@@ -666,6 +720,88 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             }
         }
         return new ChrInfo(chr, len, len, cyto, color, vs, ve);
+    }
+
+    /** Flank (bp) added to each gene interval so sectors are not edge-to-edge. */
+    private static final int GENE_FLANK_BP = 2000;
+
+    /**
+     * Gene-list mode: build one sector per gene from the session's current gene list. Each sector
+     * carries its gene name as the display label but resolves data/features from the chromosome the
+     * gene lives on ({@link ChrInfo#realChr}). The sector's angular weight is the (flanked) gene
+     * span, so genes keep their relative size; {@code c.length} stays the real chromosome length
+     * so bigWig bins and feature coordinates map correctly.
+     *
+     * @param arcZoom per-gene arc-width zoom factors (Ctrl+wheel), keyed by gene name (may be null).
+     * @param rangeMap per-gene visible-window overrides (Shift+wheel), keyed by gene name (may be null).
+     * @param geneOut receives the resolved gene features (keyed by gene name) so the structure
+     *               (UTR/CDS) is drawn even when no gene track is loaded.
+     */
+    static List<ChrInfo> buildGenes(Genome genome, Map<String, Double> arcZoom,
+                                   Map<String, double[]> rangeMap,
+                                   CircularSettings s, Map<String, List<Feature>> geneOut) {
+        geneOut.clear();
+        List<ChrInfo> list = new ArrayList<>();
+        if (!FrameManager.isGeneListMode()) return list;
+        GeneList gl = IGV.getInstance().getSession().getCurrentGeneList();
+        if (gl == null) return list;
+        List<String> loci = gl.getLoci();
+        if (loci == null || loci.isEmpty()) return list;
+
+        int flank = (s != null) ? Math.max(0, s.geneFlankBp) : GENE_FLANK_BP;
+        for (String locus : loci) {
+            if (locus == null || locus.trim().isEmpty()) continue;
+            NamedFeature nf = resolveLocus(genome, locus.trim());
+            if (nf == null) continue;
+            String chr = nf.getChr();
+            org.broad.igv.feature.Chromosome c = genome.getChromosome(chr);
+            if (c == null) continue;
+            long clen = c.getLength();
+            long gs = nf.getStart(), ge = nf.getEnd();
+            if (ge <= gs) continue;
+            long vs = Math.max(0, gs - flank);
+            long ve = Math.min(clen, ge + flank);
+            double z = (arcZoom != null) ? arcZoom.getOrDefault(locus, 1.0) : 1.0;
+            double weight = Math.max(1, (ve - vs) * z);
+            Color color = pickColor(locus, null);
+
+            if (nf instanceof Feature) {
+                geneOut.put(locus, Collections.singletonList((Feature) nf));
+            }
+
+            double rvs = vs, rve = ve;
+            if (rangeMap != null) {
+                double[] r = rangeMap.get(locus);
+                if (r != null && r[1] > r[0]) {
+                    // Clamp the zoomed window to the (flanked) gene interval so zooming out in
+                    // gene mode never escapes into chromosome-wide context.
+                    rvs = Math.max(vs, Math.min(ve, Math.max(0, r[0])));
+                    rve = Math.min(ve, Math.max(vs, Math.min(clen, r[1])));
+                }
+            }
+            list.add(new ChrInfo(locus, clen, weight, null, color, rvs, rve, chr));
+        }
+        return list;
+    }
+
+    /** Resolve a gene-list entry to a feature: by name via FeatureDB, else as a chr:start-end locus. */
+    private static NamedFeature resolveLocus(Genome genome, String locus) {
+        NamedFeature nf = FeatureDB.getFeature(locus.toUpperCase());
+        if (nf != null) return nf;
+        int colon = locus.indexOf(':');
+        if (colon > 0) {
+            String chr = locus.substring(0, colon);
+            if (genome.getChromosome(chr) == null) return null;
+            int dash = locus.indexOf('-', colon);
+            try {
+                long st = Long.parseLong(locus.substring(colon + 1, dash > 0 ? dash : locus.length()).replace(",", ""));
+                long en = dash > 0 ? Long.parseLong(locus.substring(dash + 1).replace(",", "")) : st + 1;
+                return new BasicFeature(chr, (int) st, (int) en);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     // ------------------------------------------------------------------
@@ -1082,7 +1218,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         for (Track t : ringTracks) {
             if (!(t instanceof DataTrack)) continue;
             for (ChrInfo c : chrs) {
-                float[] b = dataCache.get(t.getName() + "|" + c.name);
+                float[] b = dataCache.get(t.getName() + "|" + c.chrKey());
                 if (b == null) continue;
                 for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < mn) mn = v; if (v > mx) mx = v; }
             }
@@ -1100,7 +1236,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             float[] r = map.get(cfg.yGroup);
             if (r == null) { r = new float[]{Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY}; map.put(cfg.yGroup, r); }
             for (ChrInfo c : chrs) {
-                float[] b = dataCache.get(t.getName() + "|" + c.name);
+                float[] b = dataCache.get(t.getName() + "|" + c.chrKey());
                 if (b == null) continue;
                 for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < r[0]) r[0] = v; if (v > r[1]) r[1] = v; }
             }
@@ -1122,7 +1258,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             gmx = shared[1];
         } else if (global) {
             for (ChrInfo c : chrs) {
-                float[] b = dataCache.get(track.getName() + "|" + c.name);
+                float[] b = dataCache.get(track.getName() + "|" + c.chrKey());
                 if (b == null) continue;
                 for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < gmn) gmn = v; if (v > gmx) gmx = v; }
             }
@@ -1130,7 +1266,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         }
 
         for (int i = 0; i < chrs.size(); i++) {
-            float[] b = dataCache.get(track.getName() + "|" + chrs.get(i).name);
+            float[] b = dataCache.get(track.getName() + "|" + chrs.get(i).chrKey());
             if (b == null) continue;
             ChrInfo c = chrs.get(i);
             double len = Math.max(1, c.length);
@@ -1205,8 +1341,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     /** Draw a feature track's features inside one concentric band (collapsed or expanded rows). */
     private void drawFeatures(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
                               List<ChrInfo> chrs, List<double[]> sec, FeatureTrack ft, TrackRingConfig cfg) {
+        // Gene-list mode (one sector per gene) stashes the resolved gene under its name so the
+        // structure shows even when no gene track is loaded; otherwise fall back to the cache.
         drawFeatureBand(g2, cx, cy, bandInner, bandOuter, chrs, sec, cfg,
-                name -> featureCache.get(ft.getName() + "|" + name));
+                name -> {
+                    java.util.List<Feature> g = geneFeatures.get(name);
+                    return g != null ? g : featureCache.get(ft.getName() + "|" + name);
+                });
     }
 
     /** Static core of the feature-band drawing (also used by the headless render probe). */
@@ -1220,6 +1361,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
         for (int i = 0; i < chrs.size(); i++) {
             ChrInfo c = chrs.get(i);
+            // In gene-list mode c.name is the gene name (features are stashed by name); in normal
+            // mode c.name and c.chrKey() are identical, so this lookup resolves both cases.
             List<Feature> list = featsFn.apply(c.name);
             if (list == null || list.isEmpty()) continue;
             double f0 = sec.get(i)[0], f1 = sec.get(i)[1], span = f1 - f0;
@@ -1829,26 +1972,44 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** Visible bp window inside this chromosome; the whole chromosome by default. */
         final double viewStart;
         final double viewEnd;
+        /**
+         * The real chromosome that supplies data/features/cytobands for this sector. Null means
+         * the sector's own {@link #name} is the chromosome (normal "All"/single modes). In the
+         * gene-list mode each sector is a gene interval but its data comes from the chromosome
+         * the gene lives on.
+         */
+        final String realChr;
 
         public ChrInfo(String name, long length, List<Cytoband> cytobands, Color color) {
-            this(name, length, length, cytobands, color);
+            this(name, length, length, cytobands, color, 0, length, null);
         }
 
         public ChrInfo(String name, long length, double weight, List<Cytoband> cytobands, Color color) {
-            this(name, length, weight, cytobands, color, 0, length);
+            this(name, length, weight, cytobands, color, 0, length, null);
         }
 
         public ChrInfo(String name, long length, double weight, List<Cytoband> cytobands, Color color,
                        double viewStart, double viewEnd) {
+            this(name, length, weight, cytobands, color, viewStart, viewEnd, null);
+        }
+
+        public ChrInfo(String name, long length, double weight, List<Cytoband> cytobands, Color color,
+                       double viewStart, double viewEnd, String realChr) {
             this.name = name;
             this.length = length;
             this.weight = weight;
             this.cytobands = cytobands;
             this.color = color;
+            this.realChr = realChr;
             double s = Math.max(0, Math.min(viewStart, length));
             double e = Math.max(s + 1, Math.min(viewEnd, length));
             this.viewStart = s;
             this.viewEnd = e;
+        }
+
+        /** Key used to look up data/features: the real chromosome, or the sector name. */
+        String chrKey() {
+            return realChr != null ? realChr : name;
         }
 
         /** bp length covered by the visible window. */
