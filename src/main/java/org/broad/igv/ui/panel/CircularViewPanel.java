@@ -165,6 +165,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public String graphType = "Bar";
         /** Y-axis range: false = per-chromosome scale (default), true = global across all chromosomes. */
         public boolean globalYScale = false;
+        /** Non-null = this track shares a Y range with tracks of the same group id (group scale). */
+        public String yGroup = null;
     }
 
     public CircularViewPanel() {
@@ -729,12 +731,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (R <= 20) return;
         double cursor = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx) - 5;
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
-        float[] shared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
+        float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
+        java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
         for (Track t : ringTracks) {                       // order == top->bottom == outer->inner
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor;
             double bandInner = bandOuter - cfg.heightPx;
             if (bandInner < 24) break;
+            float[] shared = cfg.yGroup != null ? groups.get(cfg.yGroup) : globalShared;
             drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg, shared);
             cursor = bandInner - 5;
         }
@@ -749,11 +753,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         List<ChrInfo> chrs = Collections.singletonList(chr);
         List<double[]> sec = new ArrayList<>();
         sec.add(new double[]{0.0, 1.0, 360.0});
-        float[] shared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
+        float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
+        java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
         for (Track t : ringTracks) {
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor, bandInner = bandOuter - cfg.heightPx;
             if (bandInner < 24) break;
+            float[] shared = cfg.yGroup != null ? groups.get(cfg.yGroup) : globalShared;
             drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg, shared);
             cursor = bandInner - 5;
         }
@@ -817,6 +823,24 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             }
         }
         return mn == Float.POSITIVE_INFINITY ? null : new float[]{mn, mx};
+    }
+
+    /** Y ranges per shared group id (tracks with the same cfg.yGroup share one range). */
+    private java.util.Map<String, float[]> computeGroupRanges(List<ChrInfo> chrs) {
+        java.util.Map<String, float[]> map = new java.util.HashMap<>();
+        for (Track t : ringTracks) {
+            if (!(t instanceof DataTrack)) continue;
+            TrackRingConfig cfg = getRingConfig(t.getName());
+            if (cfg.yGroup == null) continue;
+            float[] r = map.get(cfg.yGroup);
+            if (r == null) { r = new float[]{Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY}; map.put(cfg.yGroup, r); }
+            for (ChrInfo c : chrs) {
+                float[] b = dataCache.get(t.getName() + "|" + c.name);
+                if (b == null) continue;
+                for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < r[0]) r[0] = v; if (v > r[1]) r[1] = v; }
+            }
+        }
+        return map;
     }
 
     /** Draw a continuous data track (bigWig/bedGraph) as Bar / Point / Line / Heatmap. */

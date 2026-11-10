@@ -515,6 +515,26 @@ public class IGVContentPane extends JPanel {
         yaxis.add(yGlobal);
         menu.add(yaxis);
 
+        JMenu yscale = new JMenu("Y-axis scale (multi-sample)");
+        ButtonGroup ysg = new ButtonGroup();
+        JRadioButtonMenuItem ySelf = new JRadioButtonMenuItem("Self scale (default)", cfg.yGroup == null);
+        ySelf.addActionListener(a -> {
+            for (CircularViewPanel.TrackRingConfig c : cfgs) c.yGroup = null;
+            circularDrawingArea.invalidateRing();
+        });
+        JRadioButtonMenuItem yGroupItem = new JRadioButtonMenuItem(
+                "Group scale (selected" + (n > 1 ? ", " + n + " tracks" : "") + ")", cfg.yGroup != null);
+        yGroupItem.addActionListener(a -> {
+            String gid = "g" + System.nanoTime();
+            for (CircularViewPanel.TrackRingConfig c : cfgs) c.yGroup = gid;
+            circularDrawingArea.invalidateRing();
+        });
+        ysg.add(ySelf);
+        ysg.add(yGroupItem);
+        yscale.add(ySelf);
+        yscale.add(yGroupItem);
+        menu.add(yscale);
+
         JMenuItem colorItem = new JMenuItem("Colour…");
         colorItem.addActionListener(a -> {
             Color c = JColorChooser.showDialog(this, "Track colour", cfg.color);
