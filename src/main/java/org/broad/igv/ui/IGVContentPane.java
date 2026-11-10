@@ -388,17 +388,15 @@ public class IGVContentPane extends JPanel {
         List<Track> tracks = igv.getAllTracks();
         DefaultListModel<String> model = new DefaultListModel<>();
         dataColumnTracks.clear();
-        List<Track> featureTracks = new ArrayList<>();
         if (tracks != null) {
             for (Track t : tracks) {
                 model.addElement(t.getDisplayName());
                 dataColumnTracks.add(t);
-                if (t instanceof org.broad.igv.track.FeatureTrack) featureTracks.add(t);
             }
         }
         if (model.isEmpty()) model.addElement("(no tracks loaded)");
         dataColumnList.setModel(model);
-        circularDrawingArea.setRingTracks(featureTracks);
+        circularDrawingArea.setRingTracks(new ArrayList<>(dataColumnTracks));   // ordered top->bottom
     }
 
     /** Right-click popup on the data column: per-track ring band height + collapse/expand. */

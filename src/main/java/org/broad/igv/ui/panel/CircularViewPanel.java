@@ -41,7 +41,9 @@ import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import htsjdk.tribble.Feature;
+import org.broad.igv.track.DataTrack;
 import org.broad.igv.track.FeatureTrack;
+import org.broad.igv.track.RegionScoreType;
 import org.broad.igv.track.Track;
 
 import java.util.ArrayList;
@@ -135,6 +137,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     private final Map<String, TrackRingConfig> ringConfig = new HashMap<>();
     private final Map<String, List<Feature>> featureCache = new ConcurrentHashMap<>();
     private final Set<String> pendingLoads = ConcurrentHashMap.newKeySet();
+    private final Map<String, float[]> dataCache = new ConcurrentHashMap<>();   // bigWig/bedGraph bins
+    private final Set<String> dataPending = ConcurrentHashMap.newKeySet();
+    private static final int DATA_BINS = 300;                                    // bins per chromosome
     private final Map<String, Integer> loadAttempts = new HashMap<>();
     private final Map<String, Long> lastAttemptMs = new HashMap<>();
     private final Map<String, Boolean> trackLoaded = new HashMap<>();
@@ -188,7 +193,24 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     @Override
-    public void receiveEvent(IGVEvent event) { repaint(); }
+    public void receiveEvent(IGVEvent event) {
+        if (event instanceof org.broad.igv.event.RefreshEvent) {
+            // A refresh means IGV (re)loaded data. Purge cached EMPTY feature results so those
+            // chromosomes are refetched — this is what fills in a track that was only partially
+            // parsed when we first queried it (e.g. only chrX had data).
+            List<String> empties = new ArrayList<>();
+            for (Map.Entry<String, List<Feature>> e : featureCache.entrySet()) {
+                if (e.getValue() == null || e.getValue().isEmpty()) empties.add(e.getKey());
+            }
+            if (!empties.isEmpty()) {
+                for (String k : empties) featureCache.remove(k);
+                loadAttempts.clear();
+                lastAttemptMs.clear();
+                ringKey = null;
+            }
+        }
+        repaint();
+    }
 
     // ------------------------------------------------------------------
     //  Painting
@@ -214,6 +236,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (gid != lastGenomeId) {
             zoom.clear(); featureCache.clear(); pendingLoads.clear();
             loadAttempts.clear(); lastAttemptMs.clear(); trackLoaded.clear();
+            dataCache.clear(); dataPending.clear();
             lastGenomeId = gid; ringKey = null;
         }
 
@@ -221,6 +244,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (chr == null || chr.isEmpty()) chr = genome.getHomeChromosome();
 
         ensureFeaturesLoaded(genome);
+        ensureDataLoaded(genome);
 
         // Render the offscreen ring at DEVICE resolution so it stays crisp on HiDPI
         // (Windows 125/150/200% scaling). The component is w x h logical pixels; the
@@ -589,9 +613,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     public void setRingTracks(List<Track> tracks) {
         ringTracks.clear();
         if (tracks != null) {
-            for (Track t : tracks) if (!hiddenRingTracks.contains(t.getName())) ringTracks.add(t);
+            for (Track t : tracks) {
+                if (hiddenRingTracks.contains(t.getName())) continue;
+                if (t instanceof FeatureTrack || t instanceof DataTrack) ringTracks.add(t);  // order == top->bottom == outer->inner
+            }
         }
-        log.info("Circular ring feature tracks: " + ringTracks.size());
+        log.info("Circular ring tracks: " + ringTracks.size());
         ringKey = null;
         repaint();
     }
@@ -653,11 +680,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                         loadAttempts.remove(key);
                         trackLoaded.put(ft.getName(), Boolean.TRUE);
                         log.info("circular features " + key + " = " + list.size());
-                    } else if (Boolean.TRUE.equals(trackLoaded.get(ft.getName())) || giveUp) {
-                        // Track has produced data for some chromosome (so this chr genuinely has
-                        // none), or we've retried long enough -> cache empty.
+                    } else if (giveUp) {
+                        // Only give up after many attempts. A per-chromosome 0 does NOT mean the
+                        // track is loaded -- non-indexed .txt.gz sources fill chromosomes gradually,
+                        // so an early 0 is usually "not parsed yet". Keep retrying until giveUp,
+                        // and RefreshEvent (data loaded) purges cached empties to refetch.
                         featureCache.put(key, Collections.emptyList());
-                        log.info("circular features " + key + " = 0");
+                        log.info("circular features " + key + " = 0 (give up)");
                     }
                     // else: track data not ready yet -> leave uncached; the retry timer retries.
                     // else: leave uncached so the retry timer tries again (track may still be loading)
@@ -684,13 +713,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (R <= 20) return;
         double cursor = R * s.bandInner - 5;
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
-        for (Track t : ringTracks) {
-            if (!(t instanceof FeatureTrack)) continue;
+        for (Track t : ringTracks) {                       // order == top->bottom == outer->inner
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor;
             double bandInner = bandOuter - cfg.heightPx;
             if (bandInner < 24) break;
-            drawFeatures(g2, cx, cy, bandInner, bandOuter, chrs, sec, (FeatureTrack) t, cfg);
+            drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg);
             cursor = bandInner - 5;
         }
     }
@@ -705,14 +733,96 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         List<double[]> sec = new ArrayList<>();
         sec.add(new double[]{0.0, 1.0, 360.0});
         for (Track t : ringTracks) {
-            if (!(t instanceof FeatureTrack)) continue;
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor, bandInner = bandOuter - cfg.heightPx;
             if (bandInner < 24) break;
-            drawFeatures(g2, cx, cy, bandInner, bandOuter, chrs, sec, (FeatureTrack) t, cfg);
+            drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg);
             cursor = bandInner - 5;
         }
     }
+
+    /** Dispatch one track to the right ring renderer (BED/feature -> marks; bigWig/bedGraph -> heatmap). */
+    private void drawOneRing(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
+                             List<ChrInfo> chrs, List<double[]> sec, Track t, TrackRingConfig cfg) {
+        if (t instanceof FeatureTrack) {
+            drawFeatures(g2, cx, cy, bandInner, bandOuter, chrs, sec, (FeatureTrack) t, cfg);
+        } else if (t instanceof DataTrack) {
+            drawDataRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, (DataTrack) t, cfg);
+        }
+    }
+
+    /** Load per-bin scores for bigWig/bedGraph tracks (background, cached). */
+    private void ensureDataLoaded(Genome genome) {
+        if (genome == null || ringTracks.isEmpty()) return;
+        final String frame = FrameManager.getDefaultFrame().getName();
+        final int zoom = FrameManager.getDefaultFrame().getZoom();
+        for (Track t : ringTracks) {
+            if (!(t instanceof DataTrack)) continue;
+            for (String chr : genome.getLongChromosomeNames()) {
+                org.broad.igv.feature.Chromosome c = genome.getChromosome(chr);
+                if (c == null) continue;
+                if (!settings.shownChromosomes.isEmpty() && !settings.shownChromosomes.contains(chr)) continue;
+                final String key = t.getName() + "|" + chr;
+                if (dataCache.containsKey(key) || !dataPending.add(key)) continue;
+                final int len = c.getLength();
+                featureLoader.submit(() -> {
+                    float[] bins = new float[DATA_BINS];
+                    int binLen = Math.max(1, len / DATA_BINS);
+                    try {
+                        for (int i = 0; i < DATA_BINS; i++) {
+                            int st = i * binLen;
+                            int en = Math.min(len, st + binLen);
+                            if (st >= len) { bins[i] = Float.NaN; continue; }
+                            bins[i] = t.getRegionScore(chr, st, en, zoom, RegionScoreType.SCORE, frame);
+                        }
+                    } catch (Throwable ex) {
+                        java.util.Arrays.fill(bins, Float.NaN);
+                    }
+                    dataCache.put(key, bins);
+                    dataPending.remove(key);
+                    SwingUtilities.invokeLater(this::invalidateRing);
+                });
+            }
+        }
+    }
+
+    /** Draw a continuous data track as a per-bin annular heatmap (value -> colour). */
+    private void drawDataRing(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
+                              List<ChrInfo> chrs, List<double[]> sec, Track track, TrackRingConfig cfg) {
+        float mn = Float.POSITIVE_INFINITY, mx = Float.NEGATIVE_INFINITY;
+        for (ChrInfo c : chrs) {
+            float[] b = dataCache.get(track.getName() + "|" + c.name);
+            if (b == null) continue;
+            for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < mn) mn = v; if (v > mx) mx = v; }
+        }
+        if (mn == Float.POSITIVE_INFINITY) return;
+        if (mx <= mn) mx = mn + 1e-6f;
+        for (int i = 0; i < chrs.size(); i++) {
+            float[] b = dataCache.get(track.getName() + "|" + chrs.get(i).name);
+            if (b == null) continue;
+            double f0 = sec.get(i)[0], span = sec.get(i)[1] - f0;
+            int n = b.length;
+            for (int k = 0; k < n; k++) {
+                float v = b[k];
+                if (Float.isNaN(v) || Float.isInfinite(v)) continue;
+                double a0 = f0 + span * ((double) k / n);
+                double a1 = f0 + span * ((double) (k + 1) / n);
+                g2.setColor(ramp((v - mn) / (mx - mn)));
+                g2.fill(annularPath(cx, cy, bandInner, bandOuter, a0, a1));
+            }
+        }
+    }
+
+    /** White -> deep-blue sequential ramp for data heatmaps. */
+    private static Color ramp(double t) {
+        if (t < 0) t = 0; else if (t > 1) t = 1;
+        int r = (int) Math.round(250 - 215 * t);
+        int g = (int) Math.round(250 - 150 * t);
+        int b = (int) Math.round(250 - 70 * t);
+        return new Color(clamp8(r), clamp8(g), clamp8(b));
+    }
+
+    private static int clamp8(int v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
 
     /** Draw a feature track's features inside one concentric band (collapsed or expanded rows). */
     private void drawFeatures(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
