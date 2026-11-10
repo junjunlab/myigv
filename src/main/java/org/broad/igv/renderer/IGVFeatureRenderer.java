@@ -83,6 +83,7 @@ public class IGVFeatureRenderer extends FeatureRenderer {
 
     int blockHeight = BLOCK_HEIGHT;
     int thinBlockHeight = THIN_BLOCK_HEIGHT;
+    int nonCodingHeight = NON_CODING_HEIGHT;
 
     //Map from Exon to y offset
     //Could use more coordinates, but they are all contained in the Exon
@@ -114,6 +115,9 @@ public class IGVFeatureRenderer extends FeatureRenderer {
         final Track.DisplayMode displayMode = track.getDisplayMode();
         blockHeight = displayMode == Track.DisplayMode.SQUISHED ? BLOCK_HEIGHT / 2 : BLOCK_HEIGHT;
         thinBlockHeight = displayMode == Track.DisplayMode.SQUISHED ? THIN_BLOCK_HEIGHT / 2 : THIN_BLOCK_HEIGHT;
+        // Keep UTR thin relative to CDS in every mode (in squished mode CDS is halved, so halve
+        // the UTR too — otherwise the fixed 8px UTR becomes as tall as, or taller than, the 7px CDS).
+        nonCodingHeight = displayMode == Track.DisplayMode.SQUISHED ? NON_CODING_HEIGHT / 2 : NON_CODING_HEIGHT;
 
         // TODO -- use enum instead of string "Color"
         if ((featureList != null) && (featureList.size() > 0)) {
@@ -485,9 +489,9 @@ public class IGVFeatureRenderer extends FeatureRenderer {
                             blockGraphics,
                             exon,
                             pClippedStart,
-                            curYOffset - NON_CODING_HEIGHT / 2,
+                            curYOffset - nonCodingHeight / 2,
                             pClippedWidth,
-                            NON_CODING_HEIGHT);
+                            nonCodingHeight);
 
                 } else {
                     // Exon contains 5' UTR -- draw non-coding part
@@ -499,9 +503,9 @@ public class IGVFeatureRenderer extends FeatureRenderer {
                                 blockGraphics,
                                 exon,
                                 pClippedStart,
-                                curYOffset - NON_CODING_HEIGHT / 2,
+                                curYOffset - nonCodingHeight / 2,
                                 pClippedWidth,
-                                NON_CODING_HEIGHT);
+                                nonCodingHeight);
                         pStart = pCdStart;
                     }
                     //  Exon contains 3' UTR  -- draw non-coding part
@@ -513,8 +517,8 @@ public class IGVFeatureRenderer extends FeatureRenderer {
                                 blockGraphics,
                                 exon,
                                 pClippedStart,
-                                curYOffset - NON_CODING_HEIGHT / 2,
-                                pClippedWidth, NON_CODING_HEIGHT);
+                                curYOffset - nonCodingHeight / 2,
+                                pClippedWidth, nonCodingHeight);
                         pEnd = pCdEnd;
                     }
                     // At least part of this exon is coding.  Draw the coding part.
