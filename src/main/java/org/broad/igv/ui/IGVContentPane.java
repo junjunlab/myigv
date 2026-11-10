@@ -132,6 +132,23 @@ public class IGVContentPane extends JPanel {
 
         updateViewLayout();
 
+        // Test hook: enable the circular view AFTER construction (IGV.contentPane is assigned by
+        // then). Enabling during construction would NPE in igv.getAllTracks().
+        if (Boolean.getBoolean("myigv.circular.autotest")) {
+            SwingUtilities.invokeLater(() -> setShowCircularView(true));
+        }
+
+        // Keep the ring's track list in sync with the loaded tracks (genome / track changes),
+        // regardless of which events fire: cheap poll every 2s.
+        javax.swing.Timer trackSync = new javax.swing.Timer(2000, e -> {
+            try {
+                java.util.List<Track> now = igv.getAllTracks();
+                if (now != null && now.size() != dataColumnTracks.size()) refreshDataColumn();
+            } catch (Throwable ignore) { }
+        });
+        trackSync.setRepeats(true);
+        trackSync.start();
+
         statusBar = new ApplicationStatusBar();
         statusBar.setDebugGraphicsOptions(javax.swing.DebugGraphics.NONE_OPTION);
         add(statusBar, BorderLayout.SOUTH);
@@ -384,7 +401,7 @@ public class IGVContentPane extends JPanel {
     }
 
     public void refreshDataColumn() {
-        if (igv == null) return;
+        if (igv == null || igv.getContentPane() == null) return;   // during construction contentPane is null
         List<Track> tracks = igv.getAllTracks();
         DefaultListModel<String> model = new DefaultListModel<>();
         dataColumnTracks.clear();
