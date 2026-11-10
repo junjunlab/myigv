@@ -113,6 +113,8 @@ public class IGVContentPane extends JPanel {
 
         circularPanel = new JPanel(new BorderLayout());
         circularPanel.setBorder(BorderFactory.createTitledBorder("Circular View"));
+        // Parameter toolbar at the top of the circular view panel (ticks / labels / spacing).
+        circularPanel.add(buildCircularToolbar(circularDrawingArea), BorderLayout.NORTH);
         circularPanel.add(circularSplit, BorderLayout.CENTER);
 
         updateViewLayout();
@@ -210,6 +212,50 @@ public class IGVContentPane extends JPanel {
         sp.setResizeWeight(resizeWeight);
         sp.setOneTouchExpandable(false);
         sp.setContinuousLayout(true);
+    }
+
+    /**
+     * Parameter toolbar at the top of the Circular View panel: quick tick/label controls
+     * plus a full "Circular View Settings…" dialog.
+     */
+    private JComponent buildCircularToolbar(CircularViewPanel panel) {
+        CircularViewPanel.CircularSettings s = panel.getSettings();
+        JToolBar bar = new JToolBar();
+        bar.setFloatable(false);
+        bar.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
+
+        JButton settingsBtn = new JButton("Settings…");
+        settingsBtn.addActionListener(e -> panel.showSettingsDialog(SwingUtilities.getWindowAncestor(panel)));
+        bar.add(settingsBtn);
+
+        JButton resetBtn = new JButton("Reset zoom");
+        resetBtn.addActionListener(e -> panel.resetZoom());
+        bar.add(resetBtn);
+        bar.addSeparator();
+
+        bar.add(new JLabel("Ticks:"));
+        JComboBox<String> pos = new JComboBox<>(new String[]{"Outside", "Inside"});
+        pos.setSelectedIndex(s.tickLabelsOutside ? 0 : 1);
+        pos.addActionListener(e -> { s.tickLabelsOutside = pos.getSelectedIndex() == 0; panel.refresh(); });
+        bar.add(pos);
+
+        bar.add(new JLabel("Labels:"));
+        JComboBox<String> orient = new JComboBox<>(new String[]{"Tangential", "Radial"});
+        orient.setSelectedIndex(s.labelTangential ? 0 : 1);
+        orient.addActionListener(e -> { s.labelTangential = orient.getSelectedIndex() == 0; panel.refresh(); });
+        bar.add(orient);
+
+        bar.add(new JLabel("Spacing(Mb):"));
+        JSpinner sp = new JSpinner(new SpinnerNumberModel(s.tickSpacingMb, 0.0, 5000.0, 10.0));
+        sp.setMaximumSize(new Dimension(90, 28));
+        sp.addChangeListener(e -> { s.tickSpacingMb = ((Number) sp.getValue()).doubleValue(); panel.refresh(); });
+        bar.add(sp);
+
+        JCheckBox chrLbl = new JCheckBox("Chr labels", s.showChromosomeLabels);
+        chrLbl.addActionListener(e -> { s.showChromosomeLabels = chrLbl.isSelected(); panel.refresh(); });
+        bar.add(chrLbl);
+
+        return bar;
     }
 
     /**

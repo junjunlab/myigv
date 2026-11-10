@@ -46,39 +46,64 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Circular / ring genome view, drawn in the classic Circos ideogram style.
+ * Circular / ring genome view, drawn in the classic Circos ideogram style, with configurable
+ * ticks / labels (parameters mirror Circos "ticks" settings).
  *
  * <ul>
  *   <li>"All" (whole genome): every chromosome is a cytoband-striped ideogram arc, scaled by
- *       length, grouped clockwise around the ring with gaps. Rotated chromosome numbers sit
- *       outside; small 0Mb/NMb tick labels run along each band (tangential, as in Circos).</li>
- *   <li>Single chromosome: a full 360&deg; ideogram ring with the same tick labels.</li>
- *   <li>Ctrl + mouse-wheel over a chromosome (in "All" mode) zooms that chromosome's sector
- *       in/out; the extra space is taken from / given back to the other chromosomes.</li>
- *   <li>If a species has no cytoband (karyotype) data, chromosomes are drawn as solid colour
- *       blocks instead of striped ideograms.</li>
+ *       length, grouped clockwise around the ring with gaps.</li>
+ *   <li>Single chromosome: a full 360&deg; ideogram ring.</li>
+ *   <li>Ctrl + mouse-wheel over a chromosome sector ("All" mode) zooms that chromosome.</li>
+ *   <li>No cytoband (karyotype) data -> solid colour blocks.</li>
  * </ul>
  *
- * <p>The geometry follows Circos conventions (clockwise from the top; tick labels tangential
- * and placed just inside the band, i.e. {@code orientation = in}). Core draw routines are
- * static and take a plain {@link ChrInfo} list so they can be exercised headlessly.</p>
+ * <p>Cytoband colours use circlize's exact {@code cytoband.col} palette
+ * (R/genomic_utils.R: gneg white, gpos25/50 = 200, gpos33 210, gpos66 160, gpos75 130,
+ * gpos100 black, gvar 220, acen 217,47,39, stalk 100,127,164). Tick placement follows
+ * Circos {@code draw_ticks}: {@code orientation=out} puts labels outside the band, and
+ * {@code label_tangential} keeps them parallel to the circle.</p>
  */
 public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
-    private static final double BAND_INNER = 0.78;
-    private static final double BAND_OUTER = 0.90;
-    private static final int    MARGIN     = 44;    // room for rotated labels outside
-    private static final double GAP_DEG    = 1.5;   // gap between chromosomes ("All")
+    private static final int MARGIN = 56;   // room for labels outside the ring
 
     private static final Color BG = Color.WHITE;
-    private static final Color CENTROMERE = new Color(200, 30, 30);
-    private static final Color NO_CYTO_FALLBACK = new Color(190, 190, 190);
 
-    /** Per-chromosome zoom factors (Ctrl+wheel in "All" mode). Keyed by chromosome name. */
+    /** User-configurable rendering parameters. */
+    public static class CircularSettings {
+        public boolean showTicks = true;
+        public boolean showTickLabels = true;
+        public boolean tickLabelsOutside = true;   // orientation "out" (coords above the band)
+        public double  tickSpacingMb = 0;           // 0 = auto (~3 ticks/chromosome)
+        public int     tickLabelSize = 7;
+        public boolean showChromosomeLabels = true;
+        public int     chromosomeLabelSize = 12;
+        public boolean labelTangential = true;       // tangential (circos label_tangential) vs radial
+        public double  bandInner = 0.78;
+        public double  bandOuter = 0.90;
+        public double  gapDeg = 1.5;
+
+        public CircularSettings copy() {
+            CircularSettings s = new CircularSettings();
+            s.showTicks = showTicks; s.showTickLabels = showTickLabels;
+            s.tickLabelsOutside = tickLabelsOutside; s.tickSpacingMb = tickSpacingMb;
+            s.tickLabelSize = tickLabelSize; s.showChromosomeLabels = showChromosomeLabels;
+            s.chromosomeLabelSize = chromosomeLabelSize; s.labelTangential = labelTangential;
+            s.bandInner = bandInner; s.bandOuter = bandOuter; s.gapDeg = gapDeg;
+            return s;
+        }
+
+        long tickStepBp(long chromosomeLength) {
+            if (tickSpacingMb > 0) return Math.max(1, Math.round(tickSpacingMb * 1_000_000.0));
+            return niceStep(chromosomeLength, 3);
+        }
+    }
+
+    private final CircularSettings settings = new CircularSettings();
+
+    /** Per-chromosome zoom factors (Ctrl+wheel in "All" mode). */
     private final Map<String, Double> zoom = new HashMap<>();
 
-    // Offscreen cache: the ring only depends on (genome, chromosome, panel size, zoom), not
-    // on pan/zoom of the linear view, so avoid re-rendering thousands of segments per refresh.
     private BufferedImage ringImage;
     private String ringKey;
     private int lastGenomeId = 0;
@@ -91,10 +116,24 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         addMouseWheelListener(this::handleWheel);
     }
 
-    @Override
-    public void receiveEvent(IGVEvent event) {
+    /** Current settings (for the settings dialog / callers). */
+    public CircularSettings getSettings() { return settings; }
+
+    /** Clear all per-chromosome zoom factors. */
+    public void resetZoom() {
+        zoom.clear();
+        ringKey = null;
         repaint();
     }
+
+    /** Force a redraw after settings changed (settings are read live during paint). */
+    public void refresh() {
+        ringKey = null;
+        repaint();
+    }
+
+    @Override
+    public void receiveEvent(IGVEvent event) { repaint(); }
 
     // ------------------------------------------------------------------
     //  Painting
@@ -117,11 +156,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         }
 
         int gid = System.identityHashCode(genome);
-        if (gid != lastGenomeId) {          // new genome -> drop stale zoom
-            zoom.clear();
-            lastGenomeId = gid;
-            ringKey = null;
-        }
+        if (gid != lastGenomeId) { zoom.clear(); lastGenomeId = gid; ringKey = null; }
 
         String chr = FrameManager.getDefaultFrame().getChrName();
         if (chr == null || chr.isEmpty()) chr = genome.getHomeChromosome();
@@ -133,11 +168,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             ig.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             ig.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             if (Globals.CHR_ALL.equals(chr)) {
-                drawAll(ig, w, h, buildAll(genome, zoom));
+                drawAll(ig, w, h, buildAll(genome, zoom), settings);
             } else {
                 ChrInfo one = buildOne(genome, chr);
                 if (one == null) drawMessage(ig, w, h, "Chromosome not found: " + chr);
-                else drawSingle(ig, w, h, one);
+                else drawSingle(ig, w, h, one, settings);
             }
             ig.dispose();
             ringKey = key;
@@ -146,54 +181,115 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     // ------------------------------------------------------------------
-    //  Ctrl + wheel -> zoom the hovered chromosome sector ("All" mode only)
+    //  Ctrl + wheel -> zoom hovered chromosome sector ("All" mode)
     // ------------------------------------------------------------------
 
     private void handleWheel(MouseWheelEvent e) {
-        if (!e.isControlDown()) return;                 // plain wheel is ignored
+        if (!e.isControlDown()) return;
         Genome genome = GenomeManager.getInstance().getCurrentGenome();
         if (genome == null) return;
-        String cur = FrameManager.getDefaultFrame().getChrName();
-        if (!Globals.CHR_ALL.equals(cur)) return;       // only in the whole-genome ring
+        if (!Globals.CHR_ALL.equals(FrameManager.getDefaultFrame().getChrName())) return;
 
         String target = chromosomeAt(e.getX(), e.getY(), genome);
         if (target == null) return;
 
         double z = zoom.getOrDefault(target, 1.0);
-        double f = e.getWheelRotation() < 0 ? 1.12 : 1.0 / 1.12;  // wheel up = zoom in
+        double f = e.getWheelRotation() < 0 ? 1.12 : 1.0 / 1.12;
         z = Math.max(0.25, Math.min(25.0, z * f));
         zoom.put(target, z);
-        ringKey = null;                                 // invalidate cache
+        ringKey = null;
         repaint();
     }
 
-    /** Which chromosome sector the point falls in (angle-based), or null. */
     private String chromosomeAt(int x, int y, Genome genome) {
         List<ChrInfo> chrs = buildAll(genome, zoom);
         if (chrs.isEmpty()) return null;
         int cx = getWidth() / 2, cy = getHeight() / 2;
         double R = Math.min(getWidth(), getHeight()) / 2.0 - MARGIN;
         if (R <= 0) return null;
-        double rIn = R * BAND_INNER, rOut = R * BAND_OUTER;
+        double rIn = R * settings.bandInner, rOut = R * settings.bandOuter;
 
-        double dx = x - cx, dy = y - cy;
-        double r = Math.hypot(dx, dy);
-        if (r < rIn * 0.6 || r > R + MARGIN) return null;    // must hover the ring region
+        double dx = x - cx, dy = y - cy, r = Math.hypot(dx, dy);
+        if (r < rIn * 0.6 || r > R + MARGIN) return null;
 
-        double theta = Math.atan2(dx, -dy);                  // clockwise from top
+        double theta = Math.atan2(dx, -dy);
         double frac = theta / (2 * Math.PI);
         if (frac < 0) frac += 1.0;
 
-        List<double[]> sec = computeSectors(chrs);
+        List<double[]> sec = computeSectors(chrs, settings.gapDeg);
         for (int i = 0; i < chrs.size(); i++) {
-            double[] s = sec.get(i);
-            if (frac >= s[0] && frac < s[1]) return chrs.get(i).name;
+            if (frac >= sec.get(i)[0] && frac < sec.get(i)[1]) return chrs.get(i).name;
         }
         return null;
     }
 
     // ------------------------------------------------------------------
-    //  Genome -> ChrInfo list (with zoom-weighted allocation)
+    //  Settings dialog  (opened from the in-panel toolbar)
+    // ------------------------------------------------------------------
+
+    public void showSettingsDialog(Component parent) {
+        final CircularSettings s = settings;
+
+        JCheckBox cbTicks = new JCheckBox("Show tick marks", s.showTicks);
+        JCheckBox cbTickLabels = new JCheckBox("Show tick labels", s.showTickLabels);
+        JCheckBox cbChrLabels = new JCheckBox("Show chromosome labels", s.showChromosomeLabels);
+        JComboBox<String> cbPos = new JComboBox<>(new String[]{"Outside (above the band)", "Inside (below the band)"});
+        cbPos.setSelectedIndex(s.tickLabelsOutside ? 0 : 1);
+        JSpinner spSpace = new JSpinner(new SpinnerNumberModel(s.tickSpacingMb, 0.0, 5000.0, 10.0));
+        JSpinner spTickSize = new JSpinner(new SpinnerNumberModel(s.tickLabelSize, 4, 24, 1));
+        JSpinner spChrSize = new JSpinner(new SpinnerNumberModel(s.chromosomeLabelSize, 6, 30, 1));
+        JComboBox<String> cbOrient = new JComboBox<>(new String[]{"Tangential", "Radial"});
+        cbOrient.setSelectedIndex(s.labelTangential ? 0 : 1);
+        JSpinner spInner = new JSpinner(new SpinnerNumberModel(s.bandInner, 0.40, 0.85, 0.01));
+        JSpinner spOuter = new JSpinner(new SpinnerNumberModel(s.bandOuter, 0.60, 0.99, 0.01));
+        JSpinner spGap = new JSpinner(new SpinnerNumberModel(s.gapDeg, 0.0, 8.0, 0.1));
+
+        JPanel p = new JPanel();
+        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+        p.add(cbTicks);
+        p.add(cbTickLabels);
+        p.add(cbChrLabels);
+        p.add(row("Tick label position:", cbPos));
+        p.add(row("Tick spacing (Mb, 0 = auto):", spSpace));
+        p.add(row("Tick label size:", spTickSize));
+        p.add(row("Chromosome label size:", spChrSize));
+        p.add(row("Label orientation:", cbOrient));
+        p.add(row("Band inner radius (0–1):", spInner));
+        p.add(row("Band outer radius (0–1):", spOuter));
+        p.add(row("Gap between chromosomes (°):", spGap));
+
+        int r = JOptionPane.showConfirmDialog(parent, p, "Circular View Settings",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (r != JOptionPane.OK_OPTION) return;
+
+        s.showTicks = cbTicks.isSelected();
+        s.showTickLabels = cbTickLabels.isSelected();
+        s.showChromosomeLabels = cbChrLabels.isSelected();
+        s.tickLabelsOutside = cbPos.getSelectedIndex() == 0;
+        s.tickSpacingMb = ((Number) spSpace.getValue()).doubleValue();
+        s.tickLabelSize = ((Number) spTickSize.getValue()).intValue();
+        s.chromosomeLabelSize = ((Number) spChrSize.getValue()).intValue();
+        s.labelTangential = cbOrient.getSelectedIndex() == 0;
+        s.bandInner = ((Number) spInner.getValue()).doubleValue();
+        s.bandOuter = ((Number) spOuter.getValue()).doubleValue();
+        s.gapDeg = ((Number) spGap.getValue()).doubleValue();
+        if (s.bandInner >= s.bandOuter) s.bandOuter = Math.min(0.99, s.bandInner + 0.05);
+
+        ringKey = null;
+        repaint();
+    }
+
+    private static JPanel row(String label, JComponent field) {
+        JPanel r = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
+        JLabel l = new JLabel(label);
+        l.setPreferredSize(new Dimension(210, 20));
+        r.add(l);
+        r.add(field);
+        return r;
+    }
+
+    // ------------------------------------------------------------------
+    //  Genome -> ChrInfo list
     // ------------------------------------------------------------------
 
     static List<ChrInfo> buildAll(Genome genome, Map<String, Double> zoomMap) {
@@ -218,35 +314,37 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     // ------------------------------------------------------------------
-    //  Public static entry points (also used by the headless render probe)
+    //  Public static entry points (default settings; used by the render probe)
     // ------------------------------------------------------------------
 
     public static void drawAllChromosomes(Graphics2D g2, int w, int h, List<ChrInfo> chrs) {
-        drawAll(g2, w, h, chrs);
+        drawAll(g2, w, h, chrs, new CircularSettings());
     }
 
     public static void drawSingleChromosome(Graphics2D g2, int w, int h, ChrInfo chr) {
-        drawSingle(g2, w, h, chr);
+        drawSingle(g2, w, h, chr, new CircularSettings());
+    }
+
+    public static void drawAllChromosomes(Graphics2D g2, int w, int h, List<ChrInfo> chrs, CircularSettings s) {
+        drawAll(g2, w, h, chrs, s);
     }
 
     // ------------------------------------------------------------------
-    //  Sector layout shared by painting and hit-testing
+    //  Sector layout (shared by painting + hit-testing)
     // ------------------------------------------------------------------
 
-    /** Returns, per chromosome, {fStart, fEnd, spanDeg} using zoom-weighted allocation. */
-    static List<double[]> computeSectors(List<ChrInfo> chrs) {
+    static List<double[]> computeSectors(List<ChrInfo> chrs, double gapDeg) {
         List<double[]> out = new ArrayList<>();
         double totalW = 0;
         for (ChrInfo c : chrs) totalW += c.weight;
         int n = chrs.size();
-        double spanTotal = 360.0 - GAP_DEG * n;
+        double spanTotal = 360.0 - gapDeg * n;
         double frac = 0.0;
         for (ChrInfo c : chrs) {
             double spanDeg = totalW > 0 ? spanTotal * (c.weight / totalW) : 0;
-            double f0 = frac;
-            double f1 = frac + spanDeg / 360.0;
+            double f0 = frac, f1 = frac + spanDeg / 360.0;
             out.add(new double[]{f0, f1, spanDeg});
-            frac = f1 + GAP_DEG / 360.0;
+            frac = f1 + gapDeg / 360.0;
         }
         return out;
     }
@@ -255,24 +353,27 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     //  "All" — cytoband ideogram arc per chromosome
     // ------------------------------------------------------------------
 
-    private static void drawAll(Graphics2D g2, int w, int h, List<ChrInfo> chrs) {
+    private static void drawAll(Graphics2D g2, int w, int h, List<ChrInfo> chrs, CircularSettings s) {
         if (chrs == null || chrs.isEmpty()) { drawMessage(g2, w, h, "Circular view — no chromosomes"); return; }
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double rIn = R * BAND_INNER, rOut = R * BAND_OUTER;
+        double rIn = R * s.bandInner, rOut = R * s.bandOuter;
 
-        List<double[]> sec = computeSectors(chrs);
+        List<double[]> sec = computeSectors(chrs, s.gapDeg);
+        double chrLabelR = rOut + ((s.showTickLabels && s.tickLabelsOutside) ? 24 : 16);
         for (int i = 0; i < chrs.size(); i++) {
             ChrInfo c = chrs.get(i);
             double f0 = sec.get(i)[0], f1 = sec.get(i)[1], spanDeg = sec.get(i)[2];
 
             drawIdeogramBand(g2, cx, cy, rIn, rOut, f0, f1, c);
-            drawBandTicks(g2, cx, cy, rIn, rOut, f0, f1, c.length, spanDeg);
+            drawBandTicks(g2, cx, cy, rIn, rOut, f0, f1, c.length, spanDeg, s);
 
-            double fMid = (f0 + f1) / 2.0;
-            drawTangentialText(g2, cx, cy, rOut + 16, fMid, shortName(c.name),
-                    new Font("SansSerif", Font.BOLD, 12), Color.BLACK);
+            if (s.showChromosomeLabels) {
+                double fMid = (f0 + f1) / 2.0;
+                drawLabelText(g2, cx, cy, chrLabelR, fMid, shortName(c.name),
+                        new Font("SansSerif", Font.BOLD, s.chromosomeLabelSize), Color.BLACK, s.labelTangential);
+            }
         }
 
         Genome genome = GenomeManager.getInstance().getCurrentGenome();
@@ -280,35 +381,29 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         drawCenteredText(g2, id, cx, cy, new Font("SansSerif", Font.PLAIN, 15), Color.DARK_GRAY);
     }
 
-    // ------------------------------------------------------------------
-    //  Single chromosome — full 360deg ideogram ring + ticks
-    // ------------------------------------------------------------------
-
-    private static void drawSingle(Graphics2D g2, int w, int h, ChrInfo chr) {
+    private static void drawSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {
         if (chr == null || chr.length <= 0) return;
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double rIn = R * BAND_INNER, rOut = R * BAND_OUTER;
+        double rIn = R * s.bandInner, rOut = R * s.bandOuter;
 
         drawIdeogramBand(g2, cx, cy, rIn, rOut, 0.0, 1.0, chr);
-        drawBandTicks(g2, cx, cy, rIn, rOut, 0.0, 1.0, chr.length, 360.0);
+        drawBandTicks(g2, cx, cy, rIn, rOut, 0.0, 1.0, chr.length, 360.0, s);
 
         drawCenteredText(g2, shortName(chr.name), cx, cy,
                 new Font("SansSerif", Font.BOLD, 18), Color.DARK_GRAY);
     }
 
     // ------------------------------------------------------------------
-    //  Ideogram band (cytoband stripes, or colour block when no karyotype)
+    //  Ideogram band
     // ------------------------------------------------------------------
 
     private static void drawIdeogramBand(Graphics2D g2, double cx, double cy,
                                          double rIn, double rOut,
                                          double fStart, double fEnd, ChrInfo c) {
         boolean hasCyto = c.cytobands != null && !c.cytobands.isEmpty();
-
         if (hasCyto) {
-            // base fill so gaps look clean
             g2.setColor(new Color(235, 235, 235));
             g2.fill(annularPath(cx, cy, rIn, rOut, fStart, fEnd));
             double L = c.length, span = fEnd - fStart;
@@ -319,7 +414,6 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 g2.setColor(cytoColor(cb));
                 g2.fill(annularPath(cx, cy, rIn, rOut, f0, f1));
             }
-            // thin radial separators -> ladder look
             g2.setColor(new Color(150, 150, 150));
             g2.setStroke(new BasicStroke(0.5f));
             for (Cytoband cb : c.cytobands) {
@@ -328,46 +422,49 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 g2.drawLine((int) a.getX(), (int) a.getY(), (int) b.getX(), (int) b.getY());
             }
         } else {
-            // No karyotype data for this species/chromosome -> solid colour block.
-            g2.setColor(c.color != null ? c.color : NO_CYTO_FALLBACK);
+            g2.setColor(c.color != null ? c.color : new Color(190, 190, 190));
             g2.fill(annularPath(cx, cy, rIn, rOut, fStart, fEnd));
         }
-
-        // chromosome-level black outline
         g2.setColor(Color.BLACK);
         g2.setStroke(new BasicStroke(1.0f));
         g2.draw(annularPath(cx, cy, rIn, rOut, fStart, fEnd));
-        g2.setStroke(new BasicStroke(1.0f));
     }
 
-    /** Tick lines across the band + small Mb labels just inside the band (circos style). */
+    /** Tick lines + Mb labels, parameterised like Circos ticks (orientation, spacing, size). */
     private static void drawBandTicks(Graphics2D g2, double cx, double cy,
                                       double rIn, double rOut,
-                                      double fStart, double fEnd, long length, double spanDeg) {
-        if (spanDeg < 3.0) return;
-        long step = niceStep(length, 3);
+                                      double fStart, double fEnd, long length, double spanDeg,
+                                      CircularSettings s) {
+        if (!s.showTicks && !s.showTickLabels) return;
+        if (spanDeg < 1.0) return;
+        long step = s.tickStepBp(length);
         double span = fEnd - fStart;
-        Font tickFont = new Font("SansSerif", Font.PLAIN, 7);
+        Font tickFont = new Font("SansSerif", Font.PLAIN, s.tickLabelSize);
+
         for (long p = 0; p <= length; p += step) {
             double f = fStart + span * ((double) p / length);
-            Point2D a = polar(cx, cy, rIn - 2, f), b = polar(cx, cy, rOut + 2, f);
-            g2.setColor(new Color(60, 60, 60));
-            g2.setStroke(new BasicStroke(0.6f));
-            g2.drawLine((int) a.getX(), (int) a.getY(), (int) b.getX(), (int) b.getY());
 
-            double labelR = rIn - 8;
-            String txt = mbLabel(p);
-            int tw = g2.getFontMetrics(tickFont).stringWidth(txt);
-            if (arcLength(labelR, spanDeg) < tw + 10) continue;
-            drawTangentialText(g2, cx, cy, labelR, f, txt, tickFont, new Color(70, 70, 70));
+            if (s.showTicks) {
+                Point2D a = polar(cx, cy, rIn - 2, f), b = polar(cx, cy, rOut + 2, f);
+                g2.setColor(new Color(60, 60, 60));
+                g2.setStroke(new BasicStroke(0.6f));
+                g2.drawLine((int) a.getX(), (int) a.getY(), (int) b.getX(), (int) b.getY());
+            }
+
+            if (s.showTickLabels) {
+                double labelR = s.tickLabelsOutside ? (rOut + 8) : (rIn - 8);
+                String txt = mbLabel(p);
+                int tw = g2.getFontMetrics(tickFont).stringWidth(txt);
+                if (arcLength(labelR, spanDeg) < tw + 10) continue;
+                drawLabelText(g2, cx, cy, labelR, f, txt, tickFont, new Color(70, 70, 70), s.labelTangential);
+            }
         }
     }
 
     // ------------------------------------------------------------------
-    //  Geometry + text helpers
+    //  Geometry + text
     // ------------------------------------------------------------------
 
-    /** Polar point, clockwise starting from the top (12 o'clock). */
     private static Point2D polar(double cx, double cy, double r, double frac) {
         double theta = frac * 2.0 * Math.PI;
         return new Point2D.Double(cx + r * Math.sin(theta), cy - r * Math.cos(theta));
@@ -393,13 +490,32 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return path;
     }
 
-    /** Text whose baseline follows the circle tangent (flipped upright on the bottom half). */
-    private static void drawTangentialText(Graphics2D g2, double cx, double cy, double r,
-                                           double frac, String text, Font font, Color color) {
+    private static void drawLabelText(Graphics2D g2, double cx, double cy, double r, double frac,
+                                      String text, Font font, Color color, boolean tangential) {
+        if (tangential) drawTangentialText(g2, cx, cy, r, frac, text, font, color);
+        else drawRadialText(g2, cx, cy, r, frac, text, font, color);
+    }
+
+    private static void drawTangentialText(Graphics2D g2, double cx, double cy, double r, double frac,
+                                           String text, Font font, Color color) {
         if (text == null || text.isEmpty()) return;
         Point2D p = polar(cx, cy, r, frac);
         double rotDeg = frac * 360.0;
         if (rotDeg > 90 && rotDeg < 270) rotDeg += 180;
+        drawRotated(g2, p, rotDeg, text, font, color);
+    }
+
+    private static void drawRadialText(Graphics2D g2, double cx, double cy, double r, double frac,
+                                       String text, Font font, Color color) {
+        if (text == null || text.isEmpty()) return;
+        Point2D p = polar(cx, cy, r, frac);
+        double rotDeg = frac * 360.0 - 90.0;
+        double a = ((rotDeg % 360) + 360) % 360;
+        if (a > 90 && a < 270) rotDeg += 180;
+        drawRotated(g2, p, rotDeg, text, font, color);
+    }
+
+    private static void drawRotated(Graphics2D g2, Point2D p, double rotDeg, String text, Font font, Color color) {
         AffineTransform old = g2.getTransform();
         g2.translate(p.getX(), p.getY());
         g2.rotate(Math.toRadians(rotDeg));
@@ -432,18 +548,29 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return name.startsWith("chr") ? name.substring(3) : name;
     }
 
-    /** Centromere (acen) red; gpos grayscale by stain; gvar/stalk light gray. */
+    /** circlize cytoband.col palette (R/genomic_utils.R). */
     private static Color cytoColor(Cytoband cb) {
-        char t = cb.getType();
-        if (t == 'c') return CENTROMERE;
-        if (t != 'p') return new Color(200, 200, 200);
-        int shade = 255 - (int) (cb.getStain() * 1.8);
-        if (shade < 55) shade = 55;
-        if (shade > 255) shade = 255;
-        return new Color(shade, shade, shade);
+        switch (cb.getType()) {
+            case 'c': return new Color(217, 47, 39);    // acen
+            case 'n': return new Color(255, 255, 255);  // gneg
+            case 'v': return new Color(220, 220, 220);  // gvar
+            case 't': return new Color(100, 127, 164);  // stalk
+            default:
+                switch (cb.getStain()) {
+                    case 100: return new Color(0, 0, 0);
+                    case 75:  return new Color(130, 130, 130);
+                    case 66:  return new Color(160, 160, 160);
+                    case 50:  return new Color(200, 200, 200);
+                    case 33:  return new Color(210, 210, 210);
+                    case 25:  return new Color(200, 200, 200);
+                    default:
+                        int g = 255 - (int) (cb.getStain() * 2.55);
+                        if (g < 0) g = 0;
+                        return new Color(g, g, g);
+                }
+        }
     }
 
-    /** Round a span up to a "nice" step (1,2,5 x 10^k) targeting ~nTicks ticks. */
     static long niceStep(long length, int nTicks) {
         double raw = (double) length / Math.max(1, nTicks);
         double mag = Math.pow(10, Math.floor(Math.log10(raw)));
@@ -456,7 +583,6 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return Math.max(1, (long) (nice * mag));
     }
 
-    /** Compact tick label, e.g. 0Mb / 90Mb / 180Mb (circos multiplier + suffix style). */
     static String mbLabel(long bp) {
         if (bp <= 0) return "0Mb";
         double mb = bp / 1_000_000.0;
@@ -466,7 +592,6 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
     static String formatMb(long bp) { return mbLabel(bp); }
 
-    /** Chromosome descriptor: name, genomic length, layout weight (= length * zoom), cytobands, colour. */
     public static class ChrInfo {
         final String name;
         final long length;
