@@ -812,6 +812,16 @@ public class IGVContentPane extends JPanel {
                 circularDrawingArea.invalidateRing();
             });
             menu.add(expanded);
+
+            // Stacking direction for expanded feature tracks: pin transcript rows to the outer
+            // (top) edge and grow inward, or the default inner (bottom) edge and grow outward.
+            JCheckBoxMenuItem stackOuter = new JCheckBoxMenuItem(
+                    "Stack from outer edge", featureCfgs.get(0).stackFromOuter);
+            stackOuter.addActionListener(a -> {
+                for (CircularViewPanel.TrackRingConfig c : featureCfgs) c.stackFromOuter = stackOuter.isSelected();
+                circularDrawingArea.invalidateRing();
+            });
+            menu.add(stackOuter);
         }
 
         // Graph type and the two Y-axis options only apply to numeric data tracks

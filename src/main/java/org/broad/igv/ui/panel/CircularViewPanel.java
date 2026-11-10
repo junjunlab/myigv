@@ -230,6 +230,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     public static class TrackRingConfig {
         public int heightPx = 26;
         public boolean expanded = false;
+        /** When expanded, stack transcript rows from the outer (top) edge inward instead of the
+         *  default inner (bottom) edge outward. */
+        public boolean stackFromOuter = false;
         public Color color = new Color(60, 90, 170);
         /** Data-track rendering: "Bar" (default, IGV wig style), "Point", "Line", "Heatmap". */
         public String graphType = "Bar";
@@ -770,7 +773,17 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             long ve = Math.min(clen, ge + flank);
             double z = (arcZoom != null) ? arcZoom.getOrDefault(locus, 1.0) : 1.0;
             double weight = Math.max(1, (ve - vs) * z);
-            Color color = pickColor(locus, null);
+            // Draw the sector with the REAL chromosome's ideogram (cytoband stripes + colour) for
+            // this interval, not a fresh palette colour, so each gene reflects where it lives.
+            List<Cytoband> cyto = (s != null && s.solidColor) ? null : genome.getCytobands(chr);
+            Color color = (s != null && s.solidColor) ? s.chromosomeColor : pickColor(chr, cyto);
+            List<Cytoband> sectorCyto = null;
+            if (cyto != null) {
+                sectorCyto = new ArrayList<>();
+                for (Cytoband cb : cyto) {
+                    if (cb.getEnd() > vs && cb.getStart() < ve) sectorCyto.add(cb);
+                }
+            }
 
             if (nf instanceof Feature) {
                 geneOut.put(locus, Collections.singletonList((Feature) nf));
@@ -786,7 +799,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     rve = Math.min(ve, Math.max(vs, Math.min(clen, r[1])));
                 }
             }
-            list.add(new ChrInfo(locus, clen, weight, null, color, rvs, rve, chr));
+            list.add(new ChrInfo(locus, clen, weight, sectorCyto, color, rvs, rve, chr));
         }
         return list;
     }
@@ -1446,7 +1459,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                         rows.add(new ArrayList<>());
                     }
                     rows.get(r).add(new double[]{a, b});
-                    double rr = bandInner + (r + 0.5) * rowH;
+                    double rr = cfg.stackFromOuter
+                            ? bandOuter - (r + 0.5) * rowH      // pin to the outer (top) edge, grow inward
+                            : bandInner + (r + 0.5) * rowH;     // pin to the inner (bottom) edge, grow outward
                     drawFeatureMark(g2, cx, cy, rr, rowH, c, f0, span, f, cfg.color);
                 }
             }
