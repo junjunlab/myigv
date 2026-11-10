@@ -758,7 +758,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         ringTracks.clear();
         if (tracks != null) {
             for (Track t : tracks) {
-                if (hiddenRingTracks.contains(t.getName())) continue;
+                if (isRingTrackHidden(t)) continue;
                 if (t instanceof FeatureTrack || t instanceof DataTrack) ringTracks.add(t);  // order == top->bottom == outer->inner
             }
         }
@@ -777,6 +777,28 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     /** Allow all removed tracks back onto the ring (caller then calls refreshDataColumn). */
     public void clearHiddenRingTracks() {
         hiddenRingTracks.clear();
+        hiddenTrackObjects.clear();
+    }
+
+    /** Tracks removed from the ring. Tracked by object identity as well as name, because a
+     *  restored track can have an empty name, which made name-only hiding silently fail. */
+    private final Set<Track> hiddenTrackObjects =
+            java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+
+    /** Hide a specific track object from the ring (robust even when its name is empty or null). */
+    public void hideRingTrack(Track t) {
+        if (t == null) return;
+        hiddenTrackObjects.add(t);
+        if (t.getName() != null) hiddenRingTracks.add(t.getName());
+        ringTracks.remove(t);
+        invalidateRing();
+    }
+
+    /** True when this track object was removed from the ring. */
+    public boolean isRingTrackHidden(Track t) {
+        if (t == null) return false;
+        return hiddenTrackObjects.contains(t)
+                || (t.getName() != null && hiddenRingTracks.contains(t.getName()));
     }
 
     /** True when the user removed this track from the ring (it stays loaded, just is not drawn). */
