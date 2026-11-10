@@ -203,8 +203,8 @@ TAD / domain 的 BED 可以直接画在 Hi-C 热图上，不用在矩阵和 BED 
 
 到 **Actions → Build installers** 下载对应 Artifact（或从 Release 下载）：
 
-- Windows：运行 `myigv-1.0.1.exe` 安装；
-- macOS：打开 `myigv-1.0.1.dmg`，把 myigv 拖入 Applications。
+- Windows：运行 `myigv-1.0.2.exe` 安装；
+- macOS：打开 `myigv-1.0.2.dmg`，把 myigv 拖入 Applications。
 
 安装包已自带运行时与离线注释，装完即用，无需另装 Java。
 

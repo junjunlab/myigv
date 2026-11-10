@@ -44,6 +44,7 @@ import org.broad.igv.renderer.*;
 import org.broad.igv.tools.motiffinder.MotifFinderSource;
 import org.broad.igv.ui.IGV;
 import org.broad.igv.ui.UIConstants;
+import org.broad.igv.ui.panel.FrameManager;
 import org.broad.igv.ui.panel.ReferenceFrame;
 import org.broad.igv.ui.util.MessageUtils;
 import org.broad.igv.util.BrowserLauncher;
@@ -101,6 +102,10 @@ public class FeatureTrack extends AbstractTrack implements IGVEventObserver {
 
     // true == features,  false =  coverage
     private boolean showFeatures = true;
+
+    // When true, directional strand arrows are drawn for features that have a strand.
+    // Off by default; the user enables it from the track's right-click menu ("Show Arrows").
+    private boolean showArrows = false;
 
     public FeatureSource source;
 
@@ -503,6 +508,74 @@ public class FeatureTrack extends AbstractTrack implements IGVEventObserver {
             throw new RuntimeException(e);
         }
         return features;
+    }
+
+    public boolean isShowArrows() {
+        return showArrows;
+    }
+
+    public void setShowArrows(boolean showArrows) {
+        this.showArrows = showArrows;
+    }
+
+    /**
+     * Returns true if any feature on this track carries directional strand information
+     * (Strand.POSITIVE or Strand.NEGATIVE).  Used to warn the user when they ask to draw
+     * strand arrows on a file that has no usable +/- strand column.
+     * <p>
+     * Scans the currently visible frames first; if none are loaded yet it falls back to a
+     * bounded sample of the feature source across chromosomes.  On any error (or a null
+     * source) it returns true so we never spuriously warn.
+     */
+    public boolean hasStrandInfo() {
+        if (source == null) {
+            return true;
+        }
+
+        // 1) Visible features in the current frames
+        for (ReferenceFrame frame : FrameManager.getFrames()) {
+            Range r = frame.getCurrentRange();
+            List<Feature> visible = getFeatures(r.getChr(), (int) r.getStart(), (int) r.getEnd());
+            for (Feature f : visible) {
+                if (f instanceof IGVFeature) {
+                    Strand s = ((IGVFeature) f).getStrand();
+                    if (s == Strand.POSITIVE || s == Strand.NEGATIVE) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // 2) Fallback: bounded sample of the whole source
+        Genome genome = GenomeManager.getInstance().getCurrentGenome();
+        if (genome != null) {
+            int examined = 0;
+            for (String chr : genome.getChromosomeNames()) {
+                try {
+                    Iterator<Feature> iter = source.getFeatures(chr, -1, Integer.MAX_VALUE);
+                    while (iter.hasNext()) {
+                        Feature f = iter.next();
+                        examined++;
+                        if (f instanceof IGVFeature) {
+                            Strand s = ((IGVFeature) f).getStrand();
+                            if (s == Strand.POSITIVE || s == Strand.NEGATIVE) {
+                                return true;
+                            }
+                        }
+                        if (examined >= 1000) {
+                            break;
+                        }
+                    }
+                } catch (IOException e) {
+                    return true;
+                }
+                if (examined >= 1000) {
+                    break;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

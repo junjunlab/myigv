@@ -292,6 +292,10 @@ public class IGVMenuBar extends JMenuBar implements IGVEventObserver {
         menuAction.setToolTipText(UIConstants.LOAD_TRACKS_TOOLTIP);
         menuItems.add(MenuAndToolbarUtils.createMenuItem(menuAction));
 
+        menuAction = new LoadFromSshMenuAction(LoadFromSshMenuAction.LOAD_FROM_SSH, KeyEvent.VK_H, igv);
+        menuAction.setToolTipText("Connect to an SSH server and read tracks directly from it");
+        menuItems.add(MenuAndToolbarUtils.createMenuItem(menuAction));
+
         menuAction = new LoadFromServerAction("Load From Server...", KeyEvent.VK_S, igv);
         menuAction.setToolTipText(UIConstants.LOAD_SERVER_DATA_TOOLTIP);
         loadTracksFromServerMenuItem = MenuAndToolbarUtils.createMenuItem(menuAction);
@@ -830,14 +834,14 @@ public class IGVMenuBar extends JMenuBar implements IGVEventObserver {
         }
 
         menuAction =
-                new MenuAction("About IGV ") {
+                new MenuAction("About myigv") {
 
                     @Override
                     public void actionPerformed(ActionEvent e) {
                         (new AboutDialog(igv.getMainFrame(), true)).setVisible(true);
                     }
                 };
-        menuAction.setToolTipText(ABOUT_TOOLTIP);
+        menuAction.setToolTipText("About myigv: version, source code and download links");
         menuItems.add(MenuAndToolbarUtils.createMenuItem(menuAction));
 
         MenuAction helpMenuAction = new MenuAction("Help");

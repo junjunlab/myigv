@@ -66,7 +66,10 @@ public class IGVSeekableStreamFactory implements ISeekableStreamFactory {
             // Resolve any bundled resource to its local copy before applying the built-in ftp->https mapping.
             path = mapPath(LocalResourcePack.mapPath(path));
             SeekableStream is = null;
-            if (FileUtils.isRemote(path)) {
+            if (path.toLowerCase().startsWith("sftp:")) {
+                // Must be tested before FileUtils.isRemote(), which also covers sftp://.
+                is = new IGVSeekableSftpStream(path);
+            } else if (FileUtils.isRemote(path)) {
                 final URL url = HttpUtils.createURL(path);
                 is = new IGVSeekableHTTPStream(url);
             } else if (path.toLowerCase().startsWith("ftp:")) {

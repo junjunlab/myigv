@@ -439,6 +439,7 @@ public class TrackMenuUtils {
         featurePopupMenu.addSeparator();
         featurePopupMenu.add(getShowFeatureNames(tracks));
         featurePopupMenu.add(getFeatureNameAttribute(tracks));
+        featurePopupMenu.add(getShowArrowsItem(tracks));
         featurePopupMenu.add(getTranscriptLabelItem(tracks));
     }
 
@@ -1401,6 +1402,36 @@ public class TrackMenuUtils {
         String label = currentValue ? "Hide Feature Names" : "Show Feature Names";
         JMenuItem item = new JMenuItem(label);
         item.addActionListener(evt -> selectedTracks.stream().forEach(t -> t.setShowFeatureNames(!currentValue)));
+        return item;
+    }
+
+    /**
+     * Checkbox toggling directional strand arrows on feature tracks.  When the user turns
+     * arrows on for a track whose file has no usable +/- strand column, a warning is shown.
+     */
+    public static JMenuItem getShowArrowsItem(final Collection<Track> selectedTracks) {
+        final List<FeatureTrack> featureTracks = new ArrayList<>();
+        for (Track t : selectedTracks) {
+            if (t instanceof FeatureTrack) {
+                featureTracks.add((FeatureTrack) t);
+            }
+        }
+
+        boolean allOn = !featureTracks.isEmpty() && featureTracks.stream().allMatch(FeatureTrack::isShowArrows);
+        JCheckBoxMenuItem item = new JCheckBoxMenuItem("Show Arrows", allOn);
+        item.addActionListener(evt -> {
+            boolean on = item.isSelected();
+            for (FeatureTrack t : featureTracks) {
+                t.setShowArrows(on);
+            }
+            if (on) {
+                boolean anyMissing = featureTracks.stream().anyMatch(t -> !t.hasStrandInfo());
+                if (anyMissing) {
+                    MessageUtils.showMessage("链信息不符：该文件未包含有效的正负链（+/-）信息，无法绘制方向箭头。");
+                }
+            }
+            IGV.getInstance().repaint(selectedTracks);
+        });
         return item;
     }
 

@@ -64,7 +64,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           "$JAVA_HOME/bin/jpackage" --type exe \
-            --name myigv --app-version 1.0.1 --vendor junjunlab \
+            --name myigv --app-version 1.0.2 --vendor junjunlab \
             --runtime-image build/jp/runtime \
             --module-path build/myigv-dist/lib \
             --module org.igv/org.broad.igv.ui.Main \
@@ -82,7 +82,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           "$JAVA_HOME/bin/jpackage" --type dmg \
-            --name myigv --app-version 1.0.1 --vendor junjunlab \
+            --name myigv --app-version 1.0.2 --vendor junjunlab \
             --runtime-image build/jp/runtime \
             --module-path build/myigv-dist/lib \
             --module org.igv/org.broad.igv.ui.Main \
@@ -113,4 +113,7 @@ jobs:
           files: |
             build/installer/*.exe
             build/installer/*.dmg
-          generate_release_notes: true
+          # Release 正文由维护者按版本手工填写，只写「本版新增」。
+          # 不要开 generate_release_notes：覆盖重发时它会反复追加重复的 Full Changelog，
+          # 也不再罗列「相比原版 IGV 的全部改进」这类累计清单（历史改动看 README/提交历史）。
+          generate_release_notes: false

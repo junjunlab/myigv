@@ -36,6 +36,10 @@ module org.igv {
     exports org.broad.igv.sam.smrt;
     exports org.broad.igv.util;
     exports org.broad.igv.util.ftp;
+    exports org.broad.igv.util.ssh;
+
+    // Gson builds SshCredentialStore's wrapper and SshProfile by reflection.
+    opens org.broad.igv.util.ssh to com.google.gson;
     exports org.broad.igv.util.blat;
     exports org.broad.igv.util.extview;
     exports org.broad.igv.util.liftover;
@@ -135,6 +139,10 @@ module org.igv {
     // Transitive dependency of amazon modules that is required to be specified
     // because amazon resolves the unmodularized 1.2.0 version while htjsdk brings in the modular 1.3.0
     requires org.apache.commons.logging;
+
+    requires com.jcraft.jsch;
+    requires com.sun.jna;
+    requires com.sun.jna.platform;
 
     requires jide.oss;
 }

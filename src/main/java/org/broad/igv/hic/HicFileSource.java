@@ -1,11 +1,10 @@
 package org.broad.igv.hic;
 
+import htsjdk.samtools.seekablestream.SeekableStream;
 import org.broad.igv.logging.LogManager;
 import org.broad.igv.logging.Logger;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -56,8 +55,17 @@ public class HicFileSource implements HiCSource {
      * 1 kb, 0.26 s at 5 kb), so finer units stay an explicit choice in the menu.
      */
 
-    private final File file;
-    private final RandomAccessFile raf;
+    private final SeekableStream stream;
+
+    /**
+     * Sequential read buffer. The parser issues many single-byte / 4-byte reads; over a network
+     * stream each would otherwise be its own (cached) fetch, so we batch them. The SFTP stream
+     * already caches 1 MB blocks, so this just avoids per-byte overhead.
+     */
+    private final byte[] readBuf = new byte[1 << 16];
+    private int bufValid;
+    private int bufPos;
+    private long filePos;
 
     private final int version;
     private final long masterIndexPos;
@@ -89,17 +97,15 @@ public class HicFileSource implements HiCSource {
 
     private long cachedBytes;
 
-    public HicFileSource(String path) throws IOException {
-        this.file = new File(path);
-        this.raf = new RandomAccessFile(file, "r");
+    public HicFileSource(SeekableStream stream, String path) throws IOException {
+        this.stream = stream;
 
-        // Anything that fails while parsing the header must not leak the file handle: on
-        // Windows the handle also locks the file, so the user could not even delete it.
+        // Anything that fails while parsing the header must not leak the stream handle.
         try {
 
-        raf.seek(0);
+        seek(0);
         byte[] magic = new byte[4];
-        raf.readFully(magic);
+        readFully(magic);
         String m = new String(magic, 0, 3, "US-ASCII");
         if (!"HIC".equals(m)) {
             throw new IOException("Not a Juicer .hic file (bad magic): " + path);
@@ -146,7 +152,7 @@ public class HicFileSource implements HiCSource {
 
         } catch (IOException | RuntimeException e) {
             try {
-                raf.close();
+                stream.close();
             } catch (IOException ignored) {
                 // the original failure is what matters
             }
@@ -360,7 +366,7 @@ public class HicFileSource implements HiCSource {
         blockCache.clear();
         cachedBytes = 0;
         pairBlocks.clear();
-        raf.close();
+        stream.close();
     }
 
     /**
@@ -456,7 +462,7 @@ public class HicFileSource implements HiCSource {
             return masterIndex;
         }
         Map<String, Long> map = new HashMap<>();
-        raf.seek(masterIndexPos);
+        seek(masterIndexPos);
         readInt();                        // nBytes
         int nEntries = readInt();
         for (int i = 0; i < nEntries; i++) {
@@ -470,7 +476,7 @@ public class HicFileSource implements HiCSource {
     }
 
     private ChromPairBlocks readBlockIndex(long filePos) throws IOException {
-        raf.seek(filePos);
+        seek(filePos);
         readInt();                        // c1 (redundant)
         readInt();                        // c2
         int nRes = readInt();
@@ -537,8 +543,8 @@ public class HicFileSource implements HiCSource {
 
     private HicBlock readBlock(long position, int size) throws IOException {
         byte[] compressed = new byte[size];
-        raf.seek(position);
-        raf.readFully(compressed);
+        seek(position);
+        readFully(compressed);
 
         byte[] raw = inflate(compressed);
         int nRecords = readInt(raw, 0);
@@ -648,11 +654,55 @@ public class HicFileSource implements HiCSource {
 
     // --- primitive readers -------------------------------------------------
 
+    /** Move the read cursor; the next read resumes from {@code p}. */
+    private void seek(long p) throws IOException {
+        stream.seek(p);
+        filePos = p;
+        bufPos = bufValid = 0;
+    }
+
+    /** Read a single byte (buffered); returns -1 at end of file. */
+    private int read() throws IOException {
+        if (bufPos >= bufValid) {
+            bufValid = stream.read(readBuf, 0, readBuf.length);
+            if (bufValid <= 0) {
+                return -1;
+            }
+            bufPos = 0;
+            filePos += bufValid;
+        }
+        return readBuf[bufPos++] & 0xFF;
+    }
+
+    /** Read exactly {@code dst.length} bytes, refilling the buffer / stream as needed. */
+    private void readFully(byte[] dst) throws IOException {
+        int off = 0;
+        int need = dst.length;
+        while (need > 0) {
+            if (bufPos < bufValid) {
+                int c = Math.min(need, bufValid - bufPos);
+                System.arraycopy(readBuf, bufPos, dst, off, c);
+                bufPos += c;
+                off += c;
+                need -= c;
+            } else {
+                int n = stream.read(dst, off, need);
+                if (n < 0) {
+                    throw new IOException("Unexpected end of .hic file");
+                }
+                off += n;
+                need -= n;
+                filePos += n;
+                bufPos = bufValid = 0;
+            }
+        }
+    }
+
     private int readInt() throws IOException {
-        int b0 = raf.read();
-        int b1 = raf.read();
-        int b2 = raf.read();
-        int b3 = raf.read();
+        int b0 = read();
+        int b1 = read();
+        int b2 = read();
+        int b3 = read();
         if ((b0 | b1 | b2 | b3) < 0) {
             throw new IOException("Unexpected end of .hic file");
         }
@@ -666,13 +716,23 @@ public class HicFileSource implements HiCSource {
     }
 
     private void skip(long n) throws IOException {
-        raf.seek(raf.getFilePointer() + n);
+        while (n > 0) {
+            if (bufPos < bufValid) {
+                long c = Math.min(n, bufValid - bufPos);
+                bufPos += c;
+                filePos += c;
+                n -= c;
+            } else {
+                seek(filePos + n);
+                return;
+            }
+        }
     }
 
     private String readCString() throws IOException {
         StringBuilder sb = new StringBuilder();
         while (true) {
-            int b = raf.read();
+            int b = read();
             if (b < 0 || b == 0) {
                 break;
             }
