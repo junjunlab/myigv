@@ -27,7 +27,10 @@ package org.broad.igv.ui.panel;
 import org.broad.igv.event.IGVEvent;
 import org.broad.igv.event.IGVEventBus;
 import org.broad.igv.event.IGVEventObserver;
+import org.broad.igv.feature.BasicFeature;
 import org.broad.igv.feature.Cytoband;
+import org.broad.igv.feature.Exon;
+import org.broad.igv.feature.Strand;
 import org.broad.igv.feature.genome.Genome;
 import org.broad.igv.feature.genome.GenomeManager;
 import org.broad.igv.Globals;
@@ -1224,13 +1227,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
             if (!cfg.expanded) {
                 double rr = (bandInner + bandOuter) / 2.0;
-                double thick = Math.min(3.0, bandH * 0.6);
                 for (Feature f : list) {
                     if (f.getEnd() < c.viewStart || f.getStart() > c.viewEnd) continue;
                     double a = f0 + span * c.viewFrac(f.getStart());
                     double b = f0 + span * c.viewFrac(f.getEnd());
                     if (b <= a) b = a + 1e-7;
-                    fillArc(g2, cx, cy, rr - thick / 2, rr + thick / 2, a, b, cfg.color);
+                    drawFeatureMark(g2, cx, cy, rr, bandH, c, f0, span, f, cfg.color);
                 }
             } else {
                 List<List<double[]>> rows = new ArrayList<>();
@@ -1247,9 +1249,123 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     }
                     rows.get(r).add(new double[]{a, b});
                     double rr = bandInner + (r + 0.5) * rowH;
-                    fillArc(g2, cx, cy, rr - rowH * 0.42, rr + rowH * 0.42, a, b, cfg.color);
+                    drawFeatureMark(g2, cx, cy, rr, rowH, c, f0, span, f, cfg.color);
                 }
             }
+        }
+    }
+
+    /**
+     * Draw one feature inside a band. When the feature has enough screen width and carries an
+     * exon model, the transcript structure is drawn the way the linear view does it: a thin
+     * intron spine, thick CDS blocks and thin UTR blocks, plus chevrons for the strand. Below
+     * that width it degrades to a simple mark, so a whole-genome ring stays readable.
+     *
+     * @param rMid   radius of the band centre
+     * @param availH the radial height available to this feature (band height, or a packed row)
+     * @param f0    start fraction of this chromosome's sector
+     * @param span  angular width of the sector, in fractions of the circle
+     */
+    private static void drawFeatureMark(Graphics2D g2, double cx, double cy,
+                                        double rMid, double availH,
+                                        ChrInfo c, double f0, double span,
+                                        Feature f, Color color) {
+        double a = f0 + span * c.viewFrac(f.getStart());
+        double b = f0 + span * c.viewFrac(f.getEnd());
+        if (b <= a) b = a + 1e-7;
+        double arcPx = arcLength(rMid, (b - a) * 360.0);
+
+        BasicFeature bf = (f instanceof BasicFeature) ? (BasicFeature) f : null;
+        List<Exon> exons = bf == null ? null : bf.getExons();
+
+        if (exons == null || exons.isEmpty() || arcPx < 10) {
+            // No exon model (or too small to show detail): a single block with a strand chevron
+            // if there is room. Thickness stays modest so an overview ring stays clean.
+            double h = Math.max(0.7, Math.min(1.6, availH * 0.5));
+            fillArc(g2, cx, cy, rMid - h, rMid + h, a, b, color);
+            if (arcPx >= 14 && bf != null) {
+                drawStrandArrows(g2, cx, cy, rMid, a, b, strandDir(bf),
+                        Math.min(2.4, Math.max(1.2, availH * 0.4)), color);
+            }
+            return;
+        }
+
+        // Faithful polar port of IGVFeatureRenderer.drawExons(): a thin intron spine, each exon
+        // split into UTR (thin) and CDS (thick) via its coding boundaries, and white directional
+        // chevrons along the coding strand. Thickness scales with the band so the structure is
+        // legible once the gene is wide enough to warrant it.
+        double cdsH = Math.max(2.0, availH * 0.46);     // IGV blockHeight (14) -> thick CDS
+        double utrH = Math.max(1.2, availH * 0.23);     // IGV NON_CODING_HEIGHT (8) -> thin UTR
+        double spineH = Math.max(0.4, availH * 0.10);
+        fillArc(g2, cx, cy, rMid - spineH, rMid + spineH, a, b, color);
+
+        for (Exon exon : exons) {
+            long exS = exon.getStart(), exE = exon.getEnd();
+            if (exE <= exS) continue;
+            long cdS = clamp(exon.getCdStart(), exS, exE);
+            long cdE = clamp(exon.getCdEnd(), exS, exE);
+
+            if (exon.isNonCoding()) {
+                fillExonSeg(g2, cx, cy, rMid, utrH, f0, span, c, exS, exE, color);   // whole exon UTR
+            } else {
+                if (cdS > exS) fillExonSeg(g2, cx, cy, rMid, utrH, f0, span, c, exS, cdS, color);  // 5' UTR
+                if (cdE < exE) fillExonSeg(g2, cx, cy, rMid, utrH, f0, span, c, cdE, exE, color);  // 3' UTR
+                if (exon.getCdStart() < exE && exon.getCdEnd() > exS)
+                    fillExonSeg(g2, cx, cy, rMid, cdsH, f0, span, c, cdS, cdE, color);             // CDS
+            }
+        }
+
+        drawStrandArrows(g2, cx, cy, rMid, a, b, strandDir(bf),
+                Math.min(8.0, Math.max(2.0, availH * 0.34)), color);
+    }
+
+    private static long clamp(long v, long lo, long hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+    /** Fill one exon (sub)segment [s, e) at a given radial thickness. */
+    private static void fillExonSeg(Graphics2D g2, double cx, double cy, double rMid, double h,
+                                    double f0, double span, ChrInfo c, long s, long e, Color color) {
+        double ea = f0 + span * c.viewFrac(s);
+        double eb = f0 + span * c.viewFrac(e);
+        if (eb <= ea) return;
+        fillArc(g2, cx, cy, rMid - h, rMid + h, ea, eb, color);
+    }
+
+    /** +1 for forward (arrow points clockwise), -1 for reverse, 0 when unknown. */
+    private static int strandDir(BasicFeature bf) {
+        if (bf == null || bf.getStrand() == null) return 0;
+        if (bf.getStrand() == Strand.POSITIVE) return 1;
+        if (bf.getStrand() == Strand.NEGATIVE) return -1;
+        return 0;
+    }
+
+    /** A colour that reads against {@code base} (black on light bars, white on dark ones). */
+    private static Color contrastColor(Color base) {
+        double lum = (0.299 * base.getRed() + 0.587 * base.getGreen() + 0.114 * base.getBlue()) / 255.0;
+        return lum > 0.55 ? new Color(20, 20, 20) : new Color(245, 245, 245);
+    }
+
+    /** Chevrons along the gene showing the direction of transcription. */
+    private static void drawStrandArrows(Graphics2D g2, double cx, double cy, double r,
+                                         double a, double b, int dir, double size, Color color) {
+        if (dir == 0 || size <= 0) return;
+        double arcPx = arcLength(r, (b - a) * 360.0);
+        int n = Math.max(1, (int) Math.round(arcPx / 26.0));
+        g2.setColor(contrastColor(color));
+        for (int i = 0; i < n; i++) {
+            double t = n == 1 ? 0.5 : (i + 0.5) / n;
+            double f = a + (b - a) * t;
+            double theta = f * 2 * Math.PI;
+            // Tangent for increasing fraction (clockwise): (cos, sin).
+            double tx = Math.cos(theta) * dir, ty = Math.sin(theta) * dir;
+            double nx = -ty, ny = tx;
+            double px = cx + r * Math.sin(theta), py = cy - r * Math.cos(theta);
+            Polygon tri = new Polygon();
+            tri.addPoint((int) Math.round(px + tx * size), (int) Math.round(py + ty * size));
+            tri.addPoint((int) Math.round(px - tx * size * 0.55 + nx * size * 0.8),
+                    (int) Math.round(py - ty * size * 0.55 + ny * size * 0.8));
+            tri.addPoint((int) Math.round(px - tx * size * 0.55 - nx * size * 0.8),
+                    (int) Math.round(py - ty * size * 0.55 - ny * size * 0.8));
+            g2.fillPolygon(tri);
         }
     }
 
