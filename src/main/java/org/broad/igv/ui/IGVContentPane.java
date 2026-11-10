@@ -216,9 +216,12 @@ public class IGVContentPane extends JPanel {
             // (its left) and the drawing area (its right) — see circularSplit in ctor.
             refreshDataColumn();
             viewSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, mainPanel, circularPanel);
-            configureSplit(viewSplitPane, 0.7);
+            configureSplit(viewSplitPane, 0.5);
+            viewSplitPane.setDividerLocation(0.5);   // 50/50 by default, no manual drag needed
             add(viewSplitPane, BorderLayout.CENTER);
             currentCenter = viewSplitPane;
+            // Re-apply after the frame has laid out (proportional divider needs a real width).
+            SwingUtilities.invokeLater(() -> viewSplitPane.setDividerLocation(0.5));
         } else if (showHorizontalView) {
             add(mainPanel, BorderLayout.CENTER);
             currentCenter = mainPanel;
