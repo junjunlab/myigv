@@ -181,6 +181,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     /** Per-chromosome zoom factors (Ctrl+wheel in "All" mode). */
     private final Map<String, Double> zoom = new HashMap<>();
 
+    /** Per-chromosome visible bp window (Shift+wheel in "All" mode); absent = whole chromosome. */
+    private final Map<String, double[]> rangeZoom = new HashMap<>();
+
     private BufferedImage ringImage;
     private String ringKey;
     private int lastGenomeId = 0;
@@ -306,8 +309,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     public CircularSettings getSettings() { return settings; }
 
     /** Clear all per-chromosome zoom factors. */
+    /** Clear all per-chromosome zoom factors and visible windows. */
     public void resetZoom() {
         zoom.clear();
+        rangeZoom.clear();
         ringKey = null;
         repaint();
     }
@@ -360,7 +365,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
         int gid = System.identityHashCode(genome);
         if (gid != lastGenomeId) {
-            zoom.clear(); featureCache.clear(); pendingLoads.clear();
+            zoom.clear(); rangeZoom.clear(); featureCache.clear(); pendingLoads.clear();
             loadAttempts.clear(); lastAttemptMs.clear(); trackLoaded.clear();
             dataCache.clear(); dataPending.clear();
             lastGenomeId = gid; ringKey = null;
@@ -392,13 +397,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             ig.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
             ig.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
             if (Globals.CHR_ALL.equals(chr)) {
-                List<ChrInfo> chrs = buildAll(genome, zoom, settings);
+                List<ChrInfo> chrs = buildAll(genome, zoom, rangeZoom, settings);
                 drawAll(ig, w, h, chrs, settings);
                 drawTrackRings(ig, w, h, chrs, settings);
                 // Links are an independent z-layer drawn last, like Circos, so they sit on top.
                 drawLinks(ig, w, h, chrs, allLinks(), settings, linkAnchorRadius(w, h, settings));
             } else {
-                ChrInfo one = buildOne(genome, chr, settings);
+                ChrInfo one = buildOne(genome, chr, rangeZoom, settings);
                 if (one == null) drawMessage(ig, w, h, "Chromosome not found: " + chr);
                 else {
                     drawSingle(ig, w, h, one, settings);
@@ -421,28 +426,84 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     // ------------------------------------------------------------------
-    //  Ctrl + wheel -> zoom hovered chromosome sector ("All" mode)
+    //  Wheel zoom ("All" mode)
+    //    Ctrl  -> widen / narrow the chromosome's arc (sector span)
+    //    Shift -> widen / narrow the visible bp window under the cursor, arc unchanged
     // ------------------------------------------------------------------
 
+    /** Smallest visible window, so Shift+wheel can get down to base-pair scale. */
+    private static final double MIN_RANGE_BP = 200;
+
     private void handleWheel(MouseWheelEvent e) {
-        if (!e.isControlDown()) return;
+        boolean ctrl = e.isControlDown();
+        boolean shift = e.isShiftDown();
+        if (!ctrl && !shift) return;
         Genome genome = GenomeManager.getInstance().getCurrentGenome();
         if (genome == null) return;
-        if (!Globals.CHR_ALL.equals(FrameManager.getDefaultFrame().getChrName())) return;
 
-        String target = chromosomeAt(e.getX(), e.getY(), genome);
-        if (target == null) return;
+        String frameChr = FrameManager.getDefaultFrame().getChrName();
+        boolean zoomIn = e.getWheelRotation() < 0;
+        int cx = getWidth() / 2, cy = getHeight() / 2;
+        double theta = Math.atan2(e.getX() - cx, -(e.getY() - cy));
+        double frac = theta / (2 * Math.PI);
+        if (frac < 0) frac += 1.0;
 
-        double z = zoom.getOrDefault(target, 1.0);
-        double f = e.getWheelRotation() < 0 ? 1.12 : 1.0 / 1.12;
-        z = Math.max(0.25, Math.min(25.0, z * f));
-        zoom.put(target, z);
+        if (Globals.CHR_ALL.equals(frameChr)) {
+            List<ChrInfo> chrs = buildAll(genome, zoom, rangeZoom, settings);
+            String target = chromosomeAt(e.getX(), e.getY(), chrs);
+            if (target == null) return;
+            int idx = indexOf(chrs, target);
+            if (idx < 0) return;
+
+            if (ctrl) {
+                // Ctrl: widen / narrow this chromosome's arc (sector span).
+                double z = zoom.getOrDefault(target, 1.0);
+                z = Math.max(0.25, Math.min(25.0, z * (zoomIn ? 1.12 : 1.0 / 1.12)));
+                zoom.put(target, z);
+            } else {
+                // Shift: keep the arc, narrow / widen the bp window under the cursor.
+                List<double[]> sec = computeSectors(chrs, settings.gapDeg);
+                double f0 = sec.get(idx)[0], f1 = sec.get(idx)[1];
+                double t = f1 > f0 ? (frac - f0) / (f1 - f0) : 0.5;
+                zoomRange(chrs.get(idx), Math.max(0, Math.min(1, t)), zoomIn);
+            }
+        } else if (frameChr != null && !frameChr.isEmpty()) {
+            // Single-chromosome mode: the chromosome already fills the ring, so the wheel zooms
+            // the visible bp window and that interval is drawn as the full ring.
+            ChrInfo one = buildOne(genome, frameChr, rangeZoom, settings);
+            if (one == null) return;
+            zoomRange(one, frac, zoomIn);
+        } else {
+            return;
+        }
+
         ringKey = null;
         repaint();
     }
 
-    private String chromosomeAt(int x, int y, Genome genome) {
-        List<ChrInfo> chrs = buildAll(genome, zoom, settings);
+    private static int indexOf(List<ChrInfo> chrs, String name) {
+        for (int i = 0; i < chrs.size(); i++) {
+            if (chrs.get(i).name.equals(name)) return i;
+        }
+        return -1;
+    }
+
+    /** Narrow / widen the visible bp window of one chromosome, anchored at fraction t (0..1). */
+    private void zoomRange(ChrInfo ci, double t, boolean zoomIn) {
+        double span = ci.viewEnd - ci.viewStart;
+        double anchor = ci.viewStart + t * span;
+        double newSpan = Math.max(MIN_RANGE_BP, Math.min(ci.length, span * (zoomIn ? 1 / 1.6 : 1.6)));
+        if (newSpan >= ci.length) {          // fully widened -> back to the whole chromosome
+            rangeZoom.remove(ci.name);
+            return;
+        }
+        double newStart = anchor - t * newSpan;
+        if (newStart < 0) newStart = 0;
+        if (newStart + newSpan > ci.length) newStart = ci.length - newSpan;
+        rangeZoom.put(ci.name, new double[]{newStart, newStart + newSpan});
+    }
+
+    private String chromosomeAt(int x, int y, List<ChrInfo> chrs) {
         if (chrs.isEmpty()) return null;
         int cx = getWidth() / 2, cy = getHeight() / 2;
         double R = Math.min(getWidth(), getHeight()) / 2.0 - MARGIN;
@@ -554,6 +615,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     static List<ChrInfo> buildAll(Genome genome, Map<String, Double> zoomMap, CircularSettings s) {
+        return buildAll(genome, zoomMap, null, s);
+    }
+
+    static List<ChrInfo> buildAll(Genome genome, Map<String, Double> zoomMap,
+                                  Map<String, double[]> rangeMap, CircularSettings s) {
         List<ChrInfo> list = new ArrayList<>();
         for (String name : genome.getLongChromosomeNames()) {
             org.broad.igv.feature.Chromosome c = genome.getChromosome(name);
@@ -565,17 +631,38 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double z = zoomMap != null ? zoomMap.getOrDefault(name, 1.0) : 1.0;
             List<Cytoband> cyto = (s != null && s.solidColor) ? null : genome.getCytobands(name);
             Color color = (s != null && s.solidColor) ? s.chromosomeColor : pickColor(name, cyto);
-            list.add(new ChrInfo(name, len, len * z, cyto, color));
+            double vs = 0, ve = len;
+            if (rangeMap != null) {
+                double[] r = rangeMap.get(name);
+                if (r != null && r[1] > r[0]) {
+                    vs = Math.max(0, r[0]);
+                    ve = Math.min(len, r[1]);
+                }
+            }
+            list.add(new ChrInfo(name, len, len * z, cyto, color, vs, ve));
         }
         return list;
     }
 
     static ChrInfo buildOne(Genome genome, String chr, CircularSettings s) {
+        return buildOne(genome, chr, null, s);
+    }
+
+    static ChrInfo buildOne(Genome genome, String chr, Map<String, double[]> rangeMap, CircularSettings s) {
         org.broad.igv.feature.Chromosome c = genome.getChromosome(chr);
         if (c == null) return null;
+        long len = c.getLength();
         List<Cytoband> cyto = (s != null && s.solidColor) ? null : genome.getCytobands(chr);
         Color color = (s != null && s.solidColor) ? s.chromosomeColor : pickColor(chr, cyto);
-        return new ChrInfo(chr, c.getLength(), c.getLength(), cyto, color);
+        double vs = 0, ve = len;
+        if (rangeMap != null) {
+            double[] r = rangeMap.get(chr);
+            if (r != null && r[1] > r[0]) {
+                vs = Math.max(0, r[0]);
+                ve = Math.min(len, r[1]);
+            }
+        }
+        return new ChrInfo(chr, len, len, cyto, color, vs, ve);
     }
 
     // ------------------------------------------------------------------
@@ -638,7 +725,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double f0 = sec.get(i)[0], f1 = sec.get(i)[1], spanDeg = sec.get(i)[2];
 
             drawIdeogramBand(g2, cx, cy, rIn, rOut, f0, f1, c);
-            drawBandTicks(g2, cx, cy, rIn, rOut, f0, f1, c.length, spanDeg, s);
+            drawBandTicks(g2, cx, cy, rIn, rOut, f0, f1, c, spanDeg, s);
 
             if (s.showChromosomeLabels) {
                 double fMid = (f0 + f1) / 2.0;
@@ -661,7 +748,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
 
         drawIdeogramBand(g2, cx, cy, rIn, rOut, 0.0, 1.0, chr);
-        drawBandTicks(g2, cx, cy, rIn, rOut, 0.0, 1.0, chr.length, 360.0, s);
+        drawBandTicks(g2, cx, cy, rIn, rOut, 0.0, 1.0, chr, 360.0, s);
 
         drawCenteredText(g2, shortName(chr.name), cx, cy,
                 new Font("SansSerif", Font.BOLD, Math.max(10, s.chromosomeLabelSize + 6)), Color.DARK_GRAY);
@@ -678,10 +765,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (hasCyto) {
             g2.setColor(new Color(235, 235, 235));
             g2.fill(annularPath(cx, cy, rIn, rOut, fStart, fEnd));
-            double L = c.length, span = fEnd - fStart;
+            double span = fEnd - fStart;
             for (Cytoband cb : c.cytobands) {
-                double f0 = fStart + span * ((double) cb.getStart() / L);
-                double f1 = fStart + span * ((double) cb.getEnd() / L);
+                double f0 = fStart + span * c.viewFrac(cb.getStart());
+                double f1 = fStart + span * c.viewFrac(cb.getEnd());
                 if (f1 <= f0) continue;
                 g2.setColor(cytoColor(cb));
                 g2.fill(annularPath(cx, cy, rIn, rOut, f0, f1));
@@ -689,7 +776,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             g2.setColor(new Color(150, 150, 150));
             g2.setStroke(new BasicStroke(0.5f));
             for (Cytoband cb : c.cytobands) {
-                double f = fStart + span * ((double) cb.getEnd() / L);
+                double f = fStart + span * c.viewFrac(cb.getEnd());
                 Point2D a = polar(cx, cy, rIn, f), b = polar(cx, cy, rOut, f);
                 g2.drawLine((int) a.getX(), (int) a.getY(), (int) b.getX(), (int) b.getY());
             }
@@ -705,13 +792,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     /** Tick lines + Mb labels, parameterised like Circos ticks (orientation, spacing, size). */
     private static void drawBandTicks(Graphics2D g2, double cx, double cy,
                                       double rIn, double rOut,
-                                      double fStart, double fEnd, long length, double spanDeg,
+                                      double fStart, double fEnd, ChrInfo c, double spanDeg,
                                       CircularSettings s) {
         if (!s.showTicks && !s.showTickLabels) return;
         if (spanDeg < 1.0) return;
 
-        // Tick interval follows the available arc: a zoomed chromosome (large spanDeg) gets
-        // finer ticks, a tiny one gets coarser — so labels stay ~70px apart ("reasonable ruler").
+        // Tick interval follows the visible bp window, so a Shift+wheel zoom gets finer ticks
+        // (down to bp) while the arc width stays the same.
+        double viewLen = c.viewSpan();
         long step;
         if (s.tickSpacingMb > 0) {
             step = Math.max(1, Math.round(s.tickSpacingMb * 1_000_000.0));
@@ -719,15 +807,17 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double midR = (rIn + rOut) / 2.0;
             double arcPx = arcLength(midR, spanDeg);
             int targetTicks = Math.max(2, (int) Math.round(arcPx / 70.0));
-            step = niceStep(length, targetTicks);
+            step = Math.max(1, niceStep((long) viewLen, targetTicks));
         }
         double span = fEnd - fStart;
         Font tickFont = new Font("SansSerif", Font.PLAIN, s.tickLabelSize);
         // angular spacing between adjacent ticks (used to decide if labels fit)
-        double stepDeg = spanDeg * ((double) step / Math.max(1, length));
+        double stepDeg = spanDeg * ((double) step / viewLen);
 
-        for (long p = 0; p <= length; p += step) {
-            double f = fStart + span * ((double) p / length);
+        long first = (long) (Math.ceil(c.viewStart / (double) step) * step);
+        for (long p = first; p <= (long) c.viewEnd; p += step) {
+            if (p < c.viewStart) continue;
+            double f = fStart + span * c.viewFrac(p);
 
             if (s.showTicks) {
                 Point2D a = polar(cx, cy, rIn - 2, f), b = polar(cx, cy, rOut + 2, f);
@@ -1039,6 +1129,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         for (int i = 0; i < chrs.size(); i++) {
             float[] b = dataCache.get(track.getName() + "|" + chrs.get(i).name);
             if (b == null) continue;
+            ChrInfo c = chrs.get(i);
+            double len = Math.max(1, c.length);
             double f0 = sec.get(i)[0], span = sec.get(i)[1] - f0;
             int n = b.length;
 
@@ -1062,7 +1154,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     float v = b[k];
                     if (Float.isNaN(v) || Float.isInfinite(v)) { pen = false; continue; }
                     double t = flat ? 0.5 : clamp01((v - mn) / denom);
-                    double a = f0 + span * ((k + 0.5) / n);
+                    double a = f0 + span * c.viewFrac(len * (k + 0.5) / n);
                     Point2D p = polar(cx, cy, bandInner + bandH * t, a);
                     if (!pen) { path.moveTo(p.getX(), p.getY()); pen = true; } else path.lineTo(p.getX(), p.getY());
                 }
@@ -1077,8 +1169,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 float v = b[k];
                 if (Float.isNaN(v) || Float.isInfinite(v)) continue;
                 double t = flat ? 0.5 : clamp01((v - mn) / denom);
-                double a0 = f0 + span * ((double) k / n);
-                double a1 = f0 + span * ((double) (k + 1) / n);
+                double binStart = len * k / n, binEnd = len * (k + 1) / n;
+                if (binEnd < c.viewStart || binStart > c.viewEnd) continue;   // outside the window
+                double a0 = f0 + span * c.viewFrac(binStart);
+                double a1 = f0 + span * c.viewFrac(binEnd);
                 if ("Heatmap".equalsIgnoreCase(type)) {
                     g2.setColor(ramp(t));
                     g2.fill(annularPath(cx, cy, bandInner, bandOuter, a0, a1));
@@ -1132,16 +1226,18 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 double rr = (bandInner + bandOuter) / 2.0;
                 double thick = Math.min(3.0, bandH * 0.6);
                 for (Feature f : list) {
-                    double a = f0 + span * clamp01(f.getStart() / len);
-                    double b = f0 + span * clamp01(f.getEnd() / len);
+                    if (f.getEnd() < c.viewStart || f.getStart() > c.viewEnd) continue;
+                    double a = f0 + span * c.viewFrac(f.getStart());
+                    double b = f0 + span * c.viewFrac(f.getEnd());
                     if (b <= a) b = a + 1e-7;
                     fillArc(g2, cx, cy, rr - thick / 2, rr + thick / 2, a, b, cfg.color);
                 }
             } else {
                 List<List<double[]>> rows = new ArrayList<>();
                 for (Feature f : list) {
-                    double a = f0 + span * clamp01(f.getStart() / len);
-                    double b = f0 + span * clamp01(f.getEnd() / len);
+                    if (f.getEnd() < c.viewStart || f.getStart() > c.viewEnd) continue;
+                    double a = f0 + span * c.viewFrac(f.getStart());
+                    double b = f0 + span * c.viewFrac(f.getEnd());
                     if (b <= a) b = a + 1e-7;
                     int r = 0;
                     while (r < rows.size() && overlapsAny(rows.get(r), a, b)) r++;
@@ -1238,13 +1334,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             if (i1 == null || i2 == null) continue;   // one end on a hidden chromosome
 
             double[] sector1 = sec.get(i1), sector2 = sec.get(i2);
-            double len1 = Math.max(1, chrs.get(i1).length);
-            double len2 = Math.max(1, chrs.get(i2).length);
+            ChrInfo ci1 = chrs.get(i1), ci2 = chrs.get(i2);
 
-            double a1s = bpToFrac(link.start1, len1, sector1);
-            double a1e = bpToFrac(link.end1, len1, sector1);
-            double a2s = bpToFrac(link.start2, len2, sector2);
-            double a2e = bpToFrac(link.end2, len2, sector2);
+            double a1s = bpToFrac(link.start1, ci1, sector1);
+            double a1e = bpToFrac(link.end1, ci1, sector1);
+            double a2s = bpToFrac(link.start2, ci2, sector2);
+            double a2e = bpToFrac(link.end2, ci2, sector2);
             if (a1e < a1s) { double t = a1s; a1s = a1e; a1e = t; }
             if (a2e < a2s) { double t = a2s; a2s = a2e; a2e = t; }
 
@@ -1342,10 +1437,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         }
     }
 
-    /** bp -> fraction of the whole circle, clamped inside one chromosome sector. */
-    private static double bpToFrac(long bp, double chrLength, double[] sector) {
-        double t = clamp01(bp / chrLength);
-        return sector[0] + (sector[1] - sector[0]) * t;
+    /** bp -> fraction of the whole circle, clamped inside one chromosome sector and its window. */
+    private static double bpToFrac(long bp, ChrInfo c, double[] sector) {
+        return c.fracIn(sector, bp);
     }
 
     /**
@@ -1616,17 +1710,45 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         final double weight;
         final List<Cytoband> cytobands;
         final Color color;
+        /** Visible bp window inside this chromosome; the whole chromosome by default. */
+        final double viewStart;
+        final double viewEnd;
 
         public ChrInfo(String name, long length, List<Cytoband> cytobands, Color color) {
             this(name, length, length, cytobands, color);
         }
 
         public ChrInfo(String name, long length, double weight, List<Cytoband> cytobands, Color color) {
+            this(name, length, weight, cytobands, color, 0, length);
+        }
+
+        public ChrInfo(String name, long length, double weight, List<Cytoband> cytobands, Color color,
+                       double viewStart, double viewEnd) {
             this.name = name;
             this.length = length;
             this.weight = weight;
             this.cytobands = cytobands;
             this.color = color;
+            double s = Math.max(0, Math.min(viewStart, length));
+            double e = Math.max(s + 1, Math.min(viewEnd, length));
+            this.viewStart = s;
+            this.viewEnd = e;
+        }
+
+        /** bp length covered by the visible window. */
+        double viewSpan() {
+            return Math.max(1, viewEnd - viewStart);
+        }
+
+        /** bp -> 0..1 position inside the visible window (clamped). */
+        double viewFrac(double bp) {
+            double t = (bp - viewStart) / viewSpan();
+            return t < 0 ? 0 : (t > 1 ? 1 : t);
+        }
+
+        /** bp -> absolute fraction of the full circle, given this chromosome's sector. */
+        double fracIn(double[] sector, double bp) {
+            return sector[0] + (sector[1] - sector[0]) * viewFrac(bp);
         }
     }
 }
