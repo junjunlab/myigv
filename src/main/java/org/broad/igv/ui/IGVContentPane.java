@@ -449,6 +449,23 @@ public class IGVContentPane extends JPanel {
         expanded.addActionListener(a -> { cfg.expanded = expanded.isSelected(); circularDrawingArea.invalidateRing(); });
         menu.add(expanded);
 
+        JMenu graph = new JMenu("Graph type");
+        ButtonGroup gg = new ButtonGroup();
+        for (String tp : new String[]{"Bar", "Point", "Line", "Heatmap"}) {
+            JRadioButtonMenuItem mi = new JRadioButtonMenuItem(tp, tp.equals(cfg.graphType));
+            mi.addActionListener(a -> { cfg.graphType = tp; circularDrawingArea.invalidateRing(); });
+            gg.add(mi);
+            graph.add(mi);
+        }
+        menu.add(graph);
+
+        JMenuItem colorItem = new JMenuItem("Colour…");
+        colorItem.addActionListener(a -> {
+            Color c = JColorChooser.showDialog(this, "Track colour", cfg.color);
+            if (c != null) { cfg.color = c; circularDrawingArea.invalidateRing(); }
+        });
+        menu.add(colorItem);
+
         menu.addSeparator();
         JMenuItem removeRing = new JMenuItem("Remove track from ring");
         removeRing.addActionListener(a -> circularDrawingArea.removeRingTrack(track.getName()));

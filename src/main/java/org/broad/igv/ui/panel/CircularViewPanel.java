@@ -158,6 +158,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public int heightPx = 26;
         public boolean expanded = false;
         public Color color = new Color(60, 90, 170);
+        /** Data-track rendering: "Bar" (default, IGV wig style), "Point", "Line", "Heatmap". */
+        public String graphType = "Bar";
     }
 
     public CircularViewPanel() {
@@ -795,7 +797,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         }
     }
 
-    /** Draw a continuous data track as a per-bin annular heatmap (value -> colour). */
+    /** Draw a continuous data track (bigWig/bedGraph) as Bar / Point / Line / Heatmap. */
     private void drawDataRing(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
                               List<ChrInfo> chrs, List<double[]> sec, Track track, TrackRingConfig cfg) {
         float mn = Float.POSITIVE_INFINITY, mx = Float.NEGATIVE_INFINITY;
@@ -805,19 +807,50 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < mn) mn = v; if (v > mx) mx = v; }
         }
         if (mn == Float.POSITIVE_INFINITY) return;
-        if (mx <= mn) mx = mn + 1e-6f;
+        boolean flat = (mx - mn) <= 1e-9f;
+        double bandH = bandOuter - bandInner;
+        String type = cfg.graphType == null ? "Bar" : cfg.graphType;
+
         for (int i = 0; i < chrs.size(); i++) {
             float[] b = dataCache.get(track.getName() + "|" + chrs.get(i).name);
             if (b == null) continue;
             double f0 = sec.get(i)[0], span = sec.get(i)[1] - f0;
             int n = b.length;
+
+            if ("Line".equalsIgnoreCase(type)) {
+                java.awt.geom.Path2D.Double path = new java.awt.geom.Path2D.Double();
+                boolean pen = false;
+                for (int k = 0; k < n; k++) {
+                    float v = b[k];
+                    if (Float.isNaN(v) || Float.isInfinite(v)) { pen = false; continue; }
+                    double t = flat ? 1.0 : (v - mn) / (mx - mn);
+                    double a = f0 + span * ((k + 0.5) / n);
+                    Point2D p = polar(cx, cy, bandInner + bandH * t, a);
+                    if (!pen) { path.moveTo(p.getX(), p.getY()); pen = true; } else path.lineTo(p.getX(), p.getY());
+                }
+                g2.setColor(cfg.color);
+                g2.setStroke(new BasicStroke(1.2f));
+                g2.draw(path);
+                g2.setStroke(new BasicStroke(1.0f));
+                continue;
+            }
+
             for (int k = 0; k < n; k++) {
                 float v = b[k];
                 if (Float.isNaN(v) || Float.isInfinite(v)) continue;
+                double t = flat ? 1.0 : (v - mn) / (mx - mn);
                 double a0 = f0 + span * ((double) k / n);
                 double a1 = f0 + span * ((double) (k + 1) / n);
-                g2.setColor(ramp((v - mn) / (mx - mn)));
-                g2.fill(annularPath(cx, cy, bandInner, bandOuter, a0, a1));
+                if ("Heatmap".equalsIgnoreCase(type)) {
+                    g2.setColor(ramp(t));
+                    g2.fill(annularPath(cx, cy, bandInner, bandOuter, a0, a1));
+                } else if ("Point".equalsIgnoreCase(type)) {
+                    Point2D p = polar(cx, cy, bandInner + bandH * t, (a0 + a1) / 2.0);
+                    g2.setColor(cfg.color);
+                    g2.fill(new java.awt.geom.Ellipse2D.Double(p.getX() - 1.2, p.getY() - 1.2, 2.4, 2.4));
+                } else { // Bar: radial bar from the inner baseline outward (IGV wig style)
+                    fillArc(g2, cx, cy, bandInner, bandInner + Math.max(1.0, bandH * t), a0, a1, cfg.color);
+                }
             }
         }
     }
