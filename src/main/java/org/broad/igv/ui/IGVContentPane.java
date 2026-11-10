@@ -295,144 +295,9 @@ public class IGVContentPane extends JPanel {
         menu.addSeparator();
 
         // ---- Circos links (bezier chords / ribbons between two genomic intervals) ----
-        JMenuItem loadLinks = new JMenuItem("Load links (BEDPE / Circos)…");
-        loadLinks.addActionListener(e -> loadCircularLinks(panel));
-
-        JMenuItem clearLinks = new JMenuItem("Clear links");
-        clearLinks.addActionListener(e -> { panel.clearRingLinks(); panel.refresh(); });
-
-        JCheckBoxMenuItem cbLinks = new JCheckBoxMenuItem("Show links", s.showLinks);
-        cbLinks.addActionListener(e -> { s.showLinks = cbLinks.isSelected(); panel.refresh(); });
-
-        JMenu linkApp = new JMenu("Link appearance");
-        linkApp.add(linkCheck("Ribbon (filled bands)", s.linkRibbon,
-                v -> { s.linkRibbon = v; panel.refresh(); }));
-        linkApp.add(linkCheck("Twist ribbons", s.linkTwist,
-                v -> { s.linkTwist = v; panel.refresh(); }));
-        linkApp.add(linkCheck("Colour by chromosome", s.linkColorByChromosome,
-                v -> { s.linkColorByChromosome = v; panel.refresh(); }));
-        linkApp.addSeparator();
-
-        JMenuItem linkColour = new JMenuItem("Colour…");
-        linkColour.addActionListener(e -> {
-            Color c = JColorChooser.showDialog(this, "Link colour", s.linkColor);
-            if (c != null) { s.linkColor = c; panel.refresh(); }
-        });
-        linkApp.add(linkColour);
-
-        JMenuItem linkThickness = new JMenuItem("Thickness… (" + s.linkThickness + ")");
-        linkThickness.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(this, "Link thickness (px):", s.linkThickness);
-            if (v != null) {
-                try { s.linkThickness = Math.max(0.1f, Float.parseFloat(v.trim())); panel.refresh(); }
-                catch (NumberFormatException ignore) { }
-            }
-        });
-        linkApp.add(linkThickness);
-
-        JMenuItem linkAlpha = new JMenuItem("Link transparency (0 = solid)… (" + (255 - s.linkAlpha) + ")");
-        linkAlpha.setToolTipText("0 draws solid links; raise it to let overlapping links show through.");
-        linkAlpha.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(this,
-                    "Link transparency (0 = solid, 255 = invisible):", 255 - s.linkAlpha);
-            if (v != null) {
-                try {
-                    int t = Math.max(0, Math.min(255, Integer.parseInt(v.trim())));
-                    s.linkAlpha = 255 - t;
-                    panel.refresh();
-                } catch (NumberFormatException ignore) { }
-            }
-        });
-        linkApp.add(linkAlpha);
-        linkApp.addSeparator();
-
-        JMenuItem linkRadius = new JMenuItem("End radius (0-1)… (" + s.linkRadius + ")");
-        linkRadius.setToolTipText("Fraction of the ideogram inner radius. Lower it to keep links clear of the data rings.");
-        linkRadius.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(this,
-                    "Link end radius, as a fraction of the ideogram inner radius (0.05-1):", s.linkRadius);
-            if (v != null) {
-                try {
-                    s.linkRadius = Math.max(0.05, Math.min(1.0, Double.parseDouble(v.trim())));
-                    panel.refresh();
-                } catch (NumberFormatException ignore) { }
-            }
-        });
-        linkApp.add(linkRadius);
-
-        JMenuItem linkBez = new JMenuItem("Bezier radius (0-1)… (" + s.linkBezierRadius + ")");
-        linkBez.setToolTipText("Circos bezier_radius: radial position of the curve's control point. 0 = straight chord.");
-        linkBez.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(this,
-                    "Bezier control radius (0 = straight chord):", s.linkBezierRadius);
-            if (v != null) {
-                try {
-                    s.linkBezierRadius = Math.max(0.0, Math.min(1.0, Double.parseDouble(v.trim())));
-                    panel.refresh();
-                } catch (NumberFormatException ignore) { }
-            }
-        });
-        linkApp.add(linkBez);
-
-        JMenuItem linkCrest = new JMenuItem("Crest (0-1)… (" + s.linkCrest + ")");
-        linkCrest.setToolTipText("Circos crest: makes links meet the ideogram perpendicularly. 0 disables.");
-        linkCrest.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(this, "Crest (0 disables):", s.linkCrest);
-            if (v != null) {
-                try {
-                    s.linkCrest = Math.max(0.0, Math.min(1.0, Double.parseDouble(v.trim())));
-                    panel.refresh();
-                } catch (NumberFormatException ignore) { }
-            }
-        });
-        linkApp.add(linkCrest);
-
-        JMenuItem linkMinWidth = new JMenuItem("Min ribbon width (deg)… (" + s.linkRibbonMinDeg + ")");
-        linkMinWidth.setToolTipText("Widens ribbon ends so links with tiny anchors stay visible.");
-        linkMinWidth.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(this,
-                    "Minimum ribbon end width, in degrees:", s.linkRibbonMinDeg);
-            if (v != null) {
-                try {
-                    s.linkRibbonMinDeg = Math.max(0, Double.parseDouble(v.trim()));
-                    panel.refresh();
-                } catch (NumberFormatException ignore) { }
-            }
-        });
-        linkApp.add(linkMinWidth);
-
-        JMenuItem ribbonAlpha = new JMenuItem("Ribbon transparency (0 = solid)… (" + (255 - s.linkRibbonAlpha) + ")");
-        ribbonAlpha.setToolTipText("0 draws solid ribbons; raise it to let overlaps show through.");
-        ribbonAlpha.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(this,
-                    "Ribbon transparency (0 = solid, 255 = invisible):", 255 - s.linkRibbonAlpha);
-            if (v != null) {
-                try {
-                    int t = Math.max(0, Math.min(255, Integer.parseInt(v.trim())));
-                    s.linkRibbonAlpha = 255 - t;
-                    panel.refresh();
-                } catch (NumberFormatException ignore) { }
-            }
-        });
-        linkApp.add(ribbonAlpha);
-
-        linkApp.add(linkCheck("Outline ribbons", s.linkRibbonStroke,
-                v -> { s.linkRibbonStroke = v; panel.refresh(); }));
-
-        JMenuItem linkMax = new JMenuItem("Max links… (" + s.linkRecordLimit + ")");
-        linkMax.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(this, "Maximum links to draw:", s.linkRecordLimit);
-            if (v != null) {
-                try { s.linkRecordLimit = Math.max(1, Integer.parseInt(v.trim())); panel.refresh(); }
-                catch (NumberFormatException ignore) { }
-            }
-        });
-        linkApp.add(linkMax);
-
-        menu.add(loadLinks);
-        menu.add(clearLinks);
-        menu.add(cbLinks);
-        menu.add(linkApp);
+        JMenu linksMenu = new JMenu("Links");
+        addLinkItems(linksMenu.getPopupMenu(), panel);
+        menu.add(linksMenu);
         menu.addSeparator();
 
         JMenu ticksPos = new JMenu("Tick labels position");
@@ -537,19 +402,160 @@ public class IGVContentPane extends JPanel {
     }
 
     /**
+     * Append every Circos-link parameter to a popup. Shared by the "View options" dropdown and
+     * the Data Tracks right-click menu, so both expose exactly the same set of actions.
+     */
+    public static void addLinkItems(JPopupMenu popup, CircularViewPanel panel) {
+        CircularViewPanel.CircularSettings s = panel.getSettings();
+
+        JMenuItem loadLinks = new JMenuItem("Load links (BEDPE / Circos)…");
+        loadLinks.addActionListener(e -> loadCircularLinks(panel));
+        popup.add(loadLinks);
+
+        JMenuItem clearLinks = new JMenuItem("Clear links (" + panel.getRingLinkCount() + " loaded)");
+        clearLinks.addActionListener(e -> { panel.clearRingLinks(); panel.refresh(); });
+        popup.add(clearLinks);
+
+        popup.add(linkCheck("Show links", s.showLinks,
+                v -> { s.showLinks = v; panel.refresh(); }));
+        popup.addSeparator();
+
+        popup.add(linkCheck("Ribbon (filled bands)", s.linkRibbon,
+                v -> { s.linkRibbon = v; panel.refresh(); }));
+        popup.add(linkCheck("Twist ribbons", s.linkTwist,
+                v -> { s.linkTwist = v; panel.refresh(); }));
+        popup.add(linkCheck("Colour by chromosome", s.linkColorByChromosome,
+                v -> { s.linkColorByChromosome = v; panel.refresh(); }));
+
+        JMenuItem colour = new JMenuItem("Colour…");
+        colour.addActionListener(e -> {
+            Color c = JColorChooser.showDialog(panel, "Link colour", s.linkColor);
+            if (c != null) { s.linkColor = c; panel.refresh(); }
+        });
+        popup.add(colour);
+
+        JMenuItem thickness = new JMenuItem("Thickness… (" + s.linkThickness + " px)");
+        thickness.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel, "Link thickness (px):", s.linkThickness);
+            if (v != null) {
+                try { s.linkThickness = Math.max(0.1f, Float.parseFloat(v.trim())); panel.refresh(); }
+                catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(thickness);
+
+        JMenuItem linkAlpha = new JMenuItem("Transparency (0 = solid)… (" + (255 - s.linkAlpha) + ")");
+        linkAlpha.setToolTipText("0 draws solid links; raise it to let overlapping links show through.");
+        linkAlpha.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Link transparency (0 = solid, 255 = invisible):", 255 - s.linkAlpha);
+            if (v != null) {
+                try {
+                    int t = Math.max(0, Math.min(255, Integer.parseInt(v.trim())));
+                    s.linkAlpha = 255 - t;
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(linkAlpha);
+        popup.addSeparator();
+
+        JMenuItem radius = new JMenuItem("End radius (0-1)… (" + s.linkRadius + ")");
+        radius.setToolTipText("Fraction of the ideogram inner radius. Lower it to keep links clear of the data rings.");
+        radius.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Link end radius, as a fraction of the ideogram inner radius (0.05-1):", s.linkRadius);
+            if (v != null) {
+                try {
+                    s.linkRadius = Math.max(0.05, Math.min(1.0, Double.parseDouble(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(radius);
+
+        JMenuItem bezier = new JMenuItem("Bezier radius (0-1)… (" + s.linkBezierRadius + ")");
+        bezier.setToolTipText("Circos bezier_radius: radial position of the control point. 0 = straight chord.");
+        bezier.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Bezier control radius (0 = straight chord):", s.linkBezierRadius);
+            if (v != null) {
+                try {
+                    s.linkBezierRadius = Math.max(0.0, Math.min(1.0, Double.parseDouble(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(bezier);
+
+        JMenuItem crest = new JMenuItem("Crest (0-1)… (" + s.linkCrest + ")");
+        crest.setToolTipText("Circos crest: makes links meet the ideogram perpendicularly. 0 disables.");
+        crest.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel, "Crest (0 disables):", s.linkCrest);
+            if (v != null) {
+                try {
+                    s.linkCrest = Math.max(0.0, Math.min(1.0, Double.parseDouble(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(crest);
+
+        JMenuItem minWidth = new JMenuItem("Min ribbon width (deg)… (" + s.linkRibbonMinDeg + ")");
+        minWidth.setToolTipText("Widens ribbon ends so links with tiny anchors stay visible.");
+        minWidth.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Minimum ribbon end width, in degrees:", s.linkRibbonMinDeg);
+            if (v != null) {
+                try { s.linkRibbonMinDeg = Math.max(0, Double.parseDouble(v.trim())); panel.refresh(); }
+                catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(minWidth);
+
+        JMenuItem ribbonAlpha = new JMenuItem("Ribbon transparency (0 = solid)… (" + (255 - s.linkRibbonAlpha) + ")");
+        ribbonAlpha.setToolTipText("0 draws solid ribbons; raise it to let overlaps show through.");
+        ribbonAlpha.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Ribbon transparency (0 = solid, 255 = invisible):", 255 - s.linkRibbonAlpha);
+            if (v != null) {
+                try {
+                    int t = Math.max(0, Math.min(255, Integer.parseInt(v.trim())));
+                    s.linkRibbonAlpha = 255 - t;
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(ribbonAlpha);
+
+        popup.add(linkCheck("Outline ribbons", s.linkRibbonStroke,
+                v -> { s.linkRibbonStroke = v; panel.refresh(); }));
+
+        JMenuItem maxLinks = new JMenuItem("Max links… (" + s.linkRecordLimit + ")");
+        maxLinks.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel, "Maximum links to draw:", s.linkRecordLimit);
+            if (v != null) {
+                try { s.linkRecordLimit = Math.max(1, Integer.parseInt(v.trim())); panel.refresh(); }
+                catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(maxLinks);
+    }
+
+    /**
      * Load a Circos-link / BEDPE file straight into the circular view. No track is created and
      * the file's extension does not matter: we call {@link BedPEParser#parse} directly, which
      * detects UTF-8 / UTF-16 (with or without BOM), canonicalises chromosome names and skips
      * malformed rows. Routing the file through {@code TrackLoader} instead would send a
      * {@code .bed} / {@code .links} file to the plain BED codec, which silently drops the links.
      */
-    private void loadCircularLinks(CircularViewPanel panel) {
+    private static void loadCircularLinks(CircularViewPanel panel) {
         JFileChooser chooser = new JFileChooser();
         chooser.setDialogTitle("Load Circos links (BEDPE / links file)");
         chooser.setFileFilter(new FileNameExtensionFilter(
                 "Links / BEDPE (*.bed, *.bedpe, *.links, *.txt, *.gz)",
                 "bed", "bedpe", "links", "txt", "gz"));
-        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+        if (chooser.showOpenDialog(panel) != JFileChooser.APPROVE_OPTION) {
             return;
         }
 
@@ -578,13 +584,12 @@ public class IGVContentPane extends JPanel {
 
             panel.setRingLinks(links);
             panel.refresh();
-            resetStatusMessage();
-            JOptionPane.showMessageDialog(this,
+            JOptionPane.showMessageDialog(panel,
                     "Loaded " + links.size() + " link(s) from " + file.getName(),
                     "Circular links", JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception ex) {
             log.error("Failed to load circular links from " + file, ex);
-            JOptionPane.showMessageDialog(this,
+            JOptionPane.showMessageDialog(panel,
                     "Could not load links from " + file.getName() + "\n" + ex.getMessage(),
                     "Circular links", JOptionPane.ERROR_MESSAGE);
         }
@@ -843,6 +848,13 @@ public class IGVContentPane extends JPanel {
             }
         });
         menu.add(removeRing);
+
+        // Links live here too, so right-clicking the data column exposes the link parameters
+        // without going back up to the toolbar.
+        menu.addSeparator();
+        JMenu linksMenu = new JMenu("Links");
+        addLinkItems(linksMenu.getPopupMenu(), circularDrawingArea);
+        menu.add(linksMenu);
 
         menu.show(dataColumnList, e.getX(), e.getY());
     }
