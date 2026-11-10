@@ -1254,6 +1254,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (hit != null) return hit;
         if (adaptivePending.add(key)) {                 // submit at most once per window signature
             final int fn = n, fbp = (int) binBp;
+            // zoom=0 maps to the COARSEST precomputed summary, so a small window would get the
+            // same value in every bin (flat bars). Pick a zoom whose bin size is <= fbp.
+            final int fzoom = zoomForBinSize(c.length, binBp);
             final long fws = ws, fwe = we;
             final String fchr = c.chrKey();
             final DataTrack dt = (DataTrack) track;
@@ -1264,7 +1267,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                         long st = fws + (long) i * fbp;
                         long en = Math.min(fwe, st + fbp);
                         if (st >= fwe) { bins[i] = Float.NaN; continue; }
-                        bins[i] = dt.getRegionScore(fchr, (int) st, (int) en, 0, RegionScoreType.SCORE, null);
+                        bins[i] = dt.getRegionScore(fchr, (int) st, (int) en, fzoom, RegionScoreType.SCORE, null);
                     }
                 } catch (Throwable ex) {
                     java.util.Arrays.fill(bins, Float.NaN);
@@ -1277,6 +1280,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             });
         }
         return null;
+    }
+
+    /** IGV zoom level whose per-bin resolution (chrLen / (2^z * 700)) is at most {@code binBp},
+     *  so a small re-sampled window gets fine data instead of the coarse precomputed summary. */
+    private static int zoomForBinSize(long chrLength, long binBp) {
+        double target = Math.max(1.0, (double) chrLength / ((double) binBp * 700.0));
+        int z = (int) Math.ceil(Math.log(target) / Math.log(2.0));
+        return Math.max(0, Math.min(z, 22));
     }
 
     /** Shared Y range across ALL data tracks and the given chromosomes (group scale). */
@@ -1509,7 +1520,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // legible once the gene is wide enough to warrant it.
         double cdsH = Math.max(2.0, availH * 0.46);     // IGV blockHeight (14) -> thick CDS
         double utrH = Math.max(1.2, availH * 0.23);     // IGV NON_CODING_HEIGHT (8) -> thin UTR
-        double spineH = Math.max(0.4, availH * 0.10);
+        double spineH = 0.5;                            // IGV intron line is 1px (default stroke)
         fillArc(g2, cx, cy, rMid - spineH, rMid + spineH, a, b, color);
 
         for (Exon exon : exons) {
@@ -1533,6 +1544,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // being stamped across the whole transcript (which put them on top of the exon blocks).
         drawIntronArrows(g2, cx, cy, rMid, f0, span, c, exons, strandDir(bf),
                 Math.min(3.2, Math.max(1.4, availH * 0.16)), color);
+        // In-block white chevrons inside each exon (IGV also draws these), so single-exon genes
+        // like JUN/JUND that have no introns still show the transcription direction.
+        for (Exon exon : exons) {
+            double ea = f0 + span * c.viewFrac(exon.getStart());
+            double eb = f0 + span * c.viewFrac(exon.getEnd());
+            if (eb <= ea) continue;
+            drawStrandArrows(g2, cx, cy, rMid, ea, eb, strandDir(bf),
+                    Math.min(cdsH * 0.5, Math.max(1.5, availH * 0.20)), color);
+        }
     }
 
     /** Direction chevrons on the intron lines (between consecutive exons), matching IGV's linear
