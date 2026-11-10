@@ -207,9 +207,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     /** Resolved gene features for the current gene-list mode, keyed by gene name. */
     private final Map<String, List<Feature>> geneFeatures = new HashMap<>();
     private final Set<String> pendingLoads = ConcurrentHashMap.newKeySet();
-    private final Map<String, float[]> dataCache = new ConcurrentHashMap<>();   // bigWig/bedGraph bins
+    private final Map<String, float[]> dataCache = new ConcurrentHashMap<>();   // bigWig/bedGraph bins (whole chr)
     private final Set<String> dataPending = ConcurrentHashMap.newKeySet();
     private static final int DATA_BINS = 300;                                    // bins per chromosome
+    /** Fine, window-scoped bigWig bins recomputed on zoom (so a zoomed window is not a stretched
+     *  coarse bin). Keyed by "track|chr|windowStart_windowEnd_binBp". */
+    private final Map<String, float[]> adaptiveCache = new ConcurrentHashMap<>();
+    private final Set<String> adaptivePending = ConcurrentHashMap.newKeySet();
+    /** Target number of bins across the visible window when zoomed (resolution tracks the zoom). */
+    private static final int ADAPTIVE_BINS = 600;
     private final Map<String, Integer> loadAttempts = new HashMap<>();
     private final Map<String, Long> lastAttemptMs = new HashMap<>();
     private final Map<String, Boolean> trackLoaded = new HashMap<>();
@@ -381,6 +387,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             zoom.clear(); rangeZoom.clear(); featureCache.clear(); geneFeatures.clear(); pendingLoads.clear();
             loadAttempts.clear(); lastAttemptMs.clear(); trackLoaded.clear();
             dataCache.clear(); dataPending.clear();
+            adaptiveCache.clear(); adaptivePending.clear();
             lastGenomeId = gid; ringKey = null;
         }
 
@@ -1212,13 +1219,60 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         }
     }
 
+    /**
+     * BigWig bin source for one sector. When the whole chromosome is visible we return the cheap
+     * whole-chromosome 300-bin summary from {@link #ensureDataLoaded}. When only a window is visible
+     * (zoomed in, or a gene-list sector) we re-sample at a finer granularity scoped to that window,
+     * so the bars reflect the actual values in view rather than a stretched coarse bin. The fine
+     * bins are cached by window signature and computed in the background; the method returns
+     * {@code null} while a re-sample is still pending (the ring repaints when it finishes).
+     */
+    private float[] binsFor(Track track, ChrInfo c) {
+        double span = c.viewSpan();
+        if (span >= c.length * 0.999) {
+            return dataCache.get(track.getName() + "|" + c.chrKey());
+        }
+        long ws = (long) Math.floor(c.viewStart);
+        long we = (long) Math.ceil(c.viewEnd);
+        long binBp = Math.max(1, (long) Math.ceil(span / ADAPTIVE_BINS));
+        int n = (int) Math.max(2, Math.ceil(span / binBp));
+        String key = track.getName() + "|" + c.chrKey() + "|" + ws + "_" + we + "_" + binBp;
+        float[] hit = adaptiveCache.get(key);
+        if (hit != null) return hit;
+        if (adaptivePending.add(key)) {                 // submit at most once per window signature
+            final int fn = n, fbp = (int) binBp;
+            final long fws = ws, fwe = we;
+            final String fchr = c.chrKey();
+            final DataTrack dt = (DataTrack) track;
+            featureLoader.submit(() -> {
+                float[] bins = new float[fn];
+                try {
+                    for (int i = 0; i < fn; i++) {
+                        long st = fws + (long) i * fbp;
+                        long en = Math.min(fwe, st + fbp);
+                        if (st >= fwe) { bins[i] = Float.NaN; continue; }
+                        bins[i] = dt.getRegionScore(fchr, (int) st, (int) en, 0, RegionScoreType.SCORE, null);
+                    }
+                } catch (Throwable ex) {
+                    java.util.Arrays.fill(bins, Float.NaN);
+                }
+                adaptiveCache.put(key, bins);
+                adaptivePending.remove(key);
+                // Soft cap so the cache cannot grow without bound across many zoom levels.
+                if (adaptiveCache.size() > 4000) adaptiveCache.clear();
+                SwingUtilities.invokeLater(this::invalidateRing);
+            });
+        }
+        return null;
+    }
+
     /** Shared Y range across ALL data tracks and the given chromosomes (group scale). */
     private float[] computeSharedYRange(List<ChrInfo> chrs) {
         float mn = Float.POSITIVE_INFINITY, mx = Float.NEGATIVE_INFINITY;
         for (Track t : ringTracks) {
             if (!(t instanceof DataTrack)) continue;
             for (ChrInfo c : chrs) {
-                float[] b = dataCache.get(t.getName() + "|" + c.chrKey());
+                float[] b = binsFor(t, c);
                 if (b == null) continue;
                 for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < mn) mn = v; if (v > mx) mx = v; }
             }
@@ -1236,7 +1290,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             float[] r = map.get(cfg.yGroup);
             if (r == null) { r = new float[]{Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY}; map.put(cfg.yGroup, r); }
             for (ChrInfo c : chrs) {
-                float[] b = dataCache.get(t.getName() + "|" + c.chrKey());
+                float[] b = binsFor(t, c);
                 if (b == null) continue;
                 for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < r[0]) r[0] = v; if (v > r[1]) r[1] = v; }
             }
@@ -1258,7 +1312,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             gmx = shared[1];
         } else if (global) {
             for (ChrInfo c : chrs) {
-                float[] b = dataCache.get(track.getName() + "|" + c.chrKey());
+                float[] b = binsFor(track, c);
                 if (b == null) continue;
                 for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < gmn) gmn = v; if (v > gmx) gmx = v; }
             }
@@ -1266,10 +1320,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         }
 
         for (int i = 0; i < chrs.size(); i++) {
-            float[] b = dataCache.get(track.getName() + "|" + chrs.get(i).chrKey());
+            float[] b = binsFor(track, chrs.get(i));
             if (b == null) continue;
             ChrInfo c = chrs.get(i);
-            double len = Math.max(1, c.length);
+            double wSpan = c.viewSpan();
+            double vStart = c.viewStart;
             double f0 = sec.get(i)[0], span = sec.get(i)[1] - f0;
             int n = b.length;
 
@@ -1293,7 +1348,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     float v = b[k];
                     if (Float.isNaN(v) || Float.isInfinite(v)) { pen = false; continue; }
                     double t = flat ? 0.5 : clamp01((v - mn) / denom);
-                    double a = f0 + span * c.viewFrac(len * (k + 0.5) / n);
+                    double a = f0 + span * c.viewFrac(vStart + wSpan * (k + 0.5) / n);
                     Point2D p = polar(cx, cy, bandInner + bandH * t, a);
                     if (!pen) { path.moveTo(p.getX(), p.getY()); pen = true; } else path.lineTo(p.getX(), p.getY());
                 }
@@ -1308,7 +1363,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 float v = b[k];
                 if (Float.isNaN(v) || Float.isInfinite(v)) continue;
                 double t = flat ? 0.5 : clamp01((v - mn) / denom);
-                double binStart = len * k / n, binEnd = len * (k + 1) / n;
+                double binStart = vStart + wSpan * k / n, binEnd = vStart + wSpan * (k + 1) / n;
                 if (binEnd < c.viewStart || binStart > c.viewEnd) continue;   // outside the window
                 double a0 = f0 + span * c.viewFrac(binStart);
                 double a1 = f0 + span * c.viewFrac(binEnd);
