@@ -161,12 +161,25 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         String chr = FrameManager.getDefaultFrame().getChrName();
         if (chr == null || chr.isEmpty()) chr = genome.getHomeChromosome();
 
-        String key = gid + "|" + chr + "|" + w + "x" + h;
+        // Render the offscreen ring at DEVICE resolution so it stays crisp on HiDPI
+        // (Windows 125/150/200% scaling). The component is w x h logical pixels; the
+        // graphics transform carries the device scale (sx, sy).
+        AffineTransform tx = g2.getTransform();
+        double sx = tx.getScaleX(), sy = tx.getScaleY();
+        if (sx <= 0) sx = 1.0;
+        if (sy <= 0) sy = 1.0;
+        int bw = Math.max(1, (int) Math.ceil(w * sx));
+        int bh = Math.max(1, (int) Math.ceil(h * sy));
+
+        String key = gid + "|" + chr + "|" + bw + "x" + bh;
         if (!key.equals(ringKey) || ringImage == null) {
-            ringImage = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+            ringImage = new BufferedImage(bw, bh, BufferedImage.TYPE_INT_ARGB);
             Graphics2D ig = ringImage.createGraphics();
+            ig.scale(sx, sy);   // draw in logical coords, mapped to device pixels
             ig.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             ig.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            ig.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+            ig.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
             if (Globals.CHR_ALL.equals(chr)) {
                 drawAll(ig, w, h, buildAll(genome, zoom), settings);
             } else {
@@ -177,7 +190,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             ig.dispose();
             ringKey = key;
         }
-        g2.drawImage(ringImage, 0, 0, null);
+        // blit the device-resolution image back at logical size; the panel transform
+        // scales it to exactly bw x bh device pixels -> 1:1, sharp.
+        g2.drawImage(ringImage, 0, 0, w, h, null);
     }
 
     // ------------------------------------------------------------------
