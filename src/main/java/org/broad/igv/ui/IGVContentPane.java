@@ -27,6 +27,7 @@ package org.broad.igv.ui;
 
 import org.broad.igv.logging.*;
 import org.broad.igv.ui.commandbar.IGVCommandBar;
+import org.broad.igv.ui.panel.CircularViewPanel;
 import org.broad.igv.ui.panel.MainPanel;
 import org.broad.igv.ui.panel.TrackPanel;
 import org.broad.igv.track.Track;
@@ -57,7 +58,7 @@ public class IGVContentPane extends JPanel {
     private JPanel circularPanel;
     private JPanel dataColumnPanel;
     private JList<String> dataColumnList;
-    private JPanel circularDrawingArea;
+    private CircularViewPanel circularDrawingArea;
     private JSplitPane viewSplitPane;
     private Component currentCenter;
     private boolean showHorizontalView = true;
@@ -101,12 +102,9 @@ public class IGVContentPane extends JPanel {
         dataColumnList.setBackground(new Color(248, 248, 248));
         dataColumnPanel.add(new JScrollPane(dataColumnList), BorderLayout.CENTER);
 
-        // Drawing area of the circular view (blank placeholder for now).
-        circularDrawingArea = new JPanel(new BorderLayout());
-        circularDrawingArea.setBackground(new Color(245, 245, 245));
-        JLabel circularPlaceholder = new JLabel("Circular view — not drawn yet", SwingConstants.CENTER);
-        circularPlaceholder.setForeground(Color.GRAY);
-        circularDrawingArea.add(circularPlaceholder, BorderLayout.CENTER);
+        // Drawing area of the circular view: live ring genome plot (ideogram of the
+        // selected chromosome, or all chromosomes when the view is "All").
+        circularDrawingArea = new CircularViewPanel();
 
         // Circular view panel = [Data Tracks column | drawing area].  The Data Tracks
         // column lives inside the circular panel, on its left.
