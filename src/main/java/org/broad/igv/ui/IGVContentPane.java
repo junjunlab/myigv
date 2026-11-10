@@ -114,6 +114,8 @@ public class IGVContentPane extends JPanel {
             @Override public void mousePressed(MouseEvent e) { maybeShowTrackPopup(e); }
             @Override public void mouseReleased(MouseEvent e) { maybeShowTrackPopup(e); }
         });
+        // Ctrl / Shift click to select multiple tracks; the popup applies to all selected.
+        dataColumnList.setSelectionMode(javax.swing.ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
 
         // Drawing area of the circular view: live ring genome plot (ideogram of the
         // selected chromosome, or all chromosomes when the view is "All").
@@ -445,30 +447,51 @@ public class IGVContentPane extends JPanel {
         if (!e.isPopupTrigger()) return;
         int idx = dataColumnList.locationToIndex(e.getPoint());
         if (idx < 0 || idx >= dataColumnTracks.size()) return;
-        dataColumnList.setSelectedIndex(idx);
-        Track track = dataColumnTracks.get(idx);
-        CircularViewPanel.TrackRingConfig cfg = circularDrawingArea.getRingConfig(track.getName());
+        // Keep an existing multi-selection if the click landed inside it; else select just this row.
+        boolean inSel = false;
+        for (int si : dataColumnList.getSelectedIndices()) if (si == idx) { inSel = true; break; }
+        if (!inSel) dataColumnList.setSelectedIndex(idx);
+
+        final int[] sel = dataColumnList.getSelectedIndices();
+        final java.util.List<CircularViewPanel.TrackRingConfig> cfgs = new ArrayList<>();
+        for (int si : sel) {
+            if (si >= 0 && si < dataColumnTracks.size())
+                cfgs.add(circularDrawingArea.getRingConfig(dataColumnTracks.get(si).getName()));
+        }
+        if (cfgs.isEmpty()) return;
+        final CircularViewPanel.TrackRingConfig cfg = cfgs.get(0);
+        final int n = cfgs.size();
+        final String many = n > 1 ? " (" + n + " tracks)" : "";
 
         JPopupMenu menu = new JPopupMenu();
-        JMenuItem height = new JMenuItem("Track height… (" + cfg.heightPx + " px)");
+        JMenuItem height = new JMenuItem("Track height… (" + cfg.heightPx + " px" + many + ")");
         height.addActionListener(a -> {
             String v = JOptionPane.showInputDialog(this, "Ring track height (pixels):", cfg.heightPx);
             if (v != null) {
-                try { cfg.heightPx = Math.max(8, Integer.parseInt(v.trim())); circularDrawingArea.invalidateRing(); }
-                catch (NumberFormatException ignore) { }
+                try {
+                    int h = Math.max(8, Integer.parseInt(v.trim()));
+                    for (CircularViewPanel.TrackRingConfig c : cfgs) c.heightPx = h;
+                    circularDrawingArea.invalidateRing();
+                } catch (NumberFormatException ignore) { }
             }
         });
         menu.add(height);
 
         JCheckBoxMenuItem expanded = new JCheckBoxMenuItem("Expanded (stack features)", cfg.expanded);
-        expanded.addActionListener(a -> { cfg.expanded = expanded.isSelected(); circularDrawingArea.invalidateRing(); });
+        expanded.addActionListener(a -> {
+            for (CircularViewPanel.TrackRingConfig c : cfgs) c.expanded = expanded.isSelected();
+            circularDrawingArea.invalidateRing();
+        });
         menu.add(expanded);
 
         JMenu graph = new JMenu("Graph type");
         ButtonGroup gg = new ButtonGroup();
         for (String tp : new String[]{"Bar", "Point", "Line", "Heatmap"}) {
             JRadioButtonMenuItem mi = new JRadioButtonMenuItem(tp, tp.equals(cfg.graphType));
-            mi.addActionListener(a -> { cfg.graphType = tp; circularDrawingArea.invalidateRing(); });
+            mi.addActionListener(a -> {
+                for (CircularViewPanel.TrackRingConfig c : cfgs) c.graphType = tp;
+                circularDrawingArea.invalidateRing();
+            });
             gg.add(mi);
             graph.add(mi);
         }
@@ -477,9 +500,15 @@ public class IGVContentPane extends JPanel {
         JMenu yaxis = new JMenu("Y-axis range");
         ButtonGroup yg = new ButtonGroup();
         JRadioButtonMenuItem yPer = new JRadioButtonMenuItem("Per chromosome (default)", !cfg.globalYScale);
-        yPer.addActionListener(a -> { cfg.globalYScale = false; circularDrawingArea.invalidateRing(); });
+        yPer.addActionListener(a -> {
+            for (CircularViewPanel.TrackRingConfig c : cfgs) c.globalYScale = false;
+            circularDrawingArea.invalidateRing();
+        });
         JRadioButtonMenuItem yGlobal = new JRadioButtonMenuItem("All chromosomes (unified)", cfg.globalYScale);
-        yGlobal.addActionListener(a -> { cfg.globalYScale = true; circularDrawingArea.invalidateRing(); });
+        yGlobal.addActionListener(a -> {
+            for (CircularViewPanel.TrackRingConfig c : cfgs) c.globalYScale = true;
+            circularDrawingArea.invalidateRing();
+        });
         yg.add(yPer);
         yg.add(yGlobal);
         yaxis.add(yPer);
@@ -489,13 +518,21 @@ public class IGVContentPane extends JPanel {
         JMenuItem colorItem = new JMenuItem("Colour…");
         colorItem.addActionListener(a -> {
             Color c = JColorChooser.showDialog(this, "Track colour", cfg.color);
-            if (c != null) { cfg.color = c; circularDrawingArea.invalidateRing(); }
+            if (c != null) {
+                for (CircularViewPanel.TrackRingConfig cc : cfgs) cc.color = c;
+                circularDrawingArea.invalidateRing();
+            }
         });
         menu.add(colorItem);
 
         menu.addSeparator();
-        JMenuItem removeRing = new JMenuItem("Remove track from ring");
-        removeRing.addActionListener(a -> circularDrawingArea.removeRingTrack(track.getName()));
+        JMenuItem removeRing = new JMenuItem("Remove track from ring" + many);
+        removeRing.addActionListener(a -> {
+            for (int si : sel) {
+                if (si >= 0 && si < dataColumnTracks.size())
+                    circularDrawingArea.removeRingTrack(dataColumnTracks.get(si).getName());
+            }
+        });
         menu.add(removeRing);
 
         menu.show(dataColumnList, e.getX(), e.getY());
