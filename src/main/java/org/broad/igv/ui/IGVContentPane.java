@@ -34,7 +34,10 @@ import org.broad.igv.track.Track;
 import org.broad.igv.ui.util.ApplicationStatusBar;
 
 import javax.swing.*;
+import java.util.ArrayList;
 import java.util.List;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import javax.swing.plaf.basic.BasicBorders;
 import java.awt.*;
 
@@ -58,6 +61,7 @@ public class IGVContentPane extends JPanel {
     private JPanel circularPanel;
     private JPanel dataColumnPanel;
     private JList<String> dataColumnList;
+    private final List<Track> dataColumnTracks = new ArrayList<>();
     private CircularViewPanel circularDrawingArea;
     private JSplitPane viewSplitPane;
     private Component currentCenter;
@@ -101,6 +105,11 @@ public class IGVContentPane extends JPanel {
         dataColumnList = new JList<>();
         dataColumnList.setBackground(new Color(248, 248, 248));
         dataColumnPanel.add(new JScrollPane(dataColumnList), BorderLayout.CENTER);
+        // Right-click a track in the data column to set its ring band height / expand mode.
+        dataColumnList.addMouseListener(new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) { maybeShowTrackPopup(e); }
+            @Override public void mouseReleased(MouseEvent e) { maybeShowTrackPopup(e); }
+        });
 
         // Drawing area of the circular view: live ring genome plot (ideogram of the
         // selected chromosome, or all chromosomes when the view is "All").
@@ -224,43 +233,69 @@ public class IGVContentPane extends JPanel {
         bar.setFloatable(false);
         bar.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
 
-        JButton settingsBtn = new JButton("Settings…");
-        settingsBtn.addActionListener(e -> panel.showSettingsDialog(SwingUtilities.getWindowAncestor(panel)));
-        bar.add(settingsBtn);
+        // Everything folded into a single dropdown so the panel top stays uncluttered.
+        JButton options = new JButton("View options ▾");
+        JPopupMenu menu = new JPopupMenu();
 
-        JButton resetBtn = new JButton("Reset zoom");
-        resetBtn.addActionListener(e -> panel.resetZoom());
-        bar.add(resetBtn);
-        bar.addSeparator();
+        JCheckBoxMenuItem cbTicks = new JCheckBoxMenuItem("Show tick marks", s.showTicks);
+        cbTicks.addActionListener(e -> { s.showTicks = cbTicks.isSelected(); panel.refresh(); });
+        JCheckBoxMenuItem cbTickLabels = new JCheckBoxMenuItem("Show tick labels", s.showTickLabels);
+        cbTickLabels.addActionListener(e -> { s.showTickLabels = cbTickLabels.isSelected(); panel.refresh(); });
+        JCheckBoxMenuItem cbChr = new JCheckBoxMenuItem("Show chromosome labels", s.showChromosomeLabels);
+        cbChr.addActionListener(e -> { s.showChromosomeLabels = cbChr.isSelected(); panel.refresh(); });
+        menu.add(cbTicks);
+        menu.add(cbTickLabels);
+        menu.add(cbChr);
+        menu.addSeparator();
 
-        bar.add(new JLabel("Ticks:"));
-        JComboBox<String> pos = new JComboBox<>(new String[]{"Outside", "Inside"});
-        pos.setSelectedIndex(s.tickLabelsOutside ? 0 : 1);
-        pos.addActionListener(e -> { s.tickLabelsOutside = pos.getSelectedIndex() == 0; panel.refresh(); });
-        bar.add(pos);
+        JMenu ticksPos = new JMenu("Tick labels position");
+        JRadioButtonMenuItem outside = new JRadioButtonMenuItem("Outside (above band)", s.tickLabelsOutside);
+        JRadioButtonMenuItem inside = new JRadioButtonMenuItem("Inside (below band)", !s.tickLabelsOutside);
+        ButtonGroup g1 = new ButtonGroup(); g1.add(outside); g1.add(inside);
+        outside.addActionListener(e -> { s.tickLabelsOutside = true; panel.refresh(); });
+        inside.addActionListener(e -> { s.tickLabelsOutside = false; panel.refresh(); });
+        ticksPos.add(outside); ticksPos.add(inside);
+        menu.add(ticksPos);
 
-        bar.add(new JLabel("Numbers:"));
-        JComboBox<String> orient = new JComboBox<>(new String[]{"Tangential", "Radial"});
-        orient.setSelectedIndex(s.labelTangential ? 0 : 1);
-        orient.addActionListener(e -> { s.labelTangential = orient.getSelectedIndex() == 0; panel.refresh(); });
-        bar.add(orient);
+        JMenu numOrient = new JMenu("Number orientation");
+        JRadioButtonMenuItem tang = new JRadioButtonMenuItem("Tangential", s.labelTangential);
+        JRadioButtonMenuItem rad = new JRadioButtonMenuItem("Radial", !s.labelTangential);
+        ButtonGroup g2 = new ButtonGroup(); g2.add(tang); g2.add(rad);
+        tang.addActionListener(e -> { s.labelTangential = true; panel.refresh(); });
+        rad.addActionListener(e -> { s.labelTangential = false; panel.refresh(); });
+        numOrient.add(tang); numOrient.add(rad);
+        menu.add(numOrient);
+        menu.addSeparator();
 
-        bar.add(new JLabel("Spacing(Mb):"));
-        JSpinner sp = new JSpinner(new SpinnerNumberModel(s.tickSpacingMb, 0.0, 5000.0, 10.0));
-        sp.setMaximumSize(new Dimension(90, 28));
-        sp.addChangeListener(e -> { s.tickSpacingMb = ((Number) sp.getValue()).doubleValue(); panel.refresh(); });
-        bar.add(sp);
+        JMenuItem spacing = new JMenuItem("Tick spacing (Mb)…");
+        spacing.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel, "Tick spacing in Mb (0 = auto):", s.tickSpacingMb);
+            if (v != null) {
+                try { s.tickSpacingMb = Double.parseDouble(v.trim()); panel.refresh(); } catch (NumberFormatException ignore) { }
+            }
+        });
+        menu.add(spacing);
 
-        bar.add(new JLabel("Label size:"));
-        JSpinner spFont = new JSpinner(new SpinnerNumberModel(s.tickLabelSize, 4, 24, 1));
-        spFont.setMaximumSize(new Dimension(56, 28));
-        spFont.addChangeListener(e -> { s.tickLabelSize = ((Number) spFont.getValue()).intValue(); panel.refresh(); });
-        bar.add(spFont);
+        JMenuItem labelSize = new JMenuItem("Tick label size…");
+        labelSize.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel, "Tick label font size:", s.tickLabelSize);
+            if (v != null) {
+                try { s.tickLabelSize = Integer.parseInt(v.trim()); panel.refresh(); } catch (NumberFormatException ignore) { }
+            }
+        });
+        menu.add(labelSize);
+        menu.addSeparator();
 
-        JCheckBox chrLbl = new JCheckBox("Chr labels", s.showChromosomeLabels);
-        chrLbl.addActionListener(e -> { s.showChromosomeLabels = chrLbl.isSelected(); panel.refresh(); });
-        bar.add(chrLbl);
+        JMenuItem reset = new JMenuItem("Reset zoom");
+        reset.addActionListener(e -> panel.resetZoom());
+        menu.add(reset);
 
+        JMenuItem all = new JMenuItem("All settings…");
+        all.addActionListener(e -> panel.showSettingsDialog(SwingUtilities.getWindowAncestor(panel)));
+        menu.add(all);
+
+        options.addActionListener(e -> menu.show(options, 0, options.getHeight()));
+        bar.add(options);
         return bar;
     }
 
@@ -272,15 +307,45 @@ public class IGVContentPane extends JPanel {
         if (igv == null) return;
         List<Track> tracks = igv.getAllTracks();
         DefaultListModel<String> model = new DefaultListModel<>();
+        dataColumnTracks.clear();
+        List<Track> featureTracks = new ArrayList<>();
         if (tracks != null) {
             for (Track t : tracks) {
                 model.addElement(t.getDisplayName());
+                dataColumnTracks.add(t);
+                if (t instanceof org.broad.igv.track.FeatureTrack) featureTracks.add(t);
             }
         }
-        if (model.isEmpty()) {
-            model.addElement("(no tracks loaded)");
-        }
+        if (model.isEmpty()) model.addElement("(no tracks loaded)");
         dataColumnList.setModel(model);
+        circularDrawingArea.setRingTracks(featureTracks);
+    }
+
+    /** Right-click popup on the data column: per-track ring band height + collapse/expand. */
+    private void maybeShowTrackPopup(MouseEvent e) {
+        if (!e.isPopupTrigger()) return;
+        int idx = dataColumnList.locationToIndex(e.getPoint());
+        if (idx < 0 || idx >= dataColumnTracks.size()) return;
+        dataColumnList.setSelectedIndex(idx);
+        Track track = dataColumnTracks.get(idx);
+        CircularViewPanel.TrackRingConfig cfg = circularDrawingArea.getRingConfig(track.getName());
+
+        JPopupMenu menu = new JPopupMenu();
+        JMenuItem height = new JMenuItem("Track height… (" + cfg.heightPx + " px)");
+        height.addActionListener(a -> {
+            String v = JOptionPane.showInputDialog(this, "Ring track height (pixels):", cfg.heightPx);
+            if (v != null) {
+                try { cfg.heightPx = Math.max(8, Integer.parseInt(v.trim())); circularDrawingArea.invalidateRing(); }
+                catch (NumberFormatException ignore) { }
+            }
+        });
+        menu.add(height);
+
+        JCheckBoxMenuItem expanded = new JCheckBoxMenuItem("Expanded (stack features)", cfg.expanded);
+        expanded.addActionListener(a -> { cfg.expanded = expanded.isSelected(); circularDrawingArea.invalidateRing(); });
+        menu.add(expanded);
+
+        menu.show(dataColumnList, e.getX(), e.getY());
     }
 
 }

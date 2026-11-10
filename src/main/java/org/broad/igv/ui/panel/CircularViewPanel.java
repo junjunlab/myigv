@@ -40,10 +40,20 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
+import htsjdk.tribble.Feature;
+import org.broad.igv.track.FeatureTrack;
+import org.broad.igv.track.Track;
+
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Circular / ring genome view, drawn in the classic Circos ideogram style, with configurable
@@ -108,6 +118,24 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     private String ringKey;
     private int lastGenomeId = 0;
 
+    // ---- feature tracks drawn as concentric bands inside the ideogram ----
+    private final List<Track> ringTracks = new ArrayList<>();
+    private final Map<String, TrackRingConfig> ringConfig = new HashMap<>();
+    private final Map<String, List<Feature>> featureCache = new ConcurrentHashMap<>();
+    private final Set<String> pendingLoads = ConcurrentHashMap.newKeySet();
+    private final ExecutorService featureLoader = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "circular-feature-loader");
+        t.setDaemon(true);
+        return t;
+    });
+
+    /** Per-track ring band configuration: fixed radial height (px), collapsed/expanded, colour. */
+    public static class TrackRingConfig {
+        public int heightPx = 26;
+        public boolean expanded = false;
+        public Color color = new Color(60, 90, 170);
+    }
+
     public CircularViewPanel() {
         setBackground(BG);
         setOpaque(true);
@@ -156,10 +184,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         }
 
         int gid = System.identityHashCode(genome);
-        if (gid != lastGenomeId) { zoom.clear(); lastGenomeId = gid; ringKey = null; }
+        if (gid != lastGenomeId) {
+            zoom.clear(); featureCache.clear(); pendingLoads.clear();
+            lastGenomeId = gid; ringKey = null;
+        }
 
         String chr = FrameManager.getDefaultFrame().getChrName();
         if (chr == null || chr.isEmpty()) chr = genome.getHomeChromosome();
+
+        ensureFeaturesLoaded(genome);
 
         // Render the offscreen ring at DEVICE resolution so it stays crisp on HiDPI
         // (Windows 125/150/200% scaling). The component is w x h logical pixels; the
@@ -181,11 +214,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             ig.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
             ig.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
             if (Globals.CHR_ALL.equals(chr)) {
-                drawAll(ig, w, h, buildAll(genome, zoom), settings);
+                List<ChrInfo> chrs = buildAll(genome, zoom);
+                drawAll(ig, w, h, chrs, settings);
+                drawTrackRings(ig, w, h, chrs, settings);
             } else {
                 ChrInfo one = buildOne(genome, chr);
                 if (one == null) drawMessage(ig, w, h, "Chromosome not found: " + chr);
-                else drawSingle(ig, w, h, one, settings);
+                else { drawSingle(ig, w, h, one, settings); drawTrackRingsSingle(ig, w, h, one, settings); }
             }
             ig.dispose();
             ringKey = key;
@@ -348,7 +383,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     //  Sector layout (shared by painting + hit-testing)
     // ------------------------------------------------------------------
 
-    static List<double[]> computeSectors(List<ChrInfo> chrs, double gapDeg) {
+    public static List<double[]> computeSectors(List<ChrInfo> chrs, double gapDeg) {
         List<double[]> out = new ArrayList<>();
         double totalW = 0;
         for (ChrInfo c : chrs) totalW += c.weight;
@@ -490,6 +525,155 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 drawTangentialText(g2, cx, cy, labelR, f, txt, tickFont, new Color(70, 70, 70));
             }
         }
+    }
+
+    // ------------------------------------------------------------------
+    //  Feature tracks as concentric bands inside the ideogram
+    // ------------------------------------------------------------------
+
+    /** Tracks to render as concentric feature bands (set by IGVContentPane from the Data Tracks list). */
+    public void setRingTracks(List<Track> tracks) {
+        ringTracks.clear();
+        if (tracks != null) ringTracks.addAll(tracks);
+        ringKey = null;
+        repaint();
+    }
+
+    /** Per-track ring band config (created with defaults on first use). */
+    public TrackRingConfig getRingConfig(String trackName) {
+        return ringConfig.computeIfAbsent(trackName, k -> new TrackRingConfig());
+    }
+
+    public void invalidateRing() { ringKey = null; repaint(); }
+
+    /** Load features for all ring feature-tracks / chromosomes in the background (cached). */
+    private void ensureFeaturesLoaded(Genome genome) {
+        if (genome == null || ringTracks.isEmpty()) return;
+        for (Track t : ringTracks) {
+            if (!(t instanceof FeatureTrack)) continue;
+            FeatureTrack ft = (FeatureTrack) t;
+            for (String chr : genome.getLongChromosomeNames()) {
+                org.broad.igv.feature.Chromosome c = genome.getChromosome(chr);
+                if (c == null) continue;
+                final String key = ft.getName() + "|" + chr;
+                if (featureCache.containsKey(key) || !pendingLoads.add(key)) continue;
+                final int len = c.getLength();
+                featureLoader.submit(() -> {
+                    List<Feature> list;
+                    try {
+                        list = ft.getFeatures(chr, 0, len);
+                    } catch (Throwable ex) {
+                        list = Collections.emptyList();
+                    }
+                    featureCache.put(key, list);
+                    pendingLoads.remove(key);
+                    SwingUtilities.invokeLater(this::invalidateRing);
+                });
+            }
+        }
+    }
+
+    private void drawTrackRings(Graphics2D g2, int w, int h, List<ChrInfo> chrs, CircularSettings s) {
+        if (ringTracks.isEmpty() || chrs == null || chrs.isEmpty()) return;
+        int cx = w / 2, cy = h / 2;
+        double R = Math.min(w, h) / 2.0 - MARGIN;
+        if (R <= 20) return;
+        double cursor = R * s.bandInner - 5;
+        List<double[]> sec = computeSectors(chrs, s.gapDeg);
+        for (Track t : ringTracks) {
+            if (!(t instanceof FeatureTrack)) continue;
+            TrackRingConfig cfg = getRingConfig(t.getName());
+            double bandOuter = cursor;
+            double bandInner = bandOuter - cfg.heightPx;
+            if (bandInner < 24) break;
+            drawFeatures(g2, cx, cy, bandInner, bandOuter, chrs, sec, (FeatureTrack) t, cfg);
+            cursor = bandInner - 5;
+        }
+    }
+
+    private void drawTrackRingsSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {
+        if (ringTracks.isEmpty()) return;
+        int cx = w / 2, cy = h / 2;
+        double R = Math.min(w, h) / 2.0 - MARGIN;
+        if (R <= 20) return;
+        double cursor = R * s.bandInner - 5;
+        List<ChrInfo> chrs = Collections.singletonList(chr);
+        List<double[]> sec = new ArrayList<>();
+        sec.add(new double[]{0.0, 1.0, 360.0});
+        for (Track t : ringTracks) {
+            if (!(t instanceof FeatureTrack)) continue;
+            TrackRingConfig cfg = getRingConfig(t.getName());
+            double bandOuter = cursor, bandInner = bandOuter - cfg.heightPx;
+            if (bandInner < 24) break;
+            drawFeatures(g2, cx, cy, bandInner, bandOuter, chrs, sec, (FeatureTrack) t, cfg);
+            cursor = bandInner - 5;
+        }
+    }
+
+    /** Draw a feature track's features inside one concentric band (collapsed or expanded rows). */
+    private void drawFeatures(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
+                              List<ChrInfo> chrs, List<double[]> sec, FeatureTrack ft, TrackRingConfig cfg) {
+        drawFeatureBand(g2, cx, cy, bandInner, bandOuter, chrs, sec, cfg,
+                name -> featureCache.get(ft.getName() + "|" + name));
+    }
+
+    /** Static core of the feature-band drawing (also used by the headless render probe). */
+    public static void drawFeatureBand(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
+                                       List<ChrInfo> chrs, List<double[]> sec, TrackRingConfig cfg,
+                                       java.util.function.Function<String, List<Feature>> featsFn) {
+        double bandH = bandOuter - bandInner;
+        if (bandH < 2) return;
+        int maxRows = Math.max(1, (int) (bandH / 3.0));
+        double rowH = bandH / maxRows;
+
+        for (int i = 0; i < chrs.size(); i++) {
+            ChrInfo c = chrs.get(i);
+            List<Feature> list = featsFn.apply(c.name);
+            if (list == null || list.isEmpty()) continue;
+            double f0 = sec.get(i)[0], f1 = sec.get(i)[1], span = f1 - f0;
+            double len = Math.max(1, c.length);
+
+            if (!cfg.expanded) {
+                double rr = (bandInner + bandOuter) / 2.0;
+                double thick = Math.min(3.0, bandH * 0.6);
+                for (Feature f : list) {
+                    double a = f0 + span * clamp01(f.getStart() / len);
+                    double b = f0 + span * clamp01(f.getEnd() / len);
+                    if (b <= a) b = a + 1e-7;
+                    fillArc(g2, cx, cy, rr - thick / 2, rr + thick / 2, a, b, cfg.color);
+                }
+            } else {
+                List<List<double[]>> rows = new ArrayList<>();
+                for (Feature f : list) {
+                    double a = f0 + span * clamp01(f.getStart() / len);
+                    double b = f0 + span * clamp01(f.getEnd() / len);
+                    if (b <= a) b = a + 1e-7;
+                    int r = 0;
+                    while (r < rows.size() && overlapsAny(rows.get(r), a, b)) r++;
+                    if (r == rows.size()) {
+                        if (rows.size() >= maxRows) continue;   // band full, skip extra features
+                        rows.add(new ArrayList<>());
+                    }
+                    rows.get(r).add(new double[]{a, b});
+                    double rr = bandInner + (r + 0.5) * rowH;
+                    fillArc(g2, cx, cy, rr - rowH * 0.42, rr + rowH * 0.42, a, b, cfg.color);
+                }
+            }
+        }
+    }
+
+    private static double clamp01(double v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+
+    private static boolean overlapsAny(List<double[]> rows, double a, double b) {
+        for (double[] iv : rows) if (b > iv[0] && a < iv[1]) return true;
+        return false;
+    }
+
+    private static void fillArc(Graphics2D g2, double cx, double cy, double rIn, double rOut,
+                                double f0, double f1, Color color) {
+        if (rOut <= rIn || f1 <= f0) return;
+        g2.setColor(color);
+        g2.fill(annularPath(cx, cy, rIn, rOut, f0, f1));
     }
 
     // ------------------------------------------------------------------
