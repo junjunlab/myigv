@@ -160,6 +160,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public Color color = new Color(60, 90, 170);
         /** Data-track rendering: "Bar" (default, IGV wig style), "Point", "Line", "Heatmap". */
         public String graphType = "Bar";
+        /** Y-axis range: false = per-chromosome scale (default), true = global across all chromosomes. */
+        public boolean globalYScale = false;
     }
 
     public CircularViewPanel() {
@@ -801,18 +803,20 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     /** Draw a continuous data track (bigWig/bedGraph) as Bar / Point / Line / Heatmap. */
     private void drawDataRing(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
                               List<ChrInfo> chrs, List<double[]> sec, Track track, TrackRingConfig cfg) {
-        float mn = Float.POSITIVE_INFINITY, mx = Float.NEGATIVE_INFINITY;
-        for (ChrInfo c : chrs) {
-            float[] b = dataCache.get(track.getName() + "|" + c.name);
-            if (b == null) continue;
-            for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < mn) mn = v; if (v > mx) mx = v; }
-        }
-        if (mn == Float.POSITIVE_INFINITY) return;
-        boolean flat = (mx - mn) <= 1e-9f;
         double bandH = bandOuter - bandInner;
         String type = cfg.graphType == null ? "Bar" : cfg.graphType;
-        // IGV draws bars from a baseline at value 0 (scaled by the data range), not from min.
-        double baseR = flat ? bandInner : bandInner + bandH * clamp01((0.0 - mn) / (mx - mn));
+        boolean global = cfg.globalYScale;
+
+        // Global Y-range: one min/max across all displayed chromosomes (optional).
+        float gmn = Float.POSITIVE_INFINITY, gmx = Float.NEGATIVE_INFINITY;
+        if (global) {
+            for (ChrInfo c : chrs) {
+                float[] b = dataCache.get(track.getName() + "|" + c.name);
+                if (b == null) continue;
+                for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < gmn) gmn = v; if (v > gmx) gmx = v; }
+            }
+            if (gmn == Float.POSITIVE_INFINITY) return;
+        }
 
         for (int i = 0; i < chrs.size(); i++) {
             float[] b = dataCache.get(track.getName() + "|" + chrs.get(i).name);
@@ -820,13 +824,26 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double f0 = sec.get(i)[0], span = sec.get(i)[1] - f0;
             int n = b.length;
 
+            // Y range: per-chromosome (default) or global.
+            float mn, mx;
+            if (global) { mn = gmn; mx = gmx; }
+            else {
+                mn = Float.POSITIVE_INFINITY; mx = Float.NEGATIVE_INFINITY;
+                for (float v : b) if (!Float.isNaN(v) && !Float.isInfinite(v)) { if (v < mn) mn = v; if (v > mx) mx = v; }
+                if (mn == Float.POSITIVE_INFINITY) continue;
+            }
+            boolean flat = (mx - mn) <= 1e-9f;
+            double denom = mx - mn;
+            // IGV draws bars from a baseline at value 0 (scaled by the range), not from min.
+            double baseR = flat ? bandInner : bandInner + bandH * clamp01((0.0 - mn) / denom);
+
             if ("Line".equalsIgnoreCase(type)) {
                 java.awt.geom.Path2D.Double path = new java.awt.geom.Path2D.Double();
                 boolean pen = false;
                 for (int k = 0; k < n; k++) {
                     float v = b[k];
                     if (Float.isNaN(v) || Float.isInfinite(v)) { pen = false; continue; }
-                    double t = flat ? 0.5 : (v - mn) / (mx - mn);
+                    double t = flat ? 0.5 : clamp01((v - mn) / denom);
                     double a = f0 + span * ((k + 0.5) / n);
                     Point2D p = polar(cx, cy, bandInner + bandH * t, a);
                     if (!pen) { path.moveTo(p.getX(), p.getY()); pen = true; } else path.lineTo(p.getX(), p.getY());
@@ -841,7 +858,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             for (int k = 0; k < n; k++) {
                 float v = b[k];
                 if (Float.isNaN(v) || Float.isInfinite(v)) continue;
-                double t = flat ? 1.0 : (v - mn) / (mx - mn);
+                double t = flat ? 0.5 : clamp01((v - mn) / denom);
                 double a0 = f0 + span * ((double) k / n);
                 double a1 = f0 + span * ((double) (k + 1) / n);
                 if ("Heatmap".equalsIgnoreCase(type)) {

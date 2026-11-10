@@ -462,6 +462,18 @@ public class IGVContentPane extends JPanel {
         }
         menu.add(graph);
 
+        JMenu yaxis = new JMenu("Y-axis range");
+        ButtonGroup yg = new ButtonGroup();
+        JRadioButtonMenuItem yPer = new JRadioButtonMenuItem("Per chromosome (default)", !cfg.globalYScale);
+        yPer.addActionListener(a -> { cfg.globalYScale = false; circularDrawingArea.invalidateRing(); });
+        JRadioButtonMenuItem yGlobal = new JRadioButtonMenuItem("All chromosomes (unified)", cfg.globalYScale);
+        yGlobal.addActionListener(a -> { cfg.globalYScale = true; circularDrawingArea.invalidateRing(); });
+        yg.add(yPer);
+        yg.add(yGlobal);
+        yaxis.add(yPer);
+        yaxis.add(yGlobal);
+        menu.add(yaxis);
+
         JMenuItem colorItem = new JMenuItem("Colour…");
         colorItem.addActionListener(a -> {
             Color c = JColorChooser.showDialog(this, "Track colour", cfg.color);
