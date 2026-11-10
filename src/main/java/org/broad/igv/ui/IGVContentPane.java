@@ -322,6 +322,15 @@ public class IGVContentPane extends JPanel {
             }
         });
         menu.add(chrLabelSize);
+
+        JMenuItem chrHeight = new JMenuItem("Chromosome height (px)…");
+        chrHeight.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel, "Chromosome ring height in pixels:", s.chromosomeHeightPx);
+            if (v != null) {
+                try { s.chromosomeHeightPx = Math.max(8, Integer.parseInt(v.trim())); panel.refresh(); } catch (NumberFormatException ignore) { }
+            }
+        });
+        menu.add(chrHeight);
         menu.addSeparator();
 
         JCheckBoxMenuItem solid = new JCheckBoxMenuItem("Solid chromosome colour (override karyotype)", s.solidColor);

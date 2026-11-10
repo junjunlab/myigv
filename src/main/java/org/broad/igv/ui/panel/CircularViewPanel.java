@@ -93,6 +93,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public int     tickLabelSize = 7;
         public boolean showChromosomeLabels = true;
         public int     chromosomeLabelSize = 12;
+        /** Radial thickness of the chromosome (ideogram) ring, in pixels. */
+        public int     chromosomeHeightPx = 15;
         public boolean labelTangential = true;       // tangential (circos label_tangential) vs radial
         public double  bandInner = 0.78;
         public double  bandOuter = 0.90;
@@ -109,7 +111,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.showTicks = showTicks; s.showTickLabels = showTickLabels;
             s.tickLabelsOutside = tickLabelsOutside; s.tickSpacingMb = tickSpacingMb;
             s.tickLabelSize = tickLabelSize; s.showChromosomeLabels = showChromosomeLabels;
-            s.chromosomeLabelSize = chromosomeLabelSize; s.labelTangential = labelTangential;
+            s.chromosomeLabelSize = chromosomeLabelSize; s.chromosomeHeightPx = chromosomeHeightPx;
+            s.labelTangential = labelTangential;
             s.bandInner = bandInner; s.bandOuter = bandOuter; s.gapDeg = gapDeg;
             s.solidColor = solidColor; s.chromosomeColor = chromosomeColor;
             s.shownChromosomes = new HashSet<>(shownChromosomes);
@@ -314,7 +317,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int cx = getWidth() / 2, cy = getHeight() / 2;
         double R = Math.min(getWidth(), getHeight()) / 2.0 - MARGIN;
         if (R <= 0) return null;
-        double rIn = R * settings.bandInner, rOut = R * settings.bandOuter;
+        double rOut = R * settings.bandOuter;
+        double rIn = Math.max(R * 0.2, rOut - settings.chromosomeHeightPx);
 
         double dx = x - cx, dy = y - cy, r = Math.hypot(dx, dy);
         if (r < rIn * 0.6 || r > R + MARGIN) return null;
@@ -345,6 +349,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         JSpinner spSpace = new JSpinner(new SpinnerNumberModel(s.tickSpacingMb, 0.0, 5000.0, 10.0));
         JSpinner spTickSize = new JSpinner(new SpinnerNumberModel(s.tickLabelSize, 4, 24, 1));
         JSpinner spChrSize = new JSpinner(new SpinnerNumberModel(s.chromosomeLabelSize, 6, 30, 1));
+        JSpinner spChrH = new JSpinner(new SpinnerNumberModel(s.chromosomeHeightPx, 8, 220, 2));
         JComboBox<String> cbOrient = new JComboBox<>(new String[]{"Tangential", "Radial"});
         cbOrient.setSelectedIndex(s.labelTangential ? 0 : 1);
         JSpinner spInner = new JSpinner(new SpinnerNumberModel(s.bandInner, 0.40, 0.85, 0.01));
@@ -360,6 +365,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         p.add(row("Tick spacing (Mb, 0 = auto):", spSpace));
         p.add(row("Tick label size:", spTickSize));
         p.add(row("Chromosome label size:", spChrSize));
+        p.add(row("Chromosome height (px):", spChrH));
         p.add(row("Chromosome number orientation:", cbOrient));
         p.add(row("Band inner radius (0–1):", spInner));
         p.add(row("Band outer radius (0–1):", spOuter));
@@ -376,6 +382,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         s.tickSpacingMb = ((Number) spSpace.getValue()).doubleValue();
         s.tickLabelSize = ((Number) spTickSize.getValue()).intValue();
         s.chromosomeLabelSize = ((Number) spChrSize.getValue()).intValue();
+        s.chromosomeHeightPx = ((Number) spChrH.getValue()).intValue();
         s.labelTangential = cbOrient.getSelectedIndex() == 0;
         s.bandInner = ((Number) spInner.getValue()).doubleValue();
         s.bandOuter = ((Number) spOuter.getValue()).doubleValue();
@@ -486,7 +493,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double rIn = R * s.bandInner, rOut = R * s.bandOuter;
+        double rOut = R * s.bandOuter;
+        double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
 
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
         double chrLabelR = rOut + ((s.showTickLabels && s.tickLabelsOutside) ? 24 : 16);
@@ -514,7 +522,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double rIn = R * s.bandInner, rOut = R * s.bandOuter;
+        double rOut = R * s.bandOuter;
+        double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
 
         drawIdeogramBand(g2, cx, cy, rIn, rOut, 0.0, 1.0, chr);
         drawBandTicks(g2, cx, cy, rIn, rOut, 0.0, 1.0, chr.length, 360.0, s);
@@ -711,7 +720,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double cursor = R * s.bandInner - 5;
+        double cursor = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx) - 5;
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
         for (Track t : ringTracks) {                       // order == top->bottom == outer->inner
             TrackRingConfig cfg = getRingConfig(t.getName());
@@ -728,7 +737,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double cursor = R * s.bandInner - 5;
+        double cursor = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx) - 5;
         List<ChrInfo> chrs = Collections.singletonList(chr);
         List<double[]> sec = new ArrayList<>();
         sec.add(new double[]{0.0, 1.0, 360.0});
