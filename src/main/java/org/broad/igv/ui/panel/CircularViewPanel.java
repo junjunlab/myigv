@@ -40,6 +40,11 @@ import org.broad.igv.ui.IGV;
 import org.broad.igv.lists.GeneList;
 import org.broad.igv.session.Session;
 import org.broad.igv.util.ChromosomeColors;
+import org.broad.igv.hic.HiCColorScale;
+import org.broad.igv.hic.HiCRenderer;
+import org.broad.igv.hic.HiCSource;
+import org.broad.igv.hic.HiCTrack;
+import org.broad.igv.hic.HiCTransform;
 
 import javax.swing.*;
 import java.awt.*;
@@ -214,6 +219,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     private final Set<String> pendingLoads = ConcurrentHashMap.newKeySet();
     private final Map<String, float[]> dataCache = new ConcurrentHashMap<>();   // bigWig/bedGraph bins (whole chr)
     private final Set<String> dataPending = ConcurrentHashMap.newKeySet();
+    /** Rendered Hi-C matrix tiles, keyed by track + sector window + every render parameter, so
+     *  the contact matrix is never re-sampled on an ordinary EDT repaint. */
+    private final Map<String, BufferedImage> hicTileCache = new ConcurrentHashMap<>();
+    /** Colour limits actually used for each rendered Hi-C tile. */
+    private final Map<String, double[]> hicTileLimits = new ConcurrentHashMap<>();
+    /** Limits per visible Hi-C track, consumed by the legends drawn beside the ring. */
+    private final Map<String, double[]> hicLimitsByTrack = new ConcurrentHashMap<>();
     private static final int DATA_BINS = 300;                                    // bins per chromosome
     /** Fine, window-scoped bigWig bins recomputed on zoom (so a zoomed window is not a stretched
      *  coarse bin). Keyed by "track|chr|windowStart_windowEnd_binBp". */
@@ -234,6 +246,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     /** Per-track ring band configuration: fixed radial height (px), collapsed/expanded, colour. */
     public static class TrackRingConfig {
         public int heightPx = 26;
+        /** Hi-C matrix bands are taller than a 26 px data band so the 2D warp stays legible. */
+        public int hicHeightPx = 60;
         public boolean expanded = false;
         /** When expanded, stack transcript rows from the outer (top) edge inward instead of the
          *  default inner (bottom) edge outward. */
@@ -344,12 +358,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     public void resetZoom() {
         zoom.clear();
         rangeZoom.clear();
+        invalidateHiCTiles();
         ringKey = null;
         repaint();
     }
 
     /** Force a redraw after settings changed (settings are read live during paint). */
     public void refresh() {
+        invalidateHiCTiles();
         ringKey = null;
         repaint();
     }
@@ -400,6 +416,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             loadAttempts.clear(); lastAttemptMs.clear(); trackLoaded.clear();
             dataCache.clear(); dataPending.clear();
             adaptiveCache.clear(); adaptivePending.clear();
+            invalidateHiCTiles();
             lastGenomeId = gid; ringKey = null;
         }
 
@@ -428,6 +445,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         }
         String key = gid + "|" + chr + "|" + bw + "x" + bh + geneSig;
         if (!key.equals(ringKey) || ringImage == null) {
+            hicLimitsByTrack.clear();   // only legends for tracks drawn in THIS rebuild
             ringImage = new BufferedImage(bw, bh, BufferedImage.TYPE_INT_ARGB);
             Graphics2D ig = ringImage.createGraphics();
             ig.scale(sx, sy);   // draw in logical coords, mapped to device pixels
@@ -473,6 +491,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // blit the device-resolution image back at logical size; the panel transform
         // scales it to exactly bw x bh device pixels -> 1:1, sharp.
         g2.drawImage(ringImage, 0, 0, w, h, null);
+
+        // Hi-C colour legends sit BESIDE the plot, never inside a ring band. Draw them on top
+        // of the blitted ring image so they stay upright and crisp (also on cached repaints).
+        List<HiCTrack> visibleHics = new ArrayList<>();
+        for (Track t : ringTracks) if (t instanceof HiCTrack) visibleHics.add((HiCTrack) t);
+        if (!visibleHics.isEmpty()) {
+            drawHiCLegends(g2, w, h, visibleHics, hicLimitsByTrack, settings);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1063,10 +1089,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (tracks != null) {
             for (Track t : tracks) {
                 if (isRingTrackHidden(t)) continue;
-                if (t instanceof FeatureTrack || t instanceof DataTrack) ringTracks.add(t);  // order == top->bottom == outer->inner
+                if (t instanceof FeatureTrack || t instanceof DataTrack || t instanceof HiCTrack)
+                    ringTracks.add(t);  // order == top->bottom == outer->inner
             }
         }
         log.info("Circular ring tracks: " + ringTracks.size());
+        invalidateHiCTiles();
         ringKey = null;
         repaint();
     }
@@ -1122,7 +1150,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double cursor = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx) - 5;
         for (Track t : ringTracks) {
             TrackRingConfig cfg = getRingConfig(t.getName());
-            double bandInner = cursor - cfg.heightPx;
+            double bandInner = cursor - ringHeightPx(t, cfg);
             if (bandInner < 24) break;
             cursor = bandInner - 5;
         }
@@ -1134,7 +1162,22 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return ringConfig.computeIfAbsent(trackName, k -> new TrackRingConfig());
     }
 
-    public void invalidateRing() { ringKey = null; repaint(); }
+    /** Radial height of one ring band. Hi-C matrix bands use their own (taller) height so the
+     *  2D warp has enough pixels; link anchors must use the same value to stay aligned. */
+    private int ringHeightPx(Track t, TrackRingConfig cfg) {
+        return t instanceof HiCTrack ? cfg.hicHeightPx : cfg.heightPx;
+    }
+
+    public void invalidateRing() { invalidateHiCTiles(); ringKey = null; repaint(); }
+
+    /** Drop cached Hi-C tiles and sampled limits. Called whenever the ring is rebuilt so a
+     *  parameter change is picked up on the next paint, without re-sampling the matrix on
+     *  every repaint (paintComponent runs on the EDT). */
+    private void invalidateHiCTiles() {
+        hicTileCache.clear();
+        hicTileLimits.clear();
+        hicLimitsByTrack.clear();
+    }
 
     /** Load features for all ring feature-tracks / chromosomes in the background (cached). */
     private void ensureFeaturesLoaded(Genome genome) {
@@ -1213,7 +1256,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         for (Track t : ringTracks) {                       // order == top->bottom == outer->inner
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor;
-            double bandInner = bandOuter - cfg.heightPx;
+            double bandInner = bandOuter - ringHeightPx(t, cfg);
             if (bandInner < 24) break;
             drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg,
                     sharedRangeFor(cfg, globalShared, groups, perGeneGroups));
@@ -1235,7 +1278,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         java.util.Map<String, java.util.Map<String, float[]>> perGeneGroups = needPerGeneGroups(chrs);
         for (Track t : ringTracks) {
             TrackRingConfig cfg = getRingConfig(t.getName());
-            double bandOuter = cursor, bandInner = bandOuter - cfg.heightPx;
+            double bandOuter = cursor, bandInner = bandOuter - ringHeightPx(t, cfg);
             if (bandInner < 24) break;
             drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg,
                     sharedRangeFor(cfg, globalShared, groups, perGeneGroups));
@@ -1276,7 +1319,256 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             drawFeatures(g2, cx, cy, bandInner, bandOuter, chrs, sec, (FeatureTrack) t, cfg);
         } else if (t instanceof DataTrack) {
             drawDataRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, (DataTrack) t, cfg, sharedRange);
+        } else if (t instanceof HiCTrack) {
+            drawHiCRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, (HiCTrack) t, cfg);
         }
+    }
+
+    // ------------------------------------------------------------------
+    //  Hi-C tracks: reuse the LINEAR view's TRIANGLE / SQUARE renderer, bent into a ring
+    // ------------------------------------------------------------------
+
+    /**
+     * Draw one Hi-C track as a set of annular sectors. Each sector is rendered with the LINEAR
+     * view's own renderer (HiCRenderer.paintTriangle / paintSquare), using every parameter read
+     * straight off the HiCTrack (mode, transform, palette, colour limits, depth, heightRatio,
+     * flipped, forced resolution, custom anchors). The linear tile is then polar-warped onto the
+     * band, preserving BOTH the x (genomic) and y (distance / second axis) dimensions.
+     */
+    void drawHiCRing(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
+                     List<ChrInfo> chrs, List<double[]> sec, HiCTrack hic, TrackRingConfig cfg) {
+        if (hic == null || chrs == null || sec == null) return;
+        final HiCSource data = hic.getData();
+        if (data == null) return;
+
+        // Snapshot the linear track's settings. HiCSource is shared with the linear view, so
+        // choosing the bin size here has exactly the same effect as it does there.
+        final HiCTrack.Mode mode = hic.getMode();
+        final HiCTransform transform = hic.getTransform();
+        final HiCColorScale.Palette palette = hic.getPalette();
+        final double minV = hic.getMinValue(), maxV = hic.getMaxValue();
+        final double depth = hic.getDepth(), ratio = hic.getHeightRatio();
+        final boolean flipped = hic.isFlipped();
+        final int forced = hic.getForcedResolution();
+        final int[][] anchors = hic.getCustomAnchors();
+        final String trackName = String.valueOf(hic.getName());
+
+        for (int i = 0; i < chrs.size() && i < sec.size(); i++) {
+            ChrInfo c = chrs.get(i);
+            double[] secI = sec.get(i);
+            final double f0 = secI[0], f1 = secI[1], spanDeg = secI[2];
+            if (!(f1 > f0) || c.viewEnd <= c.viewStart) continue;
+
+            double midR = (bandInner + bandOuter) / 2.0;
+            int tileW = clampInt((int) Math.round(arcLength(midR, spanDeg)), 32, 1200);
+            int tileH = clampInt((int) Math.round(bandOuter - bandInner), 8, 400);
+            if (tileW < 2 || tileH < 2) continue;
+
+            // Key covers everything that changes the matrix, so a parameter edit rebuilds the
+            // tile but an ordinary repaint (mouse-over, tooltip, ...) just reuses it.
+            String key = trackName + "|" + c.chrKey() + "|" + (long) c.viewStart + "_" + (long) c.viewEnd
+                    + "|" + mode + "|" + transform + "|" + palette + "|" + minV + "|" + maxV
+                    + "|" + depth + "|" + ratio + "|" + flipped + "|" + forced
+                    + "|" + (anchors == null ? 0 : anchors.length)
+                    + "|" + tileW + "x" + tileH + "|" + f0 + "_" + f1;
+
+            BufferedImage tile = hicTileCache.get(key);
+            if (tile == null) {
+                if (forced > 0) data.setBinSize(forced);
+                else data.autoSelectBinSize((c.viewEnd - c.viewStart) / tileW, tileW);
+
+                tile = new BufferedImage(tileW, tileH, BufferedImage.TYPE_INT_RGB);
+                double[] limits;
+                if (mode == HiCTrack.Mode.TRIANGLE) {
+                    limits = HiCRenderer.paintTriangle(tile, data, c.chrKey(), c.viewStart, c.viewEnd,
+                            depth, ratio, minV, maxV, transform, palette, anchors);
+                } else {
+                    limits = HiCRenderer.paintSquare(tile, data, c.chrKey(), c.viewStart, c.viewEnd,
+                            minV, maxV, transform, palette, anchors);
+                }
+                if (flipped) {
+                    BufferedImage mirror = new BufferedImage(tileW, tileH, BufferedImage.TYPE_INT_RGB);
+                    Graphics2D mg = mirror.createGraphics();
+                    mg.drawImage(tile, 0, tileH, tileW, -tileH, null);
+                    mg.dispose();
+                    tile = mirror;
+                }
+                hicTileCache.put(key, tile);
+                hicTileLimits.put(key, limits == null ? new double[]{0, 1, 1} : limits);
+            }
+
+            // Keep the limits the renderer actually used, for the legend drawn BESIDE the ring.
+            double[] limits = hicTileLimits.get(key);
+            if (limits != null) {
+                final double[] cur = limits;
+                hicLimitsByTrack.merge(trackName, cur, (a, b) -> new double[]{
+                        Math.min(a[0], b[0]), Math.max(a[1], b[1]), b[2]});
+            }
+
+            warpHiCTile(g2, cx, cy, bandInner, bandOuter, f0, f1, tile);
+        }
+    }
+
+    /**
+     * Polar warp: map a linear tile (x = genomic fraction, y = distance / second axis) onto the
+     * annular sector band. Pixels outside [bandInner,bandOuter] or [f0,f1] stay transparent, and
+     * the draw is additionally clipped to the band so nothing can leak out. Because BOTH axes are
+     * preserved, TRIANGLE and SQUARE both read correctly once bent into the ring.
+     */
+    static void warpHiCTile(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
+                            double f0, double f1, BufferedImage tile) {
+        if (tile == null) return;
+        int w = (int) Math.round(2 * cx), h = (int) Math.round(2 * cy);
+        if (w < 1 || h < 1) return;
+        int tileW = tile.getWidth(), tileH = tile.getHeight();
+        double rSpan = bandOuter - bandInner, fSpan = f1 - f0;
+        if (rSpan <= 0 || fSpan <= 0 || tileW < 1 || tileH < 1) return;
+
+        // Bulk read: one getRGB for the whole tile instead of a call per pixel.
+        int[] src = tile.getRGB(0, 0, tileW, tileH, null, 0, tileW);
+        int[] dst = new int[w * h];               // TYPE_INT_ARGB: 0 == transparent outside band
+        int x0 = Math.max(0, (int) Math.floor(cx - bandOuter));
+        int x1 = Math.min(w - 1, (int) Math.ceil(cx + bandOuter));
+        int y0 = Math.max(0, (int) Math.floor(cy - bandOuter));
+        int y1 = Math.min(h - 1, (int) Math.ceil(cy + bandOuter));
+        final double TWO_PI = 2.0 * Math.PI;
+        for (int py = y0; py <= y1; py++) {
+            double dy = py - cy;
+            for (int px = x0; px <= x1; px++) {
+                double dx = px - cx;
+                double r = Math.sqrt(dx * dx + dy * dy);
+                if (r < bandInner || r > bandOuter) continue;
+                double theta = Math.atan2(dx, -dy);
+                double frac = (theta / TWO_PI + 1.0) % 1.0;
+                if (frac < f0 || frac > f1) continue;
+                double t = (frac - f0) / fSpan;
+                int tx = clampInt((int) Math.round(t * (tileW - 1)), 0, tileW - 1);
+                int ty = clampInt((int) Math.round((r - bandInner) / rSpan * (tileH - 1)), 0, tileH - 1);
+                dst[py * w + px] = src[ty * tileW + tx] | 0xFF000000;
+            }
+        }
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        out.setRGB(0, 0, w, h, dst, 0, w);
+        Shape oldClip = g2.getClip();
+        g2.clip(annularPath(cx, cy, bandInner, bandOuter, f0, f1));
+        g2.drawImage(out, 0, 0, null);
+        g2.setClip(oldClip);
+    }
+
+    /** Rectangle of the i-th Hi-C legend. Legends stack vertically in a corner column,
+     *  preferring bottom-right, then bottom-left, top-left, top-right. A column is only used
+     *  when the panel's nearest point clears the ring outer radius, so legends never sit in a
+     *  ring band. When the panel is too small for any corner to clear the ring, the candidate
+     *  with the largest clearance is returned (best effort). */
+    static Rectangle legendRect(int w, int h, int index) {
+        final int panelW = 190, panelH = 44, gap = 4;
+        final double R = Math.max(20, Math.min(w, h) / 2.0 - MARGIN);
+        int[] xs = {w - panelW - 4, 4, 4, w - panelW - 4};
+        int[] y0 = {h - 6 - panelH, h - 6 - panelH, 6, 6};
+        int[] dir = {-1, -1, 1, 1};
+        Rectangle best = null;
+        double bestClearance = -1;
+        for (int c = 0; c < xs.length; c++) {
+            int x = xs[c];
+            int y = y0[c] + dir[c] * index * (panelH + gap);
+            double d = cornerClearance(x, y, panelW, panelH, w, h);
+            if (d >= R) return new Rectangle(x, y, panelW, panelH);
+            if (d > bestClearance) {
+                bestClearance = d;
+                best = new Rectangle(x, y, panelW, panelH);
+            }
+        }
+        return best;
+    }
+
+    /** Distance from the panel centre to the nearest point of the rectangle. */
+    private static double cornerClearance(int x, int y, int pw, int ph, int w, int h) {
+        double cx = w / 2.0, cy = h / 2.0;
+        double nx = Math.max(x, Math.min(cx, x + pw));
+        double ny = Math.max(y, Math.min(cy, y + ph));
+        return Math.hypot(nx - cx, ny - cy);
+    }
+
+    /** Draw one legend per visible Hi-C track, stacked, BESIDE the plot (never in a ring band). */
+    void drawHiCLegends(Graphics2D g2, int w, int h, List<HiCTrack> visibleHics,
+                        Map<String, double[]> limitsByTrack, CircularSettings s) {
+        if (visibleHics == null || visibleHics.isEmpty()) return;
+        int index = 0;
+        for (HiCTrack hic : visibleHics) {
+            if (hic.getLegendPosition() == HiCTrack.LegendPosition.NONE) continue;
+            Rectangle box = legendRect(w, h, index++);
+            drawOneHiCLegend(g2, box.x, box.y, box.width, box.height,
+                    hic.getName(), limitsByTrack.get(String.valueOf(hic.getName())),
+                    hic.getTransform(), hic.getPalette());
+        }
+    }
+
+    /** One legend panel: white rounded box, horizontal colour ramp, min/max ticks, transform
+     *  label and track name. Package-private so the headless probe can render it directly. */
+    static void drawOneHiCLegend(Graphics2D g2, int x, int y, int panelW, int panelH,
+                                 String trackName, double[] limits, HiCTransform transform,
+                                 HiCColorScale.Palette palette) {
+        double vmin = limits == null ? 0 : limits[0];
+        double vmax = limits == null ? 1 : limits[1];
+        if (!(vmax > vmin)) { vmin = 0; vmax = 1; }
+        HiCColorScale.Palette pal = palette != null ? palette : HiCColorScale.Palette.RDYLBU_R;
+        Font oldFont = g2.getFont();
+        Color oldColor = g2.getColor();
+        try {
+            g2.setColor(new Color(255, 255, 255, 235));
+            g2.fillRoundRect(x, y, panelW, panelH, 8, 8);
+            g2.setColor(new Color(120, 120, 120));
+            g2.drawRoundRect(x, y, panelW, panelH, 8, 8);
+
+            g2.setFont(oldFont.deriveFont(Font.PLAIN, 10f));
+            FontMetrics fm = g2.getFontMetrics();
+            String name = trackName == null ? "Hi-C" : trackName;
+            while (fm.stringWidth(name) > panelW - 60 && name.length() > 4) {
+                name = name.substring(0, name.length() - 2) + "…";
+            }
+            String tf = transform == null ? "" : transform.getLabel();
+            g2.setColor(Color.DARK_GRAY);
+            g2.drawString(name, x + 6, y + 12);
+            g2.setColor(new Color(90, 90, 90));
+            g2.drawString(tf, x + panelW - 6 - fm.stringWidth(tf), y + 12);
+
+            int barX = x + 6, barY = y + 16, barW = panelW - 12, barH = 8;
+            boolean reverse = transform == HiCTransform.NEG_LOG;
+            BufferedImage ramp = new BufferedImage(barW, barH, BufferedImage.TYPE_INT_RGB);
+            for (int k = 0; k < barW; k++) {
+                double t = k / (double) Math.max(1, barW - 1);
+                if (reverse) t = 1.0 - t;
+                int rgb = HiCColorScale.rgb(vmin + (vmax - vmin) * t, vmin, vmax, pal);
+                for (int j = 0; j < barH; j++) ramp.setRGB(k, j, rgb);
+            }
+            g2.drawImage(ramp, barX, barY, null);
+            g2.setColor(new Color(90, 90, 90));
+            g2.drawRect(barX, barY, barW, barH);
+
+            g2.setFont(oldFont.deriveFont(Font.PLAIN, 9f));
+            FontMetrics fm2 = g2.getFontMetrics();
+            g2.setColor(Color.BLACK);
+            String lo = formatCompact(vmin), hi = formatCompact(vmax);
+            g2.drawString(lo, barX, barY + barH + 9);
+            g2.drawString(hi, barX + barW - fm2.stringWidth(hi), barY + barH + 9);
+        } finally {
+            g2.setFont(oldFont);
+            g2.setColor(oldColor);
+        }
+    }
+
+    private static String formatCompact(double v) {
+        double a = Math.abs(v);
+        if (a < 1e-9) return "0";
+        if (a >= 1e6) return String.format(java.util.Locale.ROOT, "%.1fM", v / 1e6);
+        if (a >= 1e3) return String.format(java.util.Locale.ROOT, "%.1fk", v / 1e3);
+        if (a >= 100) return String.format(java.util.Locale.ROOT, "%.0f", v);
+        if (a >= 10) return String.format(java.util.Locale.ROOT, "%.1f", v);
+        return String.format(java.util.Locale.ROOT, "%.2f", v);
+    }
+
+    private static int clampInt(int v, int lo, int hi) {
+        return v < lo ? lo : (v > hi ? hi : v);
     }
 
     /** Load per-bin scores for bigWig/bedGraph tracks (background, cached). */

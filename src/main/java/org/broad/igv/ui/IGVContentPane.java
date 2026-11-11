@@ -35,6 +35,7 @@ import org.broad.igv.ui.panel.TrackPanel;
 import org.broad.igv.track.DataTrack;
 import org.broad.igv.track.FeatureTrack;
 import org.broad.igv.track.Track;
+import org.broad.igv.hic.HiCTrack;
 import org.broad.igv.ui.util.ApplicationStatusBar;
 
 import javax.swing.*;
@@ -733,6 +734,8 @@ public class IGVContentPane extends JPanel {
         final java.util.List<String> linkNames = new ArrayList<>();
         final java.util.List<Track> ringTracksSel = new ArrayList<>();
         final java.util.List<Track> linkTracksSel = new ArrayList<>();
+        final java.util.List<HiCTrack> hicTracks = new ArrayList<>();
+        final java.util.List<CircularViewPanel.TrackRingConfig> hicCfgs = new ArrayList<>();
         for (int si : sel) {
             if (si < 0 || si >= dataColumnTracks.size()) continue;
             Track t = dataColumnTracks.get(si);
@@ -741,6 +744,19 @@ public class IGVContentPane extends JPanel {
             if (t instanceof InteractionTrack) {
                 linkNames.add(t.getName());
                 linkTracksSel.add(t);
+                continue;
+            }
+            // A Hi-C track IS drawn as a matrix band on the ring, but it is neither a
+            // FeatureTrack nor a DataTrack. Collect it before the band-type filter drops it;
+            // keep its config out of featureCfgs / dataCfgs so no unrelated items leak in.
+            if (t instanceof HiCTrack) {
+                HiCTrack hic = (HiCTrack) t;
+                CircularViewPanel.TrackRingConfig hc = circularDrawingArea.getRingConfig(t.getName());
+                cfgs.add(hc);
+                hicCfgs.add(hc);
+                ringNames.add(t.getName());
+                ringTracksSel.add(t);
+                hicTracks.add(hic);
                 continue;
             }
             // Only FeatureTrack / DataTrack are drawn as bands on the ring. Other tracks in the
@@ -755,7 +771,7 @@ public class IGVContentPane extends JPanel {
             else dataCfgs.add(c);
         }
 
-        if (cfgs.isEmpty() && linkNames.isEmpty()) {
+        if (cfgs.isEmpty() && linkNames.isEmpty() && hicTracks.isEmpty()) {
             // Nothing selected is drawn on the ring and nothing supplies links (e.g. the
             // reference sequence track): there is no meaningful action, so show no popup.
             return;
@@ -793,13 +809,18 @@ public class IGVContentPane extends JPanel {
         final String many = n > 1 ? " (" + n + " tracks)" : "";
 
         JPopupMenu menu = new JPopupMenu();
-        JMenuItem height = new JMenuItem("Track height… (" + cfg.heightPx + " px" + many + ")");
+        final boolean onlyHic = !hicTracks.isEmpty() && hicTracks.size() == ringTracksSel.size();
+        final int shownHeight = onlyHic ? cfg.hicHeightPx : cfg.heightPx;
+        JMenuItem height = new JMenuItem("Track height… (" + shownHeight + " px" + many + ")");
         height.addActionListener(a -> {
-            String v = JOptionPane.showInputDialog(this, "Ring track height (pixels):", cfg.heightPx);
+            String v = JOptionPane.showInputDialog(this, "Ring track height (pixels):", shownHeight);
             if (v != null) {
                 try {
-                    int h = Math.max(8, Integer.parseInt(v.trim()));
-                    for (CircularViewPanel.TrackRingConfig c : cfgs) c.heightPx = h;
+                    int nh = Math.max(8, Integer.parseInt(v.trim()));
+                    for (CircularViewPanel.TrackRingConfig c : cfgs) {
+                        if (hicCfgs.contains(c)) c.hicHeightPx = nh;   // Hi-C uses its own taller band
+                        else c.heightPx = nh;
+                    }
                     circularDrawingArea.invalidateRing();
                 } catch (NumberFormatException ignore) { }
             }
@@ -895,6 +916,40 @@ public class IGVContentPane extends JPanel {
             yscale.add(yGroupItem);
             yscale.add(yGroupPerGene);
             menu.add(yscale);
+        }
+
+        // ---- Hi-C: ring band height + the LINEAR track's own parameter submenus (reused via
+        // addHiCSubmenus, never reimplemented) so every Hi-C setting is reachable here too. ----
+        if (!hicTracks.isEmpty()) {
+            menu.addSeparator();
+            for (HiCTrack hic : hicTracks) {
+                final CircularViewPanel.TrackRingConfig hc =
+                        circularDrawingArea.getRingConfig(hic.getName());
+                JMenuItem hicHeight = new JMenuItem("Hi-C ring height… (" + hc.hicHeightPx + " px)");
+                hicHeight.addActionListener(a -> {
+                    String v = JOptionPane.showInputDialog(this, "Hi-C ring height (pixels):", hc.hicHeightPx);
+                    if (v != null) {
+                        try {
+                            int nh = Math.max(8, Integer.parseInt(v.trim()));
+                            for (HiCTrack h : hicTracks) {
+                                circularDrawingArea.getRingConfig(h.getName()).hicHeightPx = nh;
+                            }
+                            circularDrawingArea.invalidateRing();
+                        } catch (NumberFormatException ignore) { }
+                    }
+                });
+                menu.add(hicHeight);
+            }
+            // Never pass a null onChange: the linear Hi-C track must repaint too when a
+            // parameter changes, otherwise the two views would disagree.
+            final Runnable onChange = () -> {
+                circularDrawingArea.invalidateRing();
+                circularDrawingArea.repaint();
+                igv.repaint();
+            };
+            for (HiCTrack hic : hicTracks) {
+                HiCTrack.addHiCSubmenus(menu, hic, onChange);
+            }
         }
 
         JMenuItem colorItem = new JMenuItem("Colour…");
