@@ -633,6 +633,49 @@ public class IGVContentPane extends JPanel {
         });
         popup.add(thickness);
 
+        // ---- arrow heads (circlize directional + arr.type = triangle) ----
+        JMenu arrowMenu = new JMenu("Arrows");
+        ButtonGroup arrowGroup = new ButtonGroup();
+        String[] arrowNames = {"None", "Start (first interval)", "End (second interval)",
+                "Both ends"};
+        for (int k = 0; k < arrowNames.length; k++) {
+            final int mode = k;
+            JRadioButtonMenuItem it = new JRadioButtonMenuItem(arrowNames[k]);
+            it.setSelected(s.linkArrow == mode);
+            it.addActionListener(e -> { s.linkArrow = mode; panel.refresh(); });
+            arrowGroup.add(it);
+            arrowMenu.add(it);
+        }
+        arrowMenu.addSeparator();
+        JMenuItem arrLen = new JMenuItem("Arrow length… ("
+                + Math.round(s.linkArrowLength) + " px)");
+        arrLen.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel, "Arrow length (pixels):",
+                    Math.round(s.linkArrowLength));
+            if (v != null) {
+                try {
+                    s.linkArrowLength = Math.max(3, Math.min(80, Double.parseDouble(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        arrowMenu.add(arrLen);
+        JMenuItem arrW = new JMenuItem("Arrow width… ("
+                + String.format(java.util.Locale.ROOT, "%.1f", s.linkArrowWidth) + "x band)");
+        arrW.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Arrow base width as a multiple of the band width (1.0 - 4.0):",
+                    String.format(java.util.Locale.ROOT, "%.1f", s.linkArrowWidth));
+            if (v != null) {
+                try {
+                    s.linkArrowWidth = Math.max(1.0, Math.min(4.0, Double.parseDouble(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        arrowMenu.add(arrW);
+        popup.add(arrowMenu);
+
         JMenuItem linkAlpha = new JMenuItem("Transparency (0 = solid)… (" + (255 - s.linkAlpha) + ")");
         linkAlpha.setToolTipText("0 draws solid links; raise it to let overlapping links show through.");
         linkAlpha.addActionListener(e -> {

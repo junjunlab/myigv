@@ -162,6 +162,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** Alpha 0-255. 255 = fully opaque, which is the default (transparency 0). */
         public int     linkAlpha = 255;
         public float   linkThickness = 1.2f;
+        /** Arrow heads on links: 0 = none (default), 1 = start, 2 = end, 3 = both ends. */
+        public int     linkArrow = 0;
+        /** Arrow length in px and base width as a multiple of the band width (circlize
+         *  arr.length / arr.width). */
+        public double  linkArrowLength = 11.0;
+        public double  linkArrowWidth = 1.7;
         /** Cap on the number of links drawn per frame (Circos {@code record_limit}). */
         public int     linkRecordLimit = 5000;
         public boolean linkColorByChromosome = false;
@@ -216,6 +222,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.linkRibbonStrokeThickness = linkRibbonStrokeThickness;
             s.linkColor = linkColor; s.linkAlpha = linkAlpha;
             s.linkThickness = linkThickness; s.linkRecordLimit = linkRecordLimit;
+            s.linkArrow = linkArrow; s.linkArrowLength = linkArrowLength;
+            s.linkArrowWidth = linkArrowWidth;
             s.linkColorByChromosome = linkColorByChromosome;
             s.linkEndsInsideTracks = linkEndsInsideTracks;
             s.geneFlankBp = geneFlankBp;
@@ -3059,10 +3067,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     ? link.color
                     : (s.linkColorByChromosome ? pickColor(chrs.get(i1).name, null) : s.linkColor);
 
-            // A ribbon's width at each end is that interval's own width, floored at the
-            // "Min ribbon width": a 1 bp end still gets a visible band, so links read as
-            // ribbons (circlize look) rather than hairlines that pinch in the middle.
-            boolean ribbon = s.linkRibbon;
+            // A single-point end is a LINE end, an interval end is a BAND end (circlize's
+            // circos.link). Only a link whose BOTH ends are single points is drawn as a plain
+            // curve; as soon as one end spans a region the link is a ribbon, and its arrow head
+            // at that end takes the band width.
+            boolean point1 = link.end1 - link.start1 <= 1;
+            boolean point2 = link.end2 - link.start2 <= 1;
+            boolean ribbon = s.linkRibbon && !(point1 && point2);
 
             // Filled areas read much lighter than thin strokes, so ribbons get their own opacity.
             int alpha = Math.min(link.color != null ? link.color.getAlpha() : 255,
@@ -3075,6 +3086,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 Path2D.Double path = ribbonBand(cx, cy, rEnd, rBez,
                         clamp01(s.linkBezierPurity), e1, e2, s.linkTwist);
                 g2.fill(path);
+                drawLinkArrows(g2, cx, cy, rEnd, e1, e2, point1, point2, s);
                 if (s.linkRibbonStroke && s.linkRibbonStrokeThickness > 0) {
                     // A tapered band is only a few pixels wide mid-span; the outline keeps that
                     // thin section from washing out against the white background.
@@ -3105,6 +3117,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                             p1.getX(), p1.getY(), qx, qy, p2.getX(), p2.getY()));
                 } else {
                     g2.draw(new Line2D.Double(p1, p2));
+                }
+                // Both ends are single points here, so the arrow heads are thin ones sitting on
+                // the curve (zero-width base) rather than the wide band tips.
+                if (s.linkArrow > 0) {
+                    drawLinkArrows(g2, cx, cy, rEnd,
+                            new double[]{a1, a1}, new double[]{a2, a2}, true, true, s);
                 }
             }
             drawn++;
@@ -3193,6 +3211,49 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         path.quadTo(cB.getX(), cB.getY(), B0.getX(), B0.getY());
         path.closePath();                            // flat cap at the first ring
         return path;
+    }
+
+    /**
+     * Arrow heads on a link's ends, like circlize's {@code directional} + {@code arr.type =
+     * "triangle"}: a triangle whose tip sits on the ring and whose base is {@code linkArrowWidth}
+     * times the band width, pointing into the band. 0 = none (default), 1 = start, 2 = end,
+     * 3 = both.
+     */
+    static void drawLinkArrows(Graphics2D g2, double cx, double cy, double rEnd,
+                               double[] e1, double[] e2, boolean point1, boolean point2,
+                               CircularSettings s) {
+        if (s == null || s.linkArrow <= 0) return;
+        double len = Math.max(3.0, s.linkArrowLength);
+        double scale = Math.max(1.0, s.linkArrowWidth);
+        boolean start = s.linkArrow == 1 || s.linkArrow == 3;
+        boolean end = s.linkArrow == 2 || s.linkArrow == 3;
+        // A point end gets a thin arrow on the curve; an interval end gets an arrow as wide as
+        // the band, so the head reads as the band flaring into a tip.
+        if (start) drawArrowHead(g2, cx, cy, rEnd, e1, point1 ? len * 0.65 : len,
+                point1 ? 1.0 : scale);
+        if (end) drawArrowHead(g2, cx, cy, rEnd, e2, point2 ? len * 0.65 : len,
+                point2 ? 1.0 : scale);
+    }
+
+    /** One arrow head at the ring end of a band whose angular extent is {@code e}. */
+    static void drawArrowHead(Graphics2D g2, double cx, double cy, double rEnd,
+                              double[] e, double len, double scale) {
+        double mid = (e[0] + e[1]) / 2.0;
+        Point2D tip = polar(cx, cy, rEnd, mid);
+        double half = Math.max(1.4, Math.abs(e[1] - e[0]) * Math.PI * rEnd) * scale;
+        double ux = tip.getX() - cx, uy = tip.getY() - cy;
+        double n = Math.hypot(ux, uy);
+        if (n < 1e-6) return;
+        ux /= n;
+        uy /= n;                                   // outward radial unit vector
+        double bx = tip.getX() - ux * len, by = tip.getY() - uy * len;
+        double nx = -uy, ny = ux;
+        Path2D.Double p = new Path2D.Double();
+        p.moveTo(tip.getX(), tip.getY());
+        p.lineTo(bx + nx * half, by + ny * half);
+        p.lineTo(bx - nx * half, by - ny * half);
+        p.closePath();
+        g2.fill(p);
     }
 
     /**
