@@ -664,14 +664,29 @@ public class IGVContentPane extends JPanel {
         });
         popup.add(lineCol);
 
-        JMenuItem spacing = new JMenuItem("Label spacing… (" + s.labelLevelGapPx + " px)");
-        spacing.setToolTipText("Radial step used when labels would overlap: larger = more room.");
-        spacing.addActionListener(e -> {
+        JMenuItem connLen = new JMenuItem("Connector length… (" + s.labelGapPx + " px)");
+        connLen.setToolTipText("Distance from the ideogram edge to the label ring "
+                + "(the comb lives in this gap).");
+        connLen.addActionListener(e -> {
             String v = JOptionPane.showInputDialog(panel,
-                    "Radial step between overlapping labels (px):", s.labelLevelGapPx);
+                    "Connector length, ideogram edge to label ring (px):", s.labelGapPx);
             if (v != null) {
                 try {
-                    s.labelLevelGapPx = Math.max(6, Math.min(40, Integer.parseInt(v.trim())));
+                    s.labelGapPx = Math.max(2, Math.min(80, Integer.parseInt(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(connLen);
+
+        JMenuItem spacing = new JMenuItem("Label spacing… (" + s.labelLevelGapPx + " px)");
+        spacing.setToolTipText("Gap between two adjacent labels when they are tiled end to end.");
+        spacing.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Gap between adjacent labels (px):", s.labelLevelGapPx);
+            if (v != null) {
+                try {
+                    s.labelLevelGapPx = Math.max(0, Math.min(30, Integer.parseInt(v.trim())));
                     panel.refresh();
                 } catch (NumberFormatException ignore) { }
             }

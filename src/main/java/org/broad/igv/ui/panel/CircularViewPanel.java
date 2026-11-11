@@ -199,8 +199,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public boolean labelInside = true;
         /** false = radial text reads outward (B->1), true = reads toward the centre (1->B). */
         public boolean labelInward = false;
-        /** Extra radius for each overlap level (labels pushed outward to avoid each other). */
-        public int     labelLevelGapPx = 13;
+        /** Gap (px) inserted between two adjacent labels when they are tiled end to end. */
+        public int     labelLevelGapPx = 3;
         /** Heatmap colour-bar legend, drawn OUTSIDE the ring (same corner set as the Hi-C legend). */
         public boolean heatmapLegend = true;
         public org.broad.igv.hic.HiCTrack.LegendPosition heatmapLegendPosition =
@@ -448,7 +448,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
     /** Radial room the inner label ring needs, so track bands start beyond it. */
     static double labelRingReserve(CircularSettings s) {
-        return s.labelGapPx + 3.0 * s.labelLevelGapPx + 4;
+        // one row of radial text plus the connector track; smartAlign keeps everything on one ring
+        return s.labelGapPx + 2.0 * (s.labelFontSize + 6);
     }
 
     /** Radius the labels hang from: the ideogram's INNER edge when inside, outer when outside. */
@@ -2516,7 +2517,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // fans out clockwise AND counter-clockwise instead of stacking at the same angle.
         int n = anchors.size();
         double rLbl = rBase + dir * s.labelGapPx;
-        double wl = (fm.getHeight() + 3) / (2 * Math.PI * Math.max(8.0, rLbl));  // arc per label
+        double wl = (fm.getHeight() + 3 + Math.max(0, s.labelLevelGapPx))
+                / (2 * Math.PI * Math.max(8.0, rLbl));                            // arc per label
         double[] s1 = new double[n], s2 = new double[n];
         for (int k = 0; k < n; k++) {
             int oi = order[k];
