@@ -581,6 +581,35 @@ public class IGVContentPane extends JPanel {
         popup.add(loadHeatmap);
         popup.add(linkCheck("Show heatmap connectors", s.heatmapConnectors,
                 v -> { s.heatmapConnectors = v; panel.refresh(); }));
+
+        JMenuItem hmHeight = new JMenuItem("Heatmap height… (" + s.heatmapHeightPx + " px)");
+        hmHeight.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel, "Heatmap band height (pixels):",
+                    s.heatmapHeightPx);
+            if (v != null) {
+                try {
+                    s.heatmapHeightPx = Math.max(8, Integer.parseInt(v.trim()));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(hmHeight);
+
+        JMenuItem hmConn = new JMenuItem("Heatmap connection height… ("
+                + s.heatmapConnectionPx + " px)");
+        hmConn.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Height of the connection track between the ideogram and the heatmap\n"
+                            + "(this is where the circlize comb lines are drawn):",
+                    s.heatmapConnectionPx);
+            if (v != null) {
+                try {
+                    s.heatmapConnectionPx = Math.max(0, Integer.parseInt(v.trim()));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(hmConn);
         popup.addSeparator();
 
         popup.add(linkCheck("Ribbon (filled bands)", s.linkRibbon,

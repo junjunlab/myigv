@@ -168,6 +168,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public int     geneFlankBp = 2000;
         /** Radial thickness (px) of the genomic-heatmap band when a heatmap is loaded. */
         public int     heatmapHeightPx = 50;
+        /** Height of the circlize "connection track" between the ideogram and the heatmap band.
+         *  It is what the comb lines live in; 0 packs the heatmap right against the ideogram. */
+        public int     heatmapConnectionPx = 22;
         /** Draw thin connectors tying each heatmap cell to its chromosome position (circlize comb). */
         public boolean heatmapConnectors = true;
         /** Single-chromosome mode: fraction of the full circle the arc spans.
@@ -202,6 +205,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.linkEndsInsideTracks = linkEndsInsideTracks;
             s.geneFlankBp = geneFlankBp;
             s.heatmapHeightPx = heatmapHeightPx;
+            s.heatmapConnectionPx = heatmapConnectionPx;
             s.singleArcFraction = singleArcFraction;
             s.singleArcStartDeg = singleArcStartDeg;
             return s;
@@ -463,85 +467,183 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return new GenomicHeatmap(samples, mn, mx, rows);
     }
 
-    /** Diverging colour: min -> blue, mid -> white, max -> red (correlation / log-ratio style). */
+    /**
+     * Diverging colour ramp: green -> black -> red, anchored at 0 (circlize's
+     * {@code colorRamp2(c(-1, 0, 1), c("green", "black", "red"))}, which is what the reference
+     * genomic-heatmap figure uses). 0 is always black; when the data is one-sided the ramp is
+     * still spread over min..max so nothing collapses to a flat colour.
+     */
     static Color divergingColor(double v, double mn, double mx) {
-        double denom = (mx - mn) > 1e-9 ? (mx - mn) : 1.0;
-        double t = (v - mn) / denom;
-        if (t < 0) t = 0; else if (t > 1) t = 1;
-        int r, g, b;
-        if (t <= 0.5) {                       // white -> blue
-            double f = (0.5 - t) / 0.5;
-            r = (int) (255 + (40 - 255) * f);
-            g = (int) (255 + (90 - 255) * f);
-            b = (int) (255 + (200 - 255) * f);
-        } else {                               // white -> red
-            double f = (t - 0.5) / 0.5;
-            r = (int) (255 + (200 - 255) * f);
-            g = (int) (255 + (40 - 255) * f);
-            b = (int) (255 + (40 - 255) * f);
+        if (Double.isNaN(v)) return new Color(200, 200, 200);
+        double lo = mn, hi = mx;
+        // Anchor black at 0 when the values straddle it: symmetric scale, so 0 -> black.
+        if (mn < 0 && mx > 0) {
+            double a = Math.max(-mn, mx);
+            lo = -a; hi = a;
         }
-        return new Color(clamp8(r), clamp8(g), clamp8(b));
+        double denom = (hi - lo) > 1e-9 ? (hi - lo) : 1.0;
+        double t = (v - lo) / denom;               // 0..1 over the ramp
+        if (t < 0) t = 0; else if (t > 1) t = 1;
+        final int[] GREEN = {0, 150, 0};
+        final int[] BLACK = {0, 0, 0};
+        final int[] RED = {215, 40, 40};
+        int[] a, b;
+        double f;
+        if (t <= 0.5) { a = GREEN; b = BLACK; f = t / 0.5; }
+        else { a = BLACK; b = RED; f = (t - 0.5) / 0.5; }
+        return new Color(
+                clamp8((int) Math.round(a[0] + (b[0] - a[0]) * f)),
+                clamp8((int) Math.round(a[1] + (b[1] - a[1]) * f)),
+                clamp8((int) Math.round(a[2] + (b[2] - a[2]) * f)));
     }
 
-    /** Draw the genomic-heatmap ring band: angular = genomic position, radial = stacked samples. */
+    /**
+     * Draw the genomic-heatmap ring band: angular = genomic position, radial = stacked samples.
+     *
+     * <p>Cells are EQUAL-WIDTH slices of each chromosome, not proportional to the interval
+     * width: that is what circlize's {@code posTransform.default} does before drawing
+     * ({@code segment = seq(xlim[1], xlim[2], length.out = nrow+1)}), and it is the reason the
+     * connector lines fan instead of standing straight. Rows stack outward, so numeric column 1
+     * is the innermost ring and the last column touches the connection track (circlize
+     * {@code stack = TRUE}: ytop = i + 0.5).
+     */
     private void drawHeatmapRing(Graphics2D g2, int cx, int cy, double bandInner, double bandOuter,
                                 List<ChrInfo> chrs, List<double[]> sec, GenomicHeatmap hm) {
         double bandH = bandOuter - bandInner;
         if (bandH < 2 || hm == null || hm.rows.isEmpty()) return;
-        java.util.Map<String, Integer> idx = new java.util.HashMap<>();
-        for (int i = 0; i < chrs.size(); i++) idx.put(chrs.get(i).name, i);
-        double denom = (hm.max - hm.min) > 1e-9 ? (hm.max - hm.min) : 1.0;
+        java.util.Map<String, List<HeatRow>> byChr = rowsByChromosome(hm);
+        java.util.Map<String, Integer> idx = chromosomeIndex(chrs);
         int samples = hm.samples;
-        for (HeatRow r : hm.rows) {
-            Integer ii = idx.get(r.chr);
+        Stroke oldStroke = g2.getStroke();
+        g2.setStroke(new BasicStroke(0.9f));       // white cell borders, like border = "white"
+        for (java.util.Map.Entry<String, List<HeatRow>> e : byChr.entrySet()) {
+            Integer ii = sectorFor(idx, e.getKey());
             if (ii == null) continue;
-            ChrInfo c = chrs.get(ii);
-            double f0 = sec.get(ii)[0], span = sec.get(ii)[1] - f0;
-            double vStart = c.viewStart, vSpan = c.viewSpan();
-            if (vSpan <= 0) vSpan = Math.max(1, c.length);
-            double a0 = f0 + span * clamp01(((double) r.start - vStart) / vSpan);
-            double a1 = f0 + span * clamp01(((double) r.end - vStart) / vSpan);
-            if (a1 <= a0) a1 = a0 + 1e-4;
-            for (int j = 0; j < samples; j++) {
-                double v = r.vals[j];
-                if (Double.isNaN(v)) continue;
-                double rIn = bandInner + bandH * j / samples;
-                double rOut = bandInner + bandH * (j + 1) / samples;
-                g2.setColor(divergingColor(v, hm.min, hm.max));
-                g2.fill(annularPath(cx, cy, rIn, rOut, a0, a1));
+            int si = ii;
+            double f0 = sec.get(si)[0], span = sec.get(si)[1] - f0;
+            if (span <= 0) continue;
+            List<HeatRow> list = e.getValue();
+            int n = list.size();
+            for (int i = 0; i < n; i++) {
+                HeatRow row = list.get(i);
+                // Equal-width slice i of n across this chromosome's arc (posTransform.default).
+                double a0 = f0 + span * i / (double) n;
+                double a1 = f0 + span * (i + 1) / (double) n;
+                if (a1 <= a0) a1 = a0 + 1e-4;
+                for (int j = 0; j < samples; j++) {
+                    double v = j < row.vals.length ? row.vals[j] : Double.NaN;
+                    if (Double.isNaN(v)) continue;
+                    double rIn = bandInner + bandH * j / samples;
+                    double rOut = bandInner + bandH * (j + 1) / samples;
+                    Shape cell = annularPath(cx, cy, rIn, rOut, a0, a1);
+                    g2.setColor(divergingColor(v, hm.min, hm.max));
+                    g2.fill(cell);
+                    g2.setColor(Color.WHITE);
+                    g2.draw(cell);
+                }
             }
         }
+        g2.setStroke(oldStroke);
+    }
+
+    /** Heatmap rows grouped per chromosome, keeping the file's row order (circlize row order). */
+    private static java.util.Map<String, List<HeatRow>> rowsByChromosome(GenomicHeatmap hm) {
+        java.util.Map<String, List<HeatRow>> byChr = new java.util.LinkedHashMap<>();
+        for (HeatRow r : hm.rows) {
+            byChr.computeIfAbsent(r.chr, k -> new ArrayList<>()).add(r);
+        }
+        return byChr;
     }
 
     /**
-     * Draw the circlize "comb": one thin connector per heatmap row, anchoring the row's
-     * chromosome position (at the ideogram inner edge, same angular fraction) to the heatmap
-     * band's outer edge. Connectors are uniform black (as in circlize genomicHeatmap); the
-     * heatmap value itself is carried by the cell colour the connector points to.
+     * Sector lookup by chromosome name, tolerant of the "chr" prefix (and case) mismatch that
+     * IGV data files constantly have: a BED written as {@code chr1} must still land on a sector
+     * named {@code 1} and vice versa. Without this the whole heatmap silently draws nothing.
+     */
+    static java.util.Map<String, Integer> chromosomeIndex(List<ChrInfo> chrs) {
+        java.util.Map<String, Integer> idx = new java.util.HashMap<>();
+        for (int i = 0; i < chrs.size(); i++) {
+            String n = chrs.get(i).name;
+            if (n == null) continue;
+            idx.putIfAbsent(n, i);
+            idx.putIfAbsent(n.toLowerCase(java.util.Locale.ROOT), i);
+            String bare = n.regionMatches(true, 0, "chr", 0, 3) ? n.substring(3) : "chr" + n;
+            idx.putIfAbsent(bare, i);
+            idx.putIfAbsent(bare.toLowerCase(java.util.Locale.ROOT), i);
+        }
+        return idx;
+    }
+
+    /** Resolve a data-file chromosome name against the sector index built by chromosomeIndex(). */
+    static Integer sectorFor(java.util.Map<String, Integer> idx, String name) {
+        if (name == null) return null;
+        Integer i = idx.get(name);
+        if (i != null) return i;
+        i = idx.get(name.toLowerCase(java.util.Locale.ROOT));
+        if (i != null) return i;
+        String bare = name.regionMatches(true, 0, "chr", 0, 3) ? name.substring(3) : "chr" + name;
+        i = idx.get(bare);
+        return i != null ? i : idx.get(bare.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /**
+     * Draw the circlize "comb" between the ideogram and the heatmap, following
+     * {@code circos.genomicPosTransformLines(posTransform = posTransform.default,
+     * horizontalLine = "top")} exactly:
+     *
+     * <ol>
+     *   <li>a horizontal cap over the region's REAL genomic interval, hugging the ideogram;</li>
+     *   <li>a radial stem from that interval's midpoint down to 2/3 of the connection track;</li>
+     *   <li>a diagonal to 1/3 of the track at the CELL's midpoint (cells are equal-width slices,
+     *       so the two midpoints differ — this is what makes the teeth fan);</li>
+     *   <li>a radial stem from there onto the heatmap band's outer edge.</li>
+     * </ol>
+     * Uniform black, as in circlize: the value is carried by the cell colour, not the line.
      */
     private void drawHeatmapConnectors(Graphics2D g2, int cx, int cy, double rIdeoInner,
                                        double bandInner, double bandOuter,
                                        List<ChrInfo> chrs, List<double[]> sec, GenomicHeatmap hm) {
         if (hm == null || hm.rows.isEmpty()) return;
-        java.util.Map<String, Integer> idx = new java.util.HashMap<>();
-        for (int i = 0; i < chrs.size(); i++) idx.put(chrs.get(i).name, i);
+        double h = rIdeoInner - bandOuter;
+        if (h < 2) return;
+        java.util.Map<String, List<HeatRow>> byChr = rowsByChromosome(hm);
+        java.util.Map<String, Integer> idx = chromosomeIndex(chrs);
         Stroke old = g2.getStroke();
-        g2.setStroke(new BasicStroke(0.6f));
+        g2.setStroke(new BasicStroke(0.7f));
         g2.setColor(Color.BLACK);
-        for (HeatRow r : hm.rows) {
-            Integer ii = idx.get(r.chr);
+        double rMidTrack = rIdeoInner - h / 3.0;      // y = 2/3 (outer third boundary)
+        double rLowerTrack = rIdeoInner - 2 * h / 3.0; // y = 1/3
+        for (java.util.Map.Entry<String, List<HeatRow>> e : byChr.entrySet()) {
+            Integer ii = sectorFor(idx, e.getKey());
             if (ii == null) continue;
             ChrInfo c = chrs.get(ii);
             double f0 = sec.get(ii)[0], span = sec.get(ii)[1] - f0;
+            if (span <= 0) continue;
             double vStart = c.viewStart, vSpan = c.viewSpan();
             if (vSpan <= 0) vSpan = Math.max(1, c.length);
-            double a0 = f0 + span * clamp01(((double) r.start - vStart) / vSpan);
-            double a1 = f0 + span * clamp01(((double) r.end - vStart) / vSpan);
-            if (a1 <= a0) a1 = a0 + 1e-4;
-            double fracMid = (a0 + a1) / 2.0;
-            Point2D pOut = polar(cx, cy, rIdeoInner, fracMid);
-            Point2D pIn  = polar(cx, cy, bandOuter, fracMid);
-            g2.draw(new Line2D.Double(pOut, pIn));
+            List<HeatRow> list = e.getValue();
+            int n = list.size();
+            for (int i = 0; i < n; i++) {
+                HeatRow row = list.get(i);
+                // (a) real genomic position of the interval -> the cap and the upper stem
+                double a0 = f0 + span * clamp01(((double) row.start - vStart) / vSpan);
+                double a1 = f0 + span * clamp01(((double) row.end - vStart) / vSpan);
+                if (a1 < a0) { double t = a0; a0 = a1; a1 = t; }
+                double fracReal = (a0 + a1) / 2.0;
+                // (b) equal-width cell slot -> the lower stem (posTransform.default)
+                double fracCell = f0 + span * (i + 0.5) / n;
+
+                // horizontal cap over the real interval, hugging the ideogram
+                g2.fill(annularPath(cx, cy, rIdeoInner - 0.45, rIdeoInner + 0.45, a0, a1));
+
+                Point2D pTop = polar(cx, cy, rIdeoInner, fracReal);
+                Point2D pMid = polar(cx, cy, rMidTrack, fracReal);
+                Point2D pLow = polar(cx, cy, rLowerTrack, fracCell);
+                Point2D pBot = polar(cx, cy, bandOuter, fracCell);
+                g2.draw(new Line2D.Double(pTop, pMid));
+                g2.draw(new Line2D.Double(pMid, pLow));
+                g2.draw(new Line2D.Double(pLow, pBot));
+            }
         }
         g2.setStroke(old);
     }
@@ -1647,6 +1749,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             cursor = bandInner - 5;
         }
         if (heatmap != null) {                              // genomic-heatmap band, innermost
+            // Reserve the circlize connection track: the comb lives between the ideogram and
+            // the heatmap, so the band starts below it instead of touching the ideogram.
+            if (s.heatmapConnectors && s.heatmapConnectionPx > 0) cursor -= s.heatmapConnectionPx;
             double bandOuter = cursor;
             double bandInner = bandOuter - (s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50);
             if (bandInner >= 24) {
@@ -1680,6 +1785,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             cursor = bandInner - 5;
         }
         if (heatmap != null) {                              // genomic-heatmap band, innermost
+            // Reserve the circlize connection track: the comb lives between the ideogram and
+            // the heatmap, so the band starts below it instead of touching the ideogram.
+            if (s.heatmapConnectors && s.heatmapConnectionPx > 0) cursor -= s.heatmapConnectionPx;
             double bandOuter = cursor;
             double bandInner = bandOuter - (s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50);
             if (bandInner >= 24) {
