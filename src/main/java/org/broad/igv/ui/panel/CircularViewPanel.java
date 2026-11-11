@@ -2496,7 +2496,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 if (a1 < a0) { double t = a0; a0 = a1; a1 = t; }
                 // radial text: its arc footprint is the line height; horizontal: the width
                 double fp = s.labelInside ? fm.getHeight() + 3 : fm.stringWidth(row.text) + 6;
-                anchors.add(new double[]{a0, a1, fp});
+                anchors.add(new double[]{a0, a1, fp, fm.stringWidth(row.text)});
                 texts.add(row.text);
             }
         }
@@ -2530,7 +2530,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             needed = wpx / (2 * Math.PI * r);
             fText = Math.max(fReal, levelEnd[level] + needed / 2.0);
             levelEnd[level] = fText + needed / 2.0;
-            labelLayout.add(new double[]{a0, a1, r, fText});
+            // r = the end of the text that FACES THE RING; the text itself extends away from it
+            labelLayout.add(new double[]{a0, a1, r, fText, anchors.get(oi)[3]});
             labelTexts.add(texts.get(oi));
         }
     }
@@ -2557,6 +2558,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     double a0 = labelLayout.get(i)[0], a1 = labelLayout.get(i)[1];
                     double r = labelLayout.get(i)[2], fText = labelLayout.get(i)[3];
                     double fReal = (a0 + a1) / 2.0;
+                    // The comb spans ONLY the gap between the ideogram and the near end of the
+                    // text (r), so no segment can run across the gene name.
                     double hT = Math.abs(r - rBase);
                     if (hT < 2) continue;
                     double rMid = rBase + dir * hT / 3.0;
@@ -2576,11 +2579,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             }
             for (int i = 0; i < labelLayout.size(); i++) {
                 double r = labelLayout.get(i)[2], fText = labelLayout.get(i)[3];
+                double len = labelLayout.get(i).length > 4 ? labelLayout.get(i)[4] : 0;
+                double rCenter = r + dir * len / 2.0;      // text centre, away from the ring
                 if (s.labelInside) {
                     // radial: reads outward along the radius, niceFacing flips the left half
-                    drawRadialText(g2, cx, cy, r, fText, labelTexts.get(i), font, s.labelColor);
+                    drawRadialText(g2, cx, cy, rCenter, fText, labelTexts.get(i), font, s.labelColor);
                 } else {
-                    drawHorizontalLabel(g2, cx, cy, r, fText, labelTexts.get(i), font, s.labelColor);
+                    drawHorizontalLabel(g2, cx, cy, rCenter, fText, labelTexts.get(i), font, s.labelColor);
                 }
             }
         } finally {
