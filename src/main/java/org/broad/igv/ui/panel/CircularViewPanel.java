@@ -507,8 +507,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     /**
      * Draw the circlize "comb": one thin connector per heatmap row, anchoring the row's
      * chromosome position (at the ideogram inner edge, same angular fraction) to the heatmap
-     * band's outer edge. The connector is coloured by the row's strongest signal (largest
-     * |value - mid|); a grey floor keeps near-zero rows visible so the comb always reads.
+     * band's outer edge. Connectors are uniform black (as in circlize genomicHeatmap); the
+     * heatmap value itself is carried by the cell colour the connector points to.
      */
     private void drawHeatmapConnectors(Graphics2D g2, int cx, int cy, double rIdeoInner,
                                        double bandInner, double bandOuter,
@@ -516,10 +516,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (hm == null || hm.rows.isEmpty()) return;
         java.util.Map<String, Integer> idx = new java.util.HashMap<>();
         for (int i = 0; i < chrs.size(); i++) idx.put(chrs.get(i).name, i);
-        double denom = (hm.max - hm.min) > 1e-9 ? (hm.max - hm.min) : 1.0;
-        double mid = (hm.min + hm.max) / 2.0;
         Stroke old = g2.getStroke();
         g2.setStroke(new BasicStroke(0.6f));
+        g2.setColor(Color.BLACK);
         for (HeatRow r : hm.rows) {
             Integer ii = idx.get(r.chr);
             if (ii == null) continue;
@@ -531,22 +530,6 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double a1 = f0 + span * clamp01(((double) r.end - vStart) / vSpan);
             if (a1 <= a0) a1 = a0 + 1e-4;
             double fracMid = (a0 + a1) / 2.0;
-            // strongest signal across the row's samples drives the connector colour
-            double rep = 0, best = -1;
-            for (double v : r.vals) {
-                if (Double.isNaN(v)) continue;
-                double m = Math.abs(v - mid);
-                if (m > best) { best = m; rep = v; }
-            }
-            if (best < 0) continue;                       // all NaN -> skip
-            Color dc = divergingColor(rep, hm.min, hm.max);
-            double mag = Math.min(1.0, best / denom);     // 0..1 signal strength
-            double blend = 0.35 + 0.65 * mag;             // floor so near-zero rows stay visible
-            int gray = 120;
-            int cr = (int) (gray + (dc.getRed()   - gray) * blend);
-            int cg = (int) (gray + (dc.getGreen() - gray) * blend);
-            int cb = (int) (gray + (dc.getBlue()  - gray) * blend);
-            g2.setColor(new Color(cr, cg, cb, 200));
             Point2D pOut = polar(cx, cy, rIdeoInner, fracMid);
             Point2D pIn  = polar(cx, cy, bandOuter, fracMid);
             g2.draw(new Line2D.Double(pOut, pIn));
