@@ -2420,7 +2420,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
     // ---- labels layer (circos.genomicLabels) -------------------------------------
 
-    /** Cached label placement from the last layout pass: {arcFraction, radius}. */
+    /** Tangential lift (px) between the radial stub and the start of the text. */
+    private static final double LIFT_PX = 4.0;
+
+    /** Cached label placement from the last layout pass: {anchor, radius, textCentre}. */
     private List<ChrInfo> lastChrs;                 // sectors used by the last ring layout
     private final List<double[]> labelLayout = new ArrayList<>();
     private final List<String> labelTexts = new ArrayList<>();
@@ -2475,17 +2478,20 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         for (int oi : order) {
             double f = anchors.get(oi)[0], wpx = anchors.get(oi)[1];
             int level = 0;
-            double r = 0;
+            double r = 0, needed = 0, fStart = 0;
             for (; level < levelEnd.length; level++) {
                 r = rOut + s.labelGapPx + level * (double) s.labelLevelGapPx;
-                double needed = wpx / (2 * Math.PI * r);      // arc fraction the text occupies
-                if (f - needed / 2.0 > levelEnd[level]) break;
+                needed = wpx / (2 * Math.PI * r);             // arc fraction the text occupies
+                fStart = f + LIFT_PX / r;                     // start just past the radial stub
+                if (fStart > levelEnd[level]) break;
             }
             if (level >= levelEnd.length) level = levelEnd.length - 1;
             r = rOut + s.labelGapPx + level * (double) s.labelLevelGapPx;
-            double needed = wpx / (2 * Math.PI * r);
-            levelEnd[level] = f + needed / 2.0;
-            labelLayout.add(new double[]{f, r, level});
+            needed = wpx / (2 * Math.PI * r);
+            fStart = f + LIFT_PX / r;
+            levelEnd[level] = fStart + needed;
+            // {anchor fraction, radius, text CENTER fraction}
+            labelLayout.add(new double[]{f, r, fStart + needed / 2.0});
             labelTexts.add(texts.get(oi));
         }
     }
@@ -2501,17 +2507,21 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         try {
             if (s.labelShowLines) {
                 g2.setColor(s.labelLineColor);
-                g2.setStroke(new BasicStroke(0.7f));
+                g2.setStroke(new BasicStroke(0.7f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
                 for (int i = 0; i < labelLayout.size(); i++) {
                     double f = labelLayout.get(i)[0], r = labelLayout.get(i)[1];
+                    double fCenter = labelLayout.get(i)[2];
+                    // elbow: radial stub out of the ideogram, then a short arc to where the text
+                    // starts — circlize's genomicLabels connector.
                     Point2D a = polar(cx, cy, rOut + 0.5, f);
-                    Point2D b = polar(cx, cy, r - 2.0, f);
+                    Point2D b = polar(cx, cy, r, f);
                     g2.draw(new Line2D.Double(a, b));
+                    g2.draw(new Line2D.Double(b, polar(cx, cy, r, f + LIFT_PX / r)));
                 }
             }
             for (int i = 0; i < labelLayout.size(); i++) {
-                double f = labelLayout.get(i)[0], r = labelLayout.get(i)[1];
-                drawTangentialText(g2, cx, cy, r, f, labelTexts.get(i), font, s.labelColor);
+                double fCenter = labelLayout.get(i)[2], r = labelLayout.get(i)[1];
+                drawTangentialText(g2, cx, cy, r, fCenter, labelTexts.get(i), font, s.labelColor);
             }
         } finally {
             g2.setStroke(oldStroke);
@@ -3258,13 +3268,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     ? link.color
                     : (s.linkColorByChromosome ? pickColor(chrs.get(i1).name, null) : s.linkColor);
 
-            // A single-point end is a LINE end, an interval end is a BAND end (circlize's
-            // circos.link). Only a link whose BOTH ends are single points is drawn as a plain
-            // curve; as soon as one end spans a region the link is a ribbon, and its arrow head
-            // at that end takes the band width.
+            // The link BODY is always a ribbon (a 1 bp end is floored at "Min ribbon width"), so
+            // no link can collapse into a hairline. The end type only decides the ARROW style:
+            // a point end gets a thin arrow, an interval end gets an arrow as wide as the band.
             boolean point1 = link.end1 - link.start1 <= 1;
             boolean point2 = link.end2 - link.start2 <= 1;
-            boolean ribbon = s.linkRibbon && !(point1 && point2);
+            boolean ribbon = s.linkRibbon;
 
             // Filled areas read much lighter than thin strokes, so ribbons get their own opacity.
             int alpha = Math.min(link.color != null ? link.color.getAlpha() : 255,
@@ -3401,7 +3410,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             // "Twist" pulls both edges toward the centreline, so the ribbon narrows to a waist at
             // mid-span and reopens. Swapping the edge pairing instead (a real 2D cross) would
             // close the band to a POINT there, which is exactly the hairline look we just fixed.
-            final double k = 0.45;
+            final double k = 0.22;
             double mx = (cA.getX() + cB.getX()) / 2.0;
             double my = (cA.getY() + cB.getY()) / 2.0;
             cA = new Point2D.Double(cA.getX() + (mx - cA.getX()) * k,
