@@ -476,6 +476,9 @@ public class IGVContentPane extends JPanel {
         JMenuItem impHeat = new JMenuItem("Heatmap  (BED with value columns)…");
         impHeat.addActionListener(e -> loadHeatmapFromFile(panel));
         importMenu.add(impHeat);
+        JMenuItem impLabels = new JMenuItem("Labels  (BED + name column)…");
+        impLabels.addActionListener(e -> loadLabelsFromFile(panel));
+        importMenu.add(impLabels);
         importMenu.addSeparator();
         JMenuItem impHint = new JMenuItem("Imported data is drawn in the circular view only");
         impHint.setEnabled(false);
@@ -591,6 +594,85 @@ public class IGVContentPane extends JPanel {
             javax.swing.JOptionPane.showMessageDialog(panel, "Could not load heatmap:\n" + ex.getMessage(),
                     "Load heatmap", javax.swing.JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    /** Import a labels file: one ring of text labels outside the ideogram (circos.genomicLabels). */
+    private void loadLabelsFromFile(CircularViewPanel panel) {
+        java.awt.FileDialog fd = new java.awt.FileDialog(
+                (java.awt.Frame) null, "Import labels (BED, 4th column = name)",
+                java.awt.FileDialog.LOAD);
+        fd.setVisible(true);
+        String dir = fd.getDirectory();
+        String file = fd.getFile();
+        if (dir == null || file == null) return;
+        String path = dir + file;
+        try {
+            org.broad.igv.util.ResourceLocator locator = new org.broad.igv.util.ResourceLocator(path);
+            java.util.List<CircularViewPanel.LabelRow> rows = CircularViewPanel.parseLabels(locator);
+            if (rows.isEmpty()) {
+                JOptionPane.showMessageDialog(panel,
+                        "No chr / start / end / name rows found in://n" + file,
+                        "Import labels", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            circularDrawingArea.addLabelsLayer(file, path, rows);
+            refreshDataColumn();
+            circularDrawingArea.refresh();
+            log.info("Loaded " + rows.size() + " circular labels from " + path);
+        } catch (Throwable ex) {
+            log.error("Failed to load labels from " + path, ex);
+            JOptionPane.showMessageDialog(panel, "Could not load labels://n" + ex.getMessage(),
+                    "Import labels", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /** Parameters for a labels layer (font, colours, connector lines), same menu pattern as heatmap. */
+    private void addLabelItems(JPopupMenu popup, CircularViewPanel panel) {
+        CircularViewPanel.CircularSettings s = panel.getSettings();
+        popup.add(linkCheck("Show connector lines", s.labelShowLines,
+                v -> { s.labelShowLines = v; panel.refresh(); }));
+        popup.add(linkCheck("Bold labels", s.labelBold,
+                v -> { s.labelBold = v; panel.refresh(); }));
+
+        JMenuItem font = new JMenuItem("Font size… (" + s.labelFontSize + " pt)");
+        font.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel, "Label font size (pt):", s.labelFontSize);
+            if (v != null) {
+                try {
+                    s.labelFontSize = Math.max(4, Math.min(36, Integer.parseInt(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(font);
+
+        JMenuItem textCol = new JMenuItem("Label colour…");
+        textCol.addActionListener(e -> {
+            Color c = JColorChooser.showDialog(panel, "Label colour", s.labelColor);
+            if (c != null) { s.labelColor = c; panel.refresh(); }
+        });
+        popup.add(textCol);
+
+        JMenuItem lineCol = new JMenuItem("Connector colour…");
+        lineCol.addActionListener(e -> {
+            Color c = JColorChooser.showDialog(panel, "Connector colour", s.labelLineColor);
+            if (c != null) { s.labelLineColor = c; panel.refresh(); }
+        });
+        popup.add(lineCol);
+
+        JMenuItem spacing = new JMenuItem("Label spacing… (" + s.labelLevelGapPx + " px)");
+        spacing.setToolTipText("Radial step used when labels would overlap: larger = more room.");
+        spacing.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Radial step between overlapping labels (px):", s.labelLevelGapPx);
+            if (v != null) {
+                try {
+                    s.labelLevelGapPx = Math.max(6, Math.min(40, Integer.parseInt(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(spacing);
     }
 
     public static void addLinkItems(JPopupMenu popup, CircularViewPanel panel) {
@@ -1126,18 +1208,25 @@ public class IGVContentPane extends JPanel {
         JPopupMenu menu = new JPopupMenu();
         final boolean heat = layer.kind == CircularViewPanel.CircularLayer.Kind.HEATMAP;
 
-        menu.add(linkCheck(heat ? "Show heatmap" : "Show this links layer", layer.visible, v -> {
+        String showLabel = heat ? "Show heatmap"
+                : (layer.kind == CircularViewPanel.CircularLayer.Kind.LABELS
+                        ? "Show labels" : "Show this links layer");
+        menu.add(linkCheck(showLabel, layer.visible, v -> {
             circularDrawingArea.setLayerVisible(layer, v);
             refreshDataColumn();
         }));
         menu.addSeparator();
 
+        boolean labels = layer.kind == CircularViewPanel.CircularLayer.Kind.LABELS;
         if (heat) addHeatmapItems(menu, circularDrawingArea);
+        else if (labels) addLabelItems(menu, circularDrawingArea);
         else addLinkItems(menu, circularDrawingArea);
 
         menu.addSeparator();
-        JMenuItem remove = new JMenuItem(heat
-                ? "Remove heatmap from circular view…" : "Remove links from circular view…");
+        JMenuItem remove = new JMenuItem(heat ? "Remove heatmap from circular view…"
+                : (layer.kind == CircularViewPanel.CircularLayer.Kind.LABELS
+                        ? "Remove labels from circular view…"
+                        : "Remove links from circular view…"));
         remove.addActionListener(a -> {
             circularDrawingArea.removeLayer(layer);
             refreshDataColumn();

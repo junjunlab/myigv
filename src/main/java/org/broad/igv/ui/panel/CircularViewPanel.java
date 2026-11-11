@@ -187,6 +187,16 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public Color   heatmapLowColor = new Color(0, 150, 0);
         public Color   heatmapMidColor = new Color(0, 0, 0);
         public Color   heatmapHighColor = new Color(215, 40, 40);
+        /** Label ring (circos.genomicLabels): text outside the ideogram, connected by a stub. */
+        public int     labelFontSize = 9;
+        public boolean labelBold = false;
+        public Color   labelColor = new Color(30, 30, 30);
+        public Color   labelLineColor = new Color(120, 120, 120);
+        public boolean labelShowLines = true;
+        /** Distance from the ideogram outer edge to the first label ring, in px. */
+        public int     labelGapPx = 7;
+        /** Extra radius for each overlap level (labels pushed outward to avoid each other). */
+        public int     labelLevelGapPx = 13;
         /** Heatmap colour-bar legend, drawn OUTSIDE the ring (same corner set as the Hi-C legend). */
         public boolean heatmapLegend = true;
         public org.broad.igv.hic.HiCTrack.LegendPosition heatmapLegendPosition =
@@ -233,6 +243,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.heatmapLowColor = heatmapLowColor;
             s.heatmapMidColor = heatmapMidColor;
             s.heatmapHighColor = heatmapHighColor;
+            s.labelFontSize = labelFontSize; s.labelBold = labelBold;
+            s.labelColor = labelColor; s.labelLineColor = labelLineColor;
+            s.labelShowLines = labelShowLines; s.labelGapPx = labelGapPx;
+            s.labelLevelGapPx = labelLevelGapPx;
             s.heatmapLegend = heatmapLegend;
             s.heatmapLegendPosition = heatmapLegendPosition;
             s.singleArcFraction = singleArcFraction;
@@ -353,7 +367,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * the layer's own context menu (ribbon / heatmap parameters + Remove).
      */
     public static class CircularLayer {
-        public enum Kind { LINKS, HEATMAP }
+        public enum Kind { LINKS, HEATMAP, LABELS }
 
         public final Kind kind;
         public final String name;      // file name, shown in the Data Tracks column
@@ -362,6 +376,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public final List<RingLink> links = new ArrayList<>();
         /** HEATMAP: the matrix (only one heatmap ring exists at a time). */
         public GenomicHeatmap heatmap;
+        /** LABELS: name rows drawn outside the ideogram (circos.genomicLabels). */
+        public final List<LabelRow> labels = new ArrayList<>();
         public boolean visible = true;
 
         public CircularLayer(Kind kind, String name, String path) {
@@ -372,12 +388,70 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
         /** Short "what is inside" tag for the column row. */
         public String summary() {
+            if (kind == Kind.LABELS) return "labels " + labels.size();
             if (kind == Kind.HEATMAP) {
                 return heatmap == null ? "heatmap"
                         : "heatmap " + heatmap.rows.size() + " x " + heatmap.samples;
             }
             return "links " + links.size();
         }
+    }
+
+    /** One row of a labels file: an interval plus the text to print next to it. */
+    public static class LabelRow {
+        public final String chr, text;
+        public final int start, end;
+
+        public LabelRow(String chr, int start, int end, String text) {
+            this.chr = chr; this.start = start; this.end = end; this.text = text;
+        }
+    }
+
+    /** Parse a BED/TSV whose 4th column holds the label (chr, start, end, name). */
+    public static List<LabelRow> parseLabels(org.broad.igv.util.ResourceLocator locator) throws java.io.IOException {
+        List<LabelRow> out = new ArrayList<>();
+        java.io.File f = new java.io.File(locator.getPath());
+        try (java.io.BufferedReader br = new java.io.BufferedReader(
+                new java.io.InputStreamReader(new java.io.FileInputStream(f),
+                        java.nio.charset.StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                String[] t = line.split("\t");
+                if (t.length < 4) t = line.trim().split("\\s+");
+                if (t.length < 4) continue;
+                int st, en;
+                try { st = Integer.parseInt(t[1].trim()); en = Integer.parseInt(t[2].trim()); }
+                catch (NumberFormatException e) { continue; }
+                String text = t[3].trim();
+                if (text.isEmpty()) text = t[0] + ":" + st;
+                out.add(new LabelRow(t[0], st, en, text));
+            }
+        }
+        return out;
+    }
+
+    /** Add a labels file as its own layer (several label files stack up). */
+    public CircularLayer addLabelsLayer(String name, String path, List<LabelRow> rows) {
+        CircularLayer l = new CircularLayer(CircularLayer.Kind.LABELS, name, path);
+        if (rows != null) l.labels.addAll(rows);
+        layers.add(l);
+        invalidateRing();
+        log.info("Circular labels layer '" + name + "': " + l.labels.size() + " label(s)");
+        return l;
+    }
+
+    /** True when at least one visible labels layer exists (drives the ring shrink). */
+    public boolean hasVisibleLabels() {
+        for (CircularLayer l : layers) {
+            if (l.kind == CircularLayer.Kind.LABELS && l.visible && !l.labels.isEmpty()) return true;
+        }
+        return false;
+    }
+
+    public boolean hasLabelsLayer() {
+        for (CircularLayer l : layers) if (l.kind == CircularLayer.Kind.LABELS) return true;
+        return false;
     }
 
     private final List<CircularLayer> layers = new ArrayList<>();
@@ -953,11 +1027,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 if (geneChrs.isEmpty()) {
                     drawMessage(ig, w, h, "Gene list empty or no genes recognised");
                 } else {
+                    lastChrs = geneChrs;
                     drawAll(ig, w, h, geneChrs, settings);
                     drawTrackRings(ig, w, h, geneChrs, settings);
                 }
             } else if (Globals.CHR_ALL.equals(chr)) {
                 List<ChrInfo> chrs = buildAll(genome, zoom, rangeZoom, settings);
+                lastChrs = chrs;
                 drawAll(ig, w, h, chrs, settings);
                 drawTrackRings(ig, w, h, chrs, settings);
                 // Links are an independent z-layer drawn last, like Circos, so they sit on top.
@@ -966,6 +1042,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 ChrInfo one = buildOne(genome, chr, rangeZoom, settings);
                 if (one == null) drawMessage(ig, w, h, "Chromosome not found: " + chr);
                 else {
+                    lastChrs = Collections.singletonList(one);
                     drawSingle(ig, w, h, one, settings);
                     drawTrackRingsSingle(ig, w, h, one, settings);
                     drawLinks(ig, w, h, Collections.singletonList(one), allLinks(), settings,
@@ -978,6 +1055,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 ig.drawString("Loading features… (" + pendingLoads.size() + ")", 10, h - 10);
             }
             ig.dispose();
+            layoutLabels(w, h, lastChrs, settings);   // label ring is laid out with the ring
             ringKey = key;
         }
         // blit the device-resolution image back at logical size; the panel transform
@@ -993,6 +1071,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         }
         // The heatmap legend is independent of any Hi-C track being loaded.
         drawHeatmapLegend(g2, w, h, heatmap, settings, visibleHics);
+        drawLabelLayers(g2, w, h, settings);
     }
 
     // ------------------------------------------------------------------
@@ -1039,11 +1118,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 drawMessage(g2, w, h, "Gene list empty or no genes recognised");
                 return;
             }
+            lastChrs = geneChrs;
             drawAll(g2, w, h, geneChrs, settings);
             drawTrackRings(g2, w, h, geneChrs, settings);
             drawLinks(g2, w, h, geneChrs, allLinks(), settings, linkAnchorRadius(w, h, settings));
         } else if (Globals.CHR_ALL.equals(chr)) {
             List<ChrInfo> chrs = buildAll(genome, zoom, rangeZoom, settings);
+            lastChrs = chrs;
             drawAll(g2, w, h, chrs, settings);
             drawTrackRings(g2, w, h, chrs, settings);
             drawLinks(g2, w, h, chrs, allLinks(), settings, linkAnchorRadius(w, h, settings));
@@ -1053,6 +1134,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 drawMessage(g2, w, h, "Chromosome not found: " + chr);
                 return;
             }
+            lastChrs = Collections.singletonList(one);
             drawSingle(g2, w, h, one, settings);
             drawTrackRingsSingle(g2, w, h, one, settings);
             drawLinks(g2, w, h, Collections.singletonList(one), allLinks(), settings,
@@ -1063,6 +1145,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         for (Track t : ringTracks) if (t instanceof HiCTrack) visibleHics.add((HiCTrack) t);
         if (!visibleHics.isEmpty()) drawHiCLegends(g2, w, h, visibleHics, hicLimitsByTrack, settings);
         drawHeatmapLegend(g2, w, h, heatmap, settings, visibleHics);
+        layoutLabels(w, h, lastChrs, settings);
+        drawLabelLayers(g2, w, h, settings);
     }
 
     // ------------------------------------------------------------------
@@ -1647,9 +1731,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * pulled in so the connection track + heatmap band still fit inside the panel.
      */
     static double ideogramOuterRadius(int w, int h, CircularSettings s) {
+        return ideogramOuterRadius(w, h, s, false);
+    }
+
+    /** Same, reserving room outside the ring for a labels layer (circos.genomicLabels). */
+    static double ideogramOuterRadius(int w, int h, CircularSettings s, boolean reserveLabels) {
         double half = Math.min(w, h) / 2.0;
         double R = half - MARGIN;
         double rOut = R * s.bandOuter;
+        if (reserveLabels) rOut = Math.min(rOut, R * 0.76);   // room for the label ring outside
         if (!s.heatmapOutside) return rOut;
         double need = outsideAxisClearance(s) + connectionTrackHeight(s)
                 + Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50) + 18;
@@ -2325,6 +2415,107 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             drawOneHiCLegend(g2, box.x, box.y, box.width, box.height,
                     hic.getName(), limitsByTrack.get(String.valueOf(hic.getName())),
                     hic.getTransform(), hic.getPalette());
+        }
+    }
+
+    // ---- labels layer (circos.genomicLabels) -------------------------------------
+
+    /** Cached label placement from the last layout pass: {arcFraction, radius}. */
+    private List<ChrInfo> lastChrs;                 // sectors used by the last ring layout
+    private final List<double[]> labelLayout = new ArrayList<>();
+    private final List<String> labelTexts = new ArrayList<>();
+
+    /**
+     * Lay out the label ring: every label is anchored at its interval's midpoint on the ideogram
+     * and placed just outside it, rotated tangentially (niceFacing). Labels that would collide are
+     * pushed one level further out, which is circlize's overlap avoidance for genomicLabels.
+     */
+    void layoutLabels(int w, int h, List<ChrInfo> chrs, CircularSettings s) {
+        labelLayout.clear();
+        labelTexts.clear();
+        if (chrs == null || chrs.isEmpty()) return;
+        java.util.Map<String, Integer> idx = chromosomeIndex(chrs);
+        List<double[]> sec = sectorsFor(chrs, s);
+        Font font = new Font("SansSerif", s.labelBold ? Font.BOLD : Font.PLAIN, s.labelFontSize);
+        // measure without a Graphics2D context: a throwaway 1x1 image gives real font metrics
+        BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D pg = probe.createGraphics();
+        pg.setFont(font);
+        FontMetrics fm = pg.getFontMetrics();
+        pg.dispose();
+
+        double rOut = ideogramOuterRadius(w, h, s, true);
+        List<double[]> anchors = new ArrayList<>();   // {fraction, widthPx}
+        List<String> texts = new ArrayList<>();
+        for (CircularLayer l : layers) {
+            if (l.kind != CircularLayer.Kind.LABELS || !l.visible) continue;
+            for (LabelRow row : l.labels) {
+                Integer i = sectorFor(idx, row.chr);
+                if (i == null) continue;
+                ChrInfo c = chrs.get(i);
+                double f0 = sec.get(i)[0], span = sec.get(i)[1] - f0;
+                double vSpan = c.viewSpan();
+                if (vSpan <= 0) vSpan = Math.max(1, c.length);
+                double mid = (row.start + row.end) / 2.0;
+                double f = f0 + span * clamp01((mid - c.viewStart) / vSpan);
+                anchors.add(new double[]{f, fm.stringWidth(row.text) + 3});
+                texts.add(row.text);
+            }
+        }
+        if (anchors.isEmpty()) return;
+
+        // sort by fraction so the greedy level assignment walks around the ring
+        Integer[] order = new Integer[anchors.size()];
+        for (int i = 0; i < order.length; i++) order[i] = i;
+        final List<double[]> a = anchors;
+        java.util.Arrays.sort(order, (x, y) -> Double.compare(a.get(x)[0], a.get(y)[0]));
+
+        double[] levelEnd = new double[16];
+        java.util.Arrays.fill(levelEnd, -1e9);
+        for (int oi : order) {
+            double f = anchors.get(oi)[0], wpx = anchors.get(oi)[1];
+            int level = 0;
+            double r = 0;
+            for (; level < levelEnd.length; level++) {
+                r = rOut + s.labelGapPx + level * (double) s.labelLevelGapPx;
+                double needed = wpx / (2 * Math.PI * r);      // arc fraction the text occupies
+                if (f - needed / 2.0 > levelEnd[level]) break;
+            }
+            if (level >= levelEnd.length) level = levelEnd.length - 1;
+            r = rOut + s.labelGapPx + level * (double) s.labelLevelGapPx;
+            double needed = wpx / (2 * Math.PI * r);
+            levelEnd[level] = f + needed / 2.0;
+            labelLayout.add(new double[]{f, r, level});
+            labelTexts.add(texts.get(oi));
+        }
+    }
+
+    /** Draw the cached label ring: connector stub + tangential text outside the ideogram. */
+    void drawLabelLayers(Graphics2D g2, int w, int h, CircularSettings s) {
+        if (labelLayout.isEmpty()) return;
+        int cx = w / 2, cy = h / 2;
+        double rOut = ideogramOuterRadius(w, h, s, true);
+        Font font = new Font("SansSerif", s.labelBold ? Font.BOLD : Font.PLAIN, s.labelFontSize);
+        Stroke oldStroke = g2.getStroke();
+        Color oldColor = g2.getColor();
+        try {
+            if (s.labelShowLines) {
+                g2.setColor(s.labelLineColor);
+                g2.setStroke(new BasicStroke(0.7f));
+                for (int i = 0; i < labelLayout.size(); i++) {
+                    double f = labelLayout.get(i)[0], r = labelLayout.get(i)[1];
+                    Point2D a = polar(cx, cy, rOut + 0.5, f);
+                    Point2D b = polar(cx, cy, r - 2.0, f);
+                    g2.draw(new Line2D.Double(a, b));
+                }
+            }
+            for (int i = 0; i < labelLayout.size(); i++) {
+                double f = labelLayout.get(i)[0], r = labelLayout.get(i)[1];
+                drawTangentialText(g2, cx, cy, r, f, labelTexts.get(i), font, s.labelColor);
+            }
+        } finally {
+            g2.setStroke(oldStroke);
+            g2.setColor(oldColor);
         }
     }
 
