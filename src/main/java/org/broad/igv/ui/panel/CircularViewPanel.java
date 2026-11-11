@@ -113,6 +113,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public boolean tickLabelsOutside = true;   // orientation "out" (coords above the band)
         public double  tickSpacingMb = 0;           // 0 = auto (~3 ticks/chromosome)
         public int     tickLabelSize = 7;
+        /** Stroke width (px) of the coordinate AXIS: the baseline arc and the major ticks.
+         *  Minor ticks and the baseline thickness are derived from it (x0.6 / x0.85). */
+        public double  axisLineWidth = 1.0;
         public boolean showChromosomeLabels = true;
         public int     chromosomeLabelSize = 12;
         /** Radial thickness of the chromosome (ideogram) ring, in pixels. */
@@ -171,6 +174,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** Height of the circlize "connection track" between the ideogram and the heatmap band.
          *  It is what the comb lines live in; 0 packs the heatmap right against the ideogram. */
         public int     heatmapConnectionPx = 22;
+        /** true = heatmap ring sits OUTSIDE the ideogram (band + comb grow outward),
+         *  false = inside, between the ideogram and the data tracks (circlize side=). */
+        public boolean heatmapOutside = false;
         /** Draw thin connectors tying each heatmap cell to its chromosome position (circlize comb). */
         public boolean heatmapConnectors = true;
         /** Single-chromosome mode: fraction of the full circle the arc spans.
@@ -185,6 +191,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.showAxis = showAxis; s.minorTicksPerMajor = minorTicksPerMajor;
             s.showTicks = showTicks; s.showTickLabels = showTickLabels;
             s.tickLabelsOutside = tickLabelsOutside; s.tickSpacingMb = tickSpacingMb;
+            s.axisLineWidth = axisLineWidth;
             s.tickLabelSize = tickLabelSize; s.showChromosomeLabels = showChromosomeLabels;
             s.chromosomeLabelSize = chromosomeLabelSize; s.chromosomeHeightPx = chromosomeHeightPx;
             s.labelTangential = labelTangential;
@@ -206,6 +213,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.geneFlankBp = geneFlankBp;
             s.heatmapHeightPx = heatmapHeightPx;
             s.heatmapConnectionPx = heatmapConnectionPx;
+            s.heatmapOutside = heatmapOutside;
             s.singleArcFraction = singleArcFraction;
             s.singleArcStartDeg = singleArcStartDeg;
             return s;
@@ -587,6 +595,37 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     /**
+     * Place and draw the heatmap band + its comb, either INSIDE the ideogram (between the
+     * ideogram and the data-track bands) or OUTSIDE it, as circlize's {@code side=} argument
+     * does. When outside, the whole ring is pulled in (see {@link #ideogramOuterRadius}) so the
+     * connection track and the cells still fit inside the panel.
+     */
+    private void drawHeatmapBand(Graphics2D g2, int cx, int cy, int w, int h, double R, double rOut,
+                                 double cursor, List<ChrInfo> chrs, List<double[]> sec,
+                                 CircularSettings s, GenomicHeatmap hm, boolean stackInside) {
+        double connH = connectionTrackHeight(s);
+        double heatH = Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50);
+        if (s.heatmapOutside) {
+            double bandInner = outsideHeatmapInner(rOut, s) + connH;
+            double bandOuter = Math.min(bandInner + heatH, Math.min(w, h) / 2.0 - 6);
+            if (bandOuter - bandInner < 6) return;
+            if (connH > 0) {
+                drawHeatmapConnectors(g2, cx, cy, rOut, bandInner, true, chrs, sec, hm);
+            }
+            drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, hm);
+        } else {
+            double bandOuter = cursor - connH;
+            double bandInner = bandOuter - heatH;
+            if (bandInner < 24) return;
+            if (connH > 0) {
+                double rIdeoInner = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
+                drawHeatmapConnectors(g2, cx, cy, rIdeoInner, bandOuter, false, chrs, sec, hm);
+            }
+            drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, hm);
+        }
+    }
+
+    /**
      * Draw the circlize "comb" between the ideogram and the heatmap, following
      * {@code circos.genomicPosTransformLines(posTransform = posTransform.default,
      * horizontalLine = "top")} exactly:
@@ -600,19 +639,22 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * </ol>
      * Uniform black, as in circlize: the value is carried by the cell colour, not the line.
      */
-    private void drawHeatmapConnectors(Graphics2D g2, int cx, int cy, double rIdeoInner,
-                                       double bandInner, double bandOuter,
+    private void drawHeatmapConnectors(Graphics2D g2, int cx, int cy, double rIdeoEdge,
+                                       double bandNear, boolean outward,
                                        List<ChrInfo> chrs, List<double[]> sec, GenomicHeatmap hm) {
         if (hm == null || hm.rows.isEmpty()) return;
-        double h = rIdeoInner - bandOuter;
+        double h = Math.abs(bandNear - rIdeoEdge);
         if (h < 2) return;
+        // outward=true: heatmap outside the ideogram, so every station grows AWAY from the centre
+        // (circlize direction="outside", horizontalLine="bottom"); false mirrors it inwards.
+        double dir = outward ? 1.0 : -1.0;
         java.util.Map<String, List<HeatRow>> byChr = rowsByChromosome(hm);
         java.util.Map<String, Integer> idx = chromosomeIndex(chrs);
         Stroke old = g2.getStroke();
         g2.setStroke(new BasicStroke(0.7f));
         g2.setColor(Color.BLACK);
-        double rMidTrack = rIdeoInner - h / 3.0;      // y = 2/3 (outer third boundary)
-        double rLowerTrack = rIdeoInner - 2 * h / 3.0; // y = 1/3
+        double rMidTrack = rIdeoEdge + dir * h / 3.0;   // first third of the connection track
+        double rLowerTrack = rIdeoEdge + dir * 2 * h / 3.0;
         for (java.util.Map.Entry<String, List<HeatRow>> e : byChr.entrySet()) {
             Integer ii = sectorFor(idx, e.getKey());
             if (ii == null) continue;
@@ -633,13 +675,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 // (b) equal-width cell slot -> the lower stem (posTransform.default)
                 double fracCell = f0 + span * (i + 0.5) / n;
 
-                // horizontal cap over the real interval, hugging the ideogram
-                g2.fill(annularPath(cx, cy, rIdeoInner - 0.45, rIdeoInner + 0.45, a0, a1));
+                // horizontal cap over the real interval, hugging the ideogram edge
+                g2.fill(annularPath(cx, cy, rIdeoEdge - 0.45, rIdeoEdge + 0.45, a0, a1));
 
-                Point2D pTop = polar(cx, cy, rIdeoInner, fracReal);
+                Point2D pTop = polar(cx, cy, rIdeoEdge, fracReal);
                 Point2D pMid = polar(cx, cy, rMidTrack, fracReal);
                 Point2D pLow = polar(cx, cy, rLowerTrack, fracCell);
-                Point2D pBot = polar(cx, cy, bandOuter, fracCell);
+                Point2D pBot = polar(cx, cy, bandNear, fracCell);
                 g2.draw(new Line2D.Double(pTop, pMid));
                 g2.draw(new Line2D.Double(pMid, pLow));
                 g2.draw(new Line2D.Double(pLow, pBot));
@@ -1036,6 +1078,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         cbPos.setSelectedIndex(s.tickLabelsOutside ? 0 : 1);
         JSpinner spSpace = new JSpinner(new SpinnerNumberModel(s.tickSpacingMb, 0.0, 5000.0, 10.0));
         JSpinner spMinor = new JSpinner(new SpinnerNumberModel(s.minorTicksPerMajor, 0, 20, 1));
+        JSpinner spAxisW = new JSpinner(new SpinnerNumberModel(s.axisLineWidth, 0.25, 6.0, 0.25));
         JSpinner spTickSize = new JSpinner(new SpinnerNumberModel(s.tickLabelSize, 4, 24, 1));
         JSpinner spChrSize = new JSpinner(new SpinnerNumberModel(s.chromosomeLabelSize, 6, 30, 1));
         JSpinner spChrH = new JSpinner(new SpinnerNumberModel(s.chromosomeHeightPx, 8, 220, 2));
@@ -1054,6 +1097,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         p.add(row("Tick label position:", cbPos));
         p.add(row("Tick spacing (Mb, 0 = auto):", spSpace));
         p.add(row("Minor ticks per major (0 = off):", spMinor));
+        p.add(row("Axis line thickness (px):", spAxisW));
         p.add(row("Tick label size:", spTickSize));
         p.add(row("Chromosome label size:", spChrSize));
         p.add(row("Chromosome height (px):", spChrH));
@@ -1073,6 +1117,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         s.tickLabelsOutside = cbPos.getSelectedIndex() == 0;
         s.tickSpacingMb = ((Number) spSpace.getValue()).doubleValue();
         s.minorTicksPerMajor = ((Number) spMinor.getValue()).intValue();
+        s.axisLineWidth = ((Number) spAxisW.getValue()).doubleValue();
         s.tickLabelSize = ((Number) spTickSize.getValue()).intValue();
         s.chromosomeLabelSize = ((Number) spChrSize.getValue()).intValue();
         s.chromosomeHeightPx = ((Number) spChrH.getValue()).intValue();
@@ -1327,11 +1372,19 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double rOut = R * s.bandOuter;
+        double rOut = ideogramOuterRadius(w, h, s);
         double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
 
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
-        double chrLabelR = rOut + ((s.showAxis && s.showTickLabels && s.tickLabelsOutside) ? 32 : 16);
+        double chrLabelR;
+        if (s.heatmapOutside) {
+            // The heatmap ring lives outside the ideogram, so push the chromosome numbers past it
+            // instead of letting them sit under the cells.
+            chrLabelR = outsideHeatmapInner(rOut, s) + connectionTrackHeight(s)
+                    + Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50) + 14;
+        } else {
+            chrLabelR = rOut + ((s.showAxis && s.showTickLabels && s.tickLabelsOutside) ? 32 : 16);
+        }
         for (int i = 0; i < chrs.size(); i++) {
             ChrInfo c = chrs.get(i);
             double f0 = sec.get(i)[0], f1 = sec.get(i)[1], spanDeg = sec.get(i)[2];
@@ -1355,7 +1408,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double rOut = R * s.bandOuter;
+        double rOut = ideogramOuterRadius(w, h, s);
         double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
 
         double[] sec = sectorsFor(Collections.singletonList(chr), s).get(0);
@@ -1414,7 +1467,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (s == null || !s.showTickLabels || s.tickLabelsOutside) return 0;
         double size = s.tickLabelSize;
         // labelR = (rIn - AXIS_GAP) - (MAJOR_TICK_LEN + 3 + size*0.6), text centred there.
-        return AXIS_GAP + MAJOR_TICK_LEN + 3 + size * 0.6 + size + 3;
+        double axisPad = Math.max(0.0, Math.max(0.25, Math.min(6.0, s.axisLineWidth)) - 1.0);
+        return AXIS_GAP + MAJOR_TICK_LEN + 3 + size * 0.6 + size + 3 + axisPad;
     }
 
     /**
@@ -1422,10 +1476,48 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * label zone (if any) reserved so the axis never overlaps the innermost track.
      */
     static double bandStartRadius(double R, CircularSettings s) {
-        double r = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx) - 5;
+        return bandStartRadius(R, R * s.bandOuter, s);
+    }
+
+    /** Same, for callers that already resolved the (possibly shrunk) ideogram outer radius. */
+    static double bandStartRadius(double R, double rOut, CircularSettings s) {
+        double r = Math.max(R * 0.2, rOut - s.chromosomeHeightPx) - 5;
         double clear = insideLabelClearance(s);
         if (clear <= 0) return r;
         return Math.max(R * 0.15, r - clear);
+    }
+
+    /** Radial clearance the coordinate axis + its labels occupy OUTSIDE the ideogram band. */
+    static double outsideAxisClearance(CircularSettings s) {
+        if (s == null || !s.showAxis) return 2;
+        double axisPad = Math.max(0.0, Math.max(0.25, Math.min(6.0, s.axisLineWidth)) - 1.0);
+        double c = AXIS_GAP + MAJOR_TICK_LEN + 2 + axisPad;
+        if (s.showTickLabels) c += 3 + s.tickLabelSize * 0.6 + s.tickLabelSize;
+        return c + 4;
+    }
+
+    /** Inner edge of the connection track when the heatmap is drawn OUTSIDE the ideogram. */
+    static double outsideHeatmapInner(double rOut, CircularSettings s) {
+        return rOut + outsideAxisClearance(s);
+    }
+
+    /** Height of the connection track (0 when the comb is switched off). */
+    static double connectionTrackHeight(CircularSettings s) {
+        return (s.heatmapConnectors && s.heatmapConnectionPx > 0) ? s.heatmapConnectionPx : 0;
+    }
+
+    /**
+     * Outer radius of the ideogram band. When the heatmap is placed OUTSIDE, the whole ring is
+     * pulled in so the connection track + heatmap band still fit inside the panel.
+     */
+    static double ideogramOuterRadius(int w, int h, CircularSettings s) {
+        double half = Math.min(w, h) / 2.0;
+        double R = half - MARGIN;
+        double rOut = R * s.bandOuter;
+        if (!s.heatmapOutside) return rOut;
+        double need = outsideAxisClearance(s) + connectionTrackHeight(s)
+                + Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50) + 18;
+        return Math.min(rOut, Math.max(R * 0.35, half - 8 - need));
     }
 
     /**
@@ -1461,15 +1553,21 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // Ticks grow away from the band: +1 when the axis sits outside, -1 when inside.
         double sign = s.tickLabelsOutside ? 1.0 : -1.0;
         double baseR = s.tickLabelsOutside ? (rOut + AXIS_GAP) : (rIn - AXIS_GAP);
-        double labelR = baseR + sign * (MAJOR_TICK_LEN + 3 + s.tickLabelSize * 0.6);
+        // A thick axis eats into the label ring, so push the text out by the extra width.
+        double axisPad = Math.max(0.0, Math.max(0.25, Math.min(6.0, s.axisLineWidth)) - 1.0);
+        double labelR = baseR + sign * (MAJOR_TICK_LEN + 3 + s.tickLabelSize * 0.6 + axisPad);
 
         if (s.showTicks) {
             // Baseline arc following the ideogram, never crossing into the band itself.
+            // Axis thickness is user controlled (0.25..6 px). The baseline arc is a filled
+            // annular strip, so its radial thickness tracks the same value (x0.85).
+            double axisW = Math.max(0.25, Math.min(6.0, s.axisLineWidth));
+            double baseT = Math.max(0.35, axisW * 0.85);
             g2.setColor(new Color(90, 90, 90));
-            g2.fill(annularPath(cx, cy, Math.min(baseR, baseR + sign * 0.7),
-                    Math.max(baseR, baseR + sign * 0.7), fStart, fEnd));
+            g2.fill(annularPath(cx, cy, Math.min(baseR, baseR + sign * baseT),
+                    Math.max(baseR, baseR + sign * baseT), fStart, fEnd));
             g2.setColor(new Color(60, 60, 60));
-            g2.setStroke(new BasicStroke(0.8f));
+            g2.setStroke(new BasicStroke((float) axisW, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
 
             long first = (long) (Math.ceil(c.viewStart / (double) step) * step);
             for (long p = first; p <= (long) c.viewEnd; p += step) {
@@ -1478,13 +1576,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
                 // Minor ticks subdivide the interval up to the next major tick.
                 if (s.minorTicksPerMajor > 1) {
-                    g2.setStroke(new BasicStroke(0.5f));
+                    g2.setStroke(new BasicStroke((float) Math.max(0.2, axisW * 0.6),
+                            BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
                     for (int k = 1; k < s.minorTicksPerMajor; k++) {
                         double mf = f + span * (k * (double) step / s.minorTicksPerMajor) / viewLen;
                         if (mf >= fEnd) break;
                         tickLine(g2, cx, cy, baseR, baseR + sign * MINOR_TICK_LEN, mf);
                     }
-                    g2.setStroke(new BasicStroke(0.8f));
+                    g2.setStroke(new BasicStroke((float) axisW,
+                            BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
                 }
                 // Major tick (longer) + label.
                 tickLine(g2, cx, cy, baseR, baseR + sign * MAJOR_TICK_LEN, f);
@@ -1734,7 +1834,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double cursor = bandStartRadius(R, s);   // leaves room for inside tick labels
+        double rOut = ideogramOuterRadius(w, h, s);
+        double cursor = bandStartRadius(R, rOut, s);   // leaves room for inside tick labels
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
@@ -1748,21 +1849,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     sharedRangeFor(cfg, globalShared, groups, perGeneGroups));
             cursor = bandInner - 5;
         }
-        if (heatmap != null) {                              // genomic-heatmap band, innermost
-            // Reserve the circlize connection track: the comb lives between the ideogram and
-            // the heatmap, so the band starts below it instead of touching the ideogram.
-            if (s.heatmapConnectors && s.heatmapConnectionPx > 0) cursor -= s.heatmapConnectionPx;
-            double bandOuter = cursor;
-            double bandInner = bandOuter - (s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50);
-            if (bandInner >= 24) {
-                if (s.heatmapConnectors) {
-                    double rIdeoInner = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx);
-                    drawHeatmapConnectors(g2, cx, cy, rIdeoInner, bandInner, bandOuter, chrs, sec, heatmap);
-                }
-                drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, heatmap);
-                cursor = bandInner - 5;
-            }
-        }
+        if (heatmap != null) drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
+                chrs, sec, s, heatmap, true);
     }
 
     private void drawTrackRingsSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {
@@ -1770,7 +1858,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double cursor = bandStartRadius(R, s);   // leaves room for inside tick labels
+        double rOut = ideogramOuterRadius(w, h, s);
+        double cursor = bandStartRadius(R, rOut, s);   // leaves room for inside tick labels
         List<ChrInfo> chrs = Collections.singletonList(chr);
         List<double[]> sec = sectorsFor(chrs, s);
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
@@ -1784,21 +1873,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     sharedRangeFor(cfg, globalShared, groups, perGeneGroups));
             cursor = bandInner - 5;
         }
-        if (heatmap != null) {                              // genomic-heatmap band, innermost
-            // Reserve the circlize connection track: the comb lives between the ideogram and
-            // the heatmap, so the band starts below it instead of touching the ideogram.
-            if (s.heatmapConnectors && s.heatmapConnectionPx > 0) cursor -= s.heatmapConnectionPx;
-            double bandOuter = cursor;
-            double bandInner = bandOuter - (s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50);
-            if (bandInner >= 24) {
-                if (s.heatmapConnectors) {
-                    double rIdeoInner = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx);
-                    drawHeatmapConnectors(g2, cx, cy, rIdeoInner, bandInner, bandOuter, chrs, sec, heatmap);
-                }
-                drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, heatmap);
-                cursor = bandInner - 5;
-            }
-        }
+        if (heatmap != null) drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
+                chrs, sec, s, heatmap, true);
     }
 
     /** Per-gene group ranges, computed only when some track has {@code yGroupPerGene} on. */
@@ -2699,7 +2775,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
 
-        double rOut = R * s.bandOuter;
+        double rOut = ideogramOuterRadius(w, h, s);
         double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
         double baseR = innerLimitR > 0 ? innerLimitR : rIn;
         double rEnd = Math.max(8.0, baseR * s.linkRadius);

@@ -417,6 +417,20 @@ public class IGVContentPane extends JPanel {
         });
         menu.add(labelSize);
 
+        JMenuItem axisWidth = new JMenuItem("Axis line thickness… ("
+                + String.format(java.util.Locale.ROOT, "%.2f", s.axisLineWidth) + " px)");
+        axisWidth.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Coordinate axis line thickness in pixels (0.25 – 6.0):",
+                    String.format(java.util.Locale.ROOT, "%.2f", s.axisLineWidth));
+            if (v == null) return;
+            try {
+                double px = Double.parseDouble(v.trim());
+                if (px >= 0.25 && px <= 6.0) { s.axisLineWidth = px; panel.refresh(); }
+            } catch (NumberFormatException ignore) { /* keep current */ }
+        });
+        menu.add(axisWidth);
+
         JMenuItem chrLabelSize = new JMenuItem("Chromosome label size…");
         chrLabelSize.addActionListener(e -> {
             String v = JOptionPane.showInputDialog(panel, "Chromosome label font size:", s.chromosomeLabelSize);
@@ -581,6 +595,8 @@ public class IGVContentPane extends JPanel {
         popup.add(loadHeatmap);
         popup.add(linkCheck("Show heatmap connectors", s.heatmapConnectors,
                 v -> { s.heatmapConnectors = v; panel.refresh(); }));
+        popup.add(linkCheck("Heatmap outside the ideogram", s.heatmapOutside,
+                v -> { s.heatmapOutside = v; panel.refresh(); }));
 
         JMenuItem hmHeight = new JMenuItem("Heatmap height… (" + s.heatmapHeightPx + " px)");
         hmHeight.addActionListener(e -> {
