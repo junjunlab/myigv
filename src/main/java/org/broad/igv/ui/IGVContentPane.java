@@ -158,8 +158,11 @@ public class IGVContentPane extends JPanel {
         // regardless of which events fire: cheap poll every 2s.
         javax.swing.Timer trackSync = new javax.swing.Timer(2000, e -> {
             try {
-                java.util.List<Track> now = igv.getAllTracks();
-                if (now != null && now.size() != dataColumnTracks.size()) refreshDataColumn();
+                // Compare against the same filtered list the column is built from: comparing with
+                // igv.getAllTracks() would never match once a track is hidden (e.g. a BED owned by
+                // a Hi-C domain overlay) and would rebuild the whole ring every 2 seconds.
+                java.util.List<Track> now = circularColumnTracks();
+                if (now.size() != dataColumnTracks.size()) refreshDataColumn();
             } catch (Throwable ignore) { }
         });
         trackSync.setRepeats(true);
@@ -836,16 +839,31 @@ public class IGVContentPane extends JPanel {
         panel.refresh();
     }
 
+    /**
+     * Tracks shown in the circular Data Tracks column: loaded AND visible. A track that is
+     * hidden is not listed and gets no ring band of its own — which is exactly what should
+     * happen to a BED used as a Hi-C TAD/domain overlay (HiCDomainOverlay.acquire() hides it,
+     * because its shapes are drawn ON the Hi-C ring instead).
+     */
+    private List<Track> circularColumnTracks() {
+        List<Track> out = new ArrayList<>();
+        if (igv == null) return out;
+        List<Track> all = igv.getAllTracks();
+        if (all == null) return out;
+        for (Track t : all) {
+            if (t != null && t.isVisible()) out.add(t);
+        }
+        return out;
+    }
+
     public void refreshDataColumn() {
         if (igv == null || igv.getContentPane() == null) return;   // during construction contentPane is null
-        List<Track> tracks = igv.getAllTracks();
+        List<Track> tracks = circularColumnTracks();
         DefaultListModel<String> model = new DefaultListModel<>();
         dataColumnTracks.clear();
-        if (tracks != null) {
-            for (Track t : tracks) {
-                model.addElement(rowLabel(t));
-                dataColumnTracks.add(t);
-            }
+        for (Track t : tracks) {
+            model.addElement(rowLabel(t));
+            dataColumnTracks.add(t);
         }
         if (model.isEmpty()) model.addElement("(no tracks loaded)");
         dataColumnList.setModel(model);

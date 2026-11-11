@@ -57,6 +57,7 @@ import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.QuadCurve2D;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
 import htsjdk.tribble.Feature;
 import org.broad.igv.track.DataTrack;
 import org.broad.igv.track.FeatureTrack;
@@ -1303,6 +1304,29 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     private static final double MINOR_TICK_LEN = 3.5;
 
     /**
+     * Space the coordinate labels occupy INSIDE the ideogram band when "Inside (below band)" is
+     * selected. Track bands stack inwards from the ideogram, so without this the first band lands
+     * on top of the labels.
+     */
+    static double insideLabelClearance(CircularSettings s) {
+        if (s == null || !s.showTickLabels || s.tickLabelsOutside) return 0;
+        double size = s.tickLabelSize;
+        // labelR = (rIn - AXIS_GAP) - (MAJOR_TICK_LEN + 3 + size*0.6), text centred there.
+        return AXIS_GAP + MAJOR_TICK_LEN + 3 + size * 0.6 + size + 3;
+    }
+
+    /**
+     * Outer radius of the FIRST track band: just inside the ideogram band, with the inside tick
+     * label zone (if any) reserved so the axis never overlaps the innermost track.
+     */
+    static double bandStartRadius(double R, CircularSettings s) {
+        double r = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx) - 5;
+        double clear = insideLabelClearance(s);
+        if (clear <= 0) return r;
+        return Math.max(R * 0.15, r - clear);
+    }
+
+    /**
      * Circos-style coordinate axis. The axis is a thin baseline arc drawn just OUTSIDE (or
      * inside, per {@code tickLabelsOutside}) the ideogram band; major and minor ticks grow away
      * from the band. Nothing is ever drawn across {@code rIn..rOut}, so the cytoband stripes
@@ -1393,14 +1417,25 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     //  Feature tracks as concentric bands inside the ideogram
     // ------------------------------------------------------------------
 
+    /**
+     * True when this track can be drawn as a ring band of its own: it must be visible and be one
+     * of the band-capable types. A hidden track gets no band — which is what removes the
+     * duplicate ring for a BED that a Hi-C track owns as a TAD/domain overlay (attaching an
+     * overlay hides that track, because its shapes are drawn on the Hi-C band instead).
+     */
+    static boolean drawableAsBand(Track t) {
+        if (t == null || !t.isVisible()) return false;
+        return t instanceof FeatureTrack || t instanceof DataTrack || t instanceof HiCTrack;
+    }
+
     /** Tracks to render as concentric feature bands (set by IGVContentPane from the Data Tracks list). */
     public void setRingTracks(List<Track> tracks) {
         ringTracks.clear();
         if (tracks != null) {
             for (Track t : tracks) {
                 if (isRingTrackHidden(t)) continue;
-                if (t instanceof FeatureTrack || t instanceof DataTrack || t instanceof HiCTrack)
-                    ringTracks.add(t);  // order == top->bottom == outer->inner
+                if (!drawableAsBand(t)) continue;
+                ringTracks.add(t);  // order == top->bottom == outer->inner
             }
         }
         refreshTrackLinks();   // re-sync the link layer from any loaded interaction tracks
@@ -1496,7 +1531,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (!s.linkEndsInsideTracks || ringTracks.isEmpty()) return -1;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return -1;
-        double cursor = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx) - 5;
+        double cursor = bandStartRadius(R, s);   // leaves room for inside tick labels
         for (Track t : ringTracks) {
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandInner = cursor - ringHeightPx(t, cfg);
@@ -1597,7 +1632,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double cursor = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx) - 5;
+        double cursor = bandStartRadius(R, s);   // leaves room for inside tick labels
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
@@ -1630,7 +1665,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double cursor = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx) - 5;
+        double cursor = bandStartRadius(R, s);   // leaves room for inside tick labels
         List<ChrInfo> chrs = Collections.singletonList(chr);
         List<double[]> sec = sectorsFor(chrs, s);
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
@@ -1745,10 +1780,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             if (tileW < 2 || tileH < 2) continue;
 
             // Key covers everything that changes the matrix, so a parameter edit rebuilds the
-            // tile but an ordinary repaint (mouse-over, tooltip, ...) just reuses it.
+            // tile but an ordinary repaint (mouse-over, tooltip, ...) just reuses it. The vertical
+            // flip is NOT part of the key: it is applied to the composite at draw time, so
+            // toggling it must not force the matrix to be re-sampled from the .hic file.
             String key = trackName + "|" + c.chrKey() + "|" + (long) c.viewStart + "_" + (long) c.viewEnd
                     + "|" + mode + "|" + transform + "|" + palette + "|" + minV + "|" + maxV
-                    + "|" + depth + "|" + ratio + "|" + flipped + "|" + forced
+                    + "|" + depth + "|" + ratio + "|" + forced
                     + "|" + (anchors == null ? 0 : anchors.length)
                     + "|" + tileW + "x" + tileH + "|" + f0 + "_" + f1;
 
@@ -1766,13 +1803,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     limits = HiCRenderer.paintSquare(tile, data, c.chrKey(), c.viewStart, c.viewEnd,
                             minV, maxV, transform, palette, anchors);
                 }
-                if (flipped) {
-                    BufferedImage mirror = new BufferedImage(tileW, tileH, BufferedImage.TYPE_INT_RGB);
-                    Graphics2D mg = mirror.createGraphics();
-                    mg.drawImage(tile, 0, tileH, tileW, -tileH, null);
-                    mg.dispose();
-                    tile = mirror;
-                }
+                // The vertical flip is applied at draw time, AFTER the TAD/domain overlay has been
+                // composited in the matrix's own coordinate space — see below.
                 hicTileCache.put(key, tile);
                 hicTileLimits.put(key, limits == null ? new double[]{0, 1, 1} : limits);
             }
@@ -1786,16 +1818,27 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             }
 
             // Composite TAD/domain overlays onto a COPY of the cached matrix tile (the cache stays
-            // matrix-only so toggling overlays never stales it), then warp. The outlines then ride
-            // the ring exactly as they do on the linear Hi-C track.
+            // matrix-only so toggling overlays never stales it), THEN flip, then warp. Order
+            // matters: the overlay painter works in the matrix's own linear coordinates, so the
+            // whole composite must be mirrored together — flipping the cached matrix first (as
+            // this used to) left the TAD outlines un-flipped, so they no longer followed the
+            // triangle after "Flip vertically".
             BufferedImage drawTile = tile;
             if (hic.hasDomainOverlays()) {
-                drawTile = new BufferedImage(tileW, tileH, BufferedImage.TYPE_INT_RGB);
-                Graphics2D cg = drawTile.createGraphics();
+                BufferedImage base = new BufferedImage(tileW, tileH, BufferedImage.TYPE_INT_RGB);
+                Graphics2D cg = base.createGraphics();
                 cg.drawImage(tile, 0, 0, null);
                 cg.dispose();
-                hic.paintDomainOverlays(drawTile, c.chrKey(), c.viewStart, c.viewEnd,
+                hic.paintDomainOverlays(base, c.chrKey(), c.viewStart, c.viewEnd,
                         tileW, tileH, mode, ratio);
+                drawTile = base;
+            }
+            if (flipped) {
+                BufferedImage mirror = new BufferedImage(tileW, tileH, BufferedImage.TYPE_INT_RGB);
+                Graphics2D mg = mirror.createGraphics();
+                mg.drawImage(drawTile, 0, tileH, tileW, -tileH, null);
+                mg.dispose();
+                drawTile = mirror;
             }
             warpHiCTile(g2, cx, cy, bandInner, bandOuter, f0, f1, drawTile);
         }
@@ -1817,7 +1860,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         AffineTransform tr = g2.getTransform();
         double sxx = tr.getScaleX() > 0 ? tr.getScaleX() : 1.0;
         double syy = tr.getScaleY() > 0 ? tr.getScaleY() : 1.0;
-        // Sample at least at the logical (pixel-geometry) resolution. On screen sxx is the HiDPI
+        // Sample at least at the logical (pixel-geometry) resolution: on screen sxx is the HiDPI
         // factor (>= 1); for vector export to a smaller physical page sxx < 1, and using it
         // directly would under-sample the matrix and print a soft Hi-C heatmap.
         double qx = Math.max(sxx, 1.0), qy = Math.max(syy, 1.0);
@@ -1827,17 +1870,28 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double rSpan = bandOuter - bandInner, fSpan = f1 - f0;
         if (rSpan <= 0 || fSpan <= 0 || tileW < 1 || tileH < 1) return;
 
-        // Bulk read: one getRGB for the whole tile instead of a call per pixel.
+        // Warp ONLY this sector's own bounding box. Scanning the whole ring for every sector made
+        // the "All" view cost one full-circle pass per chromosome per Hi-C track — 26 x 2 = 52
+        // passes, ~800x the area that actually receives pixels, and ~0.7 s of frozen UI per
+        // rebuild once two Hi-C tracks were loaded.
+        double[] bb = sectorBounds(cx, cy, bandInner, bandOuter, f0, f1);
+        int x0 = clampInt((int) Math.floor(bb[0] * qx), 0, w - 1);
+        int x1 = clampInt((int) Math.ceil(bb[1] * qx), 0, w - 1);
+        int y0 = clampInt((int) Math.floor(bb[2] * qy), 0, h - 1);
+        int y1 = clampInt((int) Math.ceil(bb[3] * qy), 0, h - 1);
+        if (x1 < x0 || y1 < y0) return;
+        int bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+
+        // Bulk read: one getRGB for the whole tile instead of a call per pixel. The destination
+        // is written straight into the image's own backing array (no second int[] + setRGB copy).
         int[] src = tile.getRGB(0, 0, tileW, tileH, null, 0, tileW);
-        int[] dst = new int[w * h];               // TYPE_INT_ARGB: 0 == transparent outside band
+        BufferedImage out = new BufferedImage(bw, bh, BufferedImage.TYPE_INT_ARGB);
+        int[] dst = ((DataBufferInt) out.getRaster().getDataBuffer()).getData();
         double cxD = cx * qx, cyD = cy * qy;
-        int x0 = Math.max(0, (int) Math.floor(cxD - bandOuter * qx));
-        int x1 = Math.min(w - 1, (int) Math.ceil(cxD + bandOuter * qx));
-        int y0 = Math.max(0, (int) Math.floor(cyD - bandOuter * qy));
-        int y1 = Math.min(h - 1, (int) Math.ceil(cyD + bandOuter * qy));
         final double TWO_PI = 2.0 * Math.PI;
         for (int py = y0; py <= y1; py++) {
             double dy = (py - cyD) / qy;          // sample pixel -> logical offset
+            int row = (py - y0) * bw - x0;
             for (int px = x0; px <= x1; px++) {
                 double dx = (px - cxD) / qx;
                 double r = Math.sqrt(dx * dx + dy * dy);
@@ -1850,19 +1904,53 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 double t = (ff - f0) / fSpan;
                 int tx = clampInt((int) Math.round(t * (tileW - 1)), 0, tileW - 1);
                 int ty = clampInt((int) Math.round((r - bandInner) / rSpan * (tileH - 1)), 0, tileH - 1);
-                dst[py * w + px] = src[ty * tileW + tx] | 0xFF000000;
+                dst[row + px] = src[ty * tileW + tx] | 0xFF000000;
             }
         }
-        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        out.setRGB(0, 0, w, h, dst, 0, w);
         Shape oldClip = g2.getClip();
         g2.clip(annularPath(cx, cy, bandInner, bandOuter, f0, f1));  // logical -> device clip
         AffineTransform saved = g2.getTransform();
         g2.setTransform(new AffineTransform());   // sample space -> device space
         g2.scale(sxx / qx, syy / qy);             // identity when sxx,syy >= 1 (screen)
-        g2.drawImage(out, 0, 0, null);
+        g2.drawImage(out, x0, y0, null);
         g2.setTransform(saved);
         g2.setClip(oldClip);
+    }
+
+    /**
+     * Bounding box (in logical coordinates, absolute) of the annular sector between radii
+     * {@code rIn..rOut} and arc fractions {@code f0..f1} (0 = 12 o'clock, clockwise, may exceed 1
+     * to wrap). The extreme points of such a sector are its four corners plus any of the four
+     * cardinal directions its arc crosses, at the outer radius.
+     */
+    static double[] sectorBounds(double cx, double cy, double rIn, double rOut, double f0, double f1) {
+        double xmin = Double.MAX_VALUE, xmax = -Double.MAX_VALUE;
+        double ymin = Double.MAX_VALUE, ymax = -Double.MAX_VALUE;
+        for (double f : new double[]{f0, f1}) {
+            double a = 2 * Math.PI * f;
+            double s = Math.sin(a), c = Math.cos(a);
+            for (double r : new double[]{rIn, rOut}) {
+                double x = cx + r * s, y = cy - r * c;
+                if (x < xmin) xmin = x;
+                if (x > xmax) xmax = x;
+                if (y < ymin) ymin = y;
+                if (y > ymax) ymax = y;
+            }
+        }
+        // Cardinal extremes: 0.25 = 3 o'clock, 0.5 = 6 o'clock, 0.75 = 9 o'clock, 1.0 = 12.
+        for (int cycle = 0; cycle <= 1; cycle++) {
+            for (int q = 0; q < 4; q++) {
+                double f = cycle + q * 0.25;
+                if (f < f0 - 1e-9 || f > f1 + 1e-9) continue;
+                double a = 2 * Math.PI * f;
+                double x = cx + rOut * Math.sin(a), y = cy - rOut * Math.cos(a);
+                if (x < xmin) xmin = x;
+                if (x > xmax) xmax = x;
+                if (y < ymin) ymin = y;
+                if (y > ymax) ymax = y;
+            }
+        }
+        return new double[]{xmin, xmax, ymin, ymax};
     }
 
     /** Rectangle of the i-th Hi-C legend for the chosen corner. Legends stack vertically in
