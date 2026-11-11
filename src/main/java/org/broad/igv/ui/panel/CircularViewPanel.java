@@ -1675,7 +1675,19 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                         Math.min(a[0], b[0]), Math.max(a[1], b[1]), b[2]});
             }
 
-            warpHiCTile(g2, cx, cy, bandInner, bandOuter, f0, f1, tile);
+            // Composite TAD/domain overlays onto a COPY of the cached matrix tile (the cache stays
+            // matrix-only so toggling overlays never stales it), then warp. The outlines then ride
+            // the ring exactly as they do on the linear Hi-C track.
+            BufferedImage drawTile = tile;
+            if (hic.hasDomainOverlays()) {
+                drawTile = new BufferedImage(tileW, tileH, BufferedImage.TYPE_INT_RGB);
+                Graphics2D cg = drawTile.createGraphics();
+                cg.drawImage(tile, 0, 0, null);
+                cg.dispose();
+                hic.paintDomainOverlays(drawTile, c.chrKey(), c.viewStart, c.viewEnd,
+                        tileW, tileH, mode, ratio);
+            }
+            warpHiCTile(g2, cx, cy, bandInner, bandOuter, f0, f1, drawTile);
         }
     }
 

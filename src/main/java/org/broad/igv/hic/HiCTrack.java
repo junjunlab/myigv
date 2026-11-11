@@ -1289,8 +1289,16 @@ public class HiCTrack extends AbstractTrack {
         return sb.toString();
     }
 
-    private void paintDomainOverlays(BufferedImage img, String chr, double origin, double end,
-                                     int w, int h, Mode renderMode, double heightRatioValue) {
+    /** True when at least one TAD / domain BED overlay is attached. */
+    public boolean hasDomainOverlays() {
+        return !domainOverlays.isEmpty();
+    }
+
+    /** Composite every attached TAD/domain BED outline onto an existing matrix image. Public so
+     *  the circular view can bake the same overlays into its linear tile before the polar warp,
+     *  giving the ring exactly the TAD outlines the linear track shows. */
+    public void paintDomainOverlays(BufferedImage img, String chr, double origin, double end,
+                                    int w, int h, Mode renderMode, double heightRatioValue) {
 
         if (domainOverlays.isEmpty()) {
             return;
