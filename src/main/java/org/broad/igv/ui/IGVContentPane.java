@@ -279,12 +279,15 @@ public class IGVContentPane extends JPanel {
         JButton options = new JButton("View options ▾");
         JPopupMenu menu = new JPopupMenu();
 
+        JCheckBoxMenuItem cbAxis = new JCheckBoxMenuItem("Show coordinate axis", s.showAxis);
+        cbAxis.addActionListener(e -> { s.showAxis = cbAxis.isSelected(); panel.refresh(); });
         JCheckBoxMenuItem cbTicks = new JCheckBoxMenuItem("Show tick marks", s.showTicks);
         cbTicks.addActionListener(e -> { s.showTicks = cbTicks.isSelected(); panel.refresh(); });
         JCheckBoxMenuItem cbTickLabels = new JCheckBoxMenuItem("Show tick labels", s.showTickLabels);
         cbTickLabels.addActionListener(e -> { s.showTickLabels = cbTickLabels.isSelected(); panel.refresh(); });
         JCheckBoxMenuItem cbChr = new JCheckBoxMenuItem("Show chromosome labels", s.showChromosomeLabels);
         cbChr.addActionListener(e -> { s.showChromosomeLabels = cbChr.isSelected(); panel.refresh(); });
+        menu.add(cbAxis);
         menu.add(cbTicks);
         menu.add(cbTickLabels);
         menu.add(cbChr);

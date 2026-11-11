@@ -838,8 +838,9 @@ public class TrackMenuUtils {
     public static JMenuItem getPerPanelAutoscaleItem() {
 
         final JCheckBoxMenuItem item = new JCheckBoxMenuItem("Group scale each gene panel");
-        item.setToolTipText("When checked, group autoscale computes a separate Y axis range for each " +
-                "gene list panel.  Uncheck to use one range shared by all panels (stock IGV behavior).");
+        item.setToolTipText("When checked, all autoscale tracks in a gene panel share ONE Y axis " +
+                "range, computed separately for each gene list panel (so a strong gene does not " +
+                "flatten the others). Uncheck to scale each track independently (stock IGV).");
         item.setSelected(Autoscaler.isPerPanelAutoscale());
 
         item.addActionListener(evt -> {

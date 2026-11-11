@@ -96,6 +96,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
     /** User-configurable rendering parameters. */
     public static class CircularSettings {
+        /** Master switch for the coordinate axis (baseline arc + major/minor ticks + labels). */
+        public boolean showAxis = true;
+        /** Number of equal subdivisions between two major ticks; 0 disables minor ticks. */
+        public int     minorTicksPerMajor = 5;
         public boolean showTicks = true;
         public boolean showTickLabels = true;
         public boolean tickLabelsOutside = true;   // orientation "out" (coords above the band)
@@ -157,6 +161,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
         public CircularSettings copy() {
             CircularSettings s = new CircularSettings();
+            s.showAxis = showAxis; s.minorTicksPerMajor = minorTicksPerMajor;
             s.showTicks = showTicks; s.showTickLabels = showTickLabels;
             s.tickLabelsOutside = tickLabelsOutside; s.tickSpacingMb = tickSpacingMb;
             s.tickLabelSize = tickLabelSize; s.showChromosomeLabels = showChromosomeLabels;
@@ -603,12 +608,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     public void showSettingsDialog(Component parent) {
         final CircularSettings s = settings;
 
+        JCheckBox cbAxis = new JCheckBox("Show coordinate axis", s.showAxis);
         JCheckBox cbTicks = new JCheckBox("Show tick marks", s.showTicks);
         JCheckBox cbTickLabels = new JCheckBox("Show tick labels", s.showTickLabels);
         JCheckBox cbChrLabels = new JCheckBox("Show chromosome labels", s.showChromosomeLabels);
         JComboBox<String> cbPos = new JComboBox<>(new String[]{"Outside (above the band)", "Inside (below the band)"});
         cbPos.setSelectedIndex(s.tickLabelsOutside ? 0 : 1);
         JSpinner spSpace = new JSpinner(new SpinnerNumberModel(s.tickSpacingMb, 0.0, 5000.0, 10.0));
+        JSpinner spMinor = new JSpinner(new SpinnerNumberModel(s.minorTicksPerMajor, 0, 20, 1));
         JSpinner spTickSize = new JSpinner(new SpinnerNumberModel(s.tickLabelSize, 4, 24, 1));
         JSpinner spChrSize = new JSpinner(new SpinnerNumberModel(s.chromosomeLabelSize, 6, 30, 1));
         JSpinner spChrH = new JSpinner(new SpinnerNumberModel(s.chromosomeHeightPx, 8, 220, 2));
@@ -620,11 +627,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
         JPanel p = new JPanel();
         p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+        p.add(cbAxis);
         p.add(cbTicks);
         p.add(cbTickLabels);
         p.add(cbChrLabels);
         p.add(row("Tick label position:", cbPos));
         p.add(row("Tick spacing (Mb, 0 = auto):", spSpace));
+        p.add(row("Minor ticks per major (0 = off):", spMinor));
         p.add(row("Tick label size:", spTickSize));
         p.add(row("Chromosome label size:", spChrSize));
         p.add(row("Chromosome height (px):", spChrH));
@@ -637,11 +646,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (r != JOptionPane.OK_OPTION) return;
 
+        s.showAxis = cbAxis.isSelected();
         s.showTicks = cbTicks.isSelected();
         s.showTickLabels = cbTickLabels.isSelected();
         s.showChromosomeLabels = cbChrLabels.isSelected();
         s.tickLabelsOutside = cbPos.getSelectedIndex() == 0;
         s.tickSpacingMb = ((Number) spSpace.getValue()).doubleValue();
+        s.minorTicksPerMajor = ((Number) spMinor.getValue()).intValue();
         s.tickLabelSize = ((Number) spTickSize.getValue()).intValue();
         s.chromosomeLabelSize = ((Number) spChrSize.getValue()).intValue();
         s.chromosomeHeightPx = ((Number) spChrH.getValue()).intValue();
@@ -882,7 +893,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
 
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
-        double chrLabelR = rOut + ((s.showTickLabels && s.tickLabelsOutside) ? 24 : 16);
+        double chrLabelR = rOut + ((s.showAxis && s.showTickLabels && s.tickLabelsOutside) ? 32 : 16);
         for (int i = 0; i < chrs.size(); i++) {
             ChrInfo c = chrs.get(i);
             double f0 = sec.get(i)[0], f1 = sec.get(i)[1], spanDeg = sec.get(i)[2];
@@ -952,11 +963,22 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         g2.draw(annularPath(cx, cy, rIn, rOut, fStart, fEnd));
     }
 
-    /** Tick lines + Mb labels, parameterised like Circos ticks (orientation, spacing, size). */
+    /** Distance from the ideogram edge to the axis baseline arc. */
+    private static final double AXIS_GAP = 2.0;
+    private static final double MAJOR_TICK_LEN = 7.0;
+    private static final double MINOR_TICK_LEN = 3.5;
+
+    /**
+     * Circos-style coordinate axis. The axis is a thin baseline arc drawn just OUTSIDE (or
+     * inside, per {@code tickLabelsOutside}) the ideogram band; major and minor ticks grow away
+     * from the band. Nothing is ever drawn across {@code rIn..rOut}, so the cytoband stripes
+     * stay clean. Major ticks carry Mb/kb/bp labels.
+     */
     private static void drawBandTicks(Graphics2D g2, double cx, double cy,
                                       double rIn, double rOut,
                                       double fStart, double fEnd, ChrInfo c, double spanDeg,
                                       CircularSettings s) {
+        if (!s.showAxis) return;                          // master on/off switch (default on)
         if (!s.showTicks && !s.showTickLabels) return;
         if (spanDeg < 1.0) return;
 
@@ -974,32 +996,63 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         }
         double span = fEnd - fStart;
         Font tickFont = new Font("SansSerif", Font.PLAIN, s.tickLabelSize);
-        // angular spacing between adjacent ticks (used to decide if labels fit)
-        double stepDeg = spanDeg * ((double) step / viewLen);
+        double stepDeg = spanDeg * ((double) step / viewLen);   // angular gap between major ticks
 
-        long first = (long) (Math.ceil(c.viewStart / (double) step) * step);
-        for (long p = first; p <= (long) c.viewEnd; p += step) {
-            if (p < c.viewStart) continue;
-            double f = fStart + span * c.viewFrac(p);
+        // Ticks grow away from the band: +1 when the axis sits outside, -1 when inside.
+        double sign = s.tickLabelsOutside ? 1.0 : -1.0;
+        double baseR = s.tickLabelsOutside ? (rOut + AXIS_GAP) : (rIn - AXIS_GAP);
+        double labelR = baseR + sign * (MAJOR_TICK_LEN + 3 + s.tickLabelSize * 0.6);
 
-            if (s.showTicks) {
-                Point2D a = polar(cx, cy, rIn - 2, f), b = polar(cx, cy, rOut + 2, f);
-                g2.setColor(new Color(60, 60, 60));
-                g2.setStroke(new BasicStroke(0.6f));
-                g2.drawLine((int) a.getX(), (int) a.getY(), (int) b.getX(), (int) b.getY());
+        if (s.showTicks) {
+            // Baseline arc following the ideogram, never crossing into the band itself.
+            g2.setColor(new Color(90, 90, 90));
+            g2.fill(annularPath(cx, cy, Math.min(baseR, baseR + sign * 0.7),
+                    Math.max(baseR, baseR + sign * 0.7), fStart, fEnd));
+            g2.setColor(new Color(60, 60, 60));
+            g2.setStroke(new BasicStroke(0.8f));
+
+            long first = (long) (Math.ceil(c.viewStart / (double) step) * step);
+            for (long p = first; p <= (long) c.viewEnd; p += step) {
+                if (p < c.viewStart) continue;
+                double f = fStart + span * c.viewFrac(p);
+
+                // Minor ticks subdivide the interval up to the next major tick.
+                if (s.minorTicksPerMajor > 1) {
+                    g2.setStroke(new BasicStroke(0.5f));
+                    for (int k = 1; k < s.minorTicksPerMajor; k++) {
+                        double mf = f + span * (k * (double) step / s.minorTicksPerMajor) / viewLen;
+                        if (mf >= fEnd) break;
+                        tickLine(g2, cx, cy, baseR, baseR + sign * MINOR_TICK_LEN, mf);
+                    }
+                    g2.setStroke(new BasicStroke(0.8f));
+                }
+                // Major tick (longer) + label.
+                tickLine(g2, cx, cy, baseR, baseR + sign * MAJOR_TICK_LEN, f);
             }
+            g2.setStroke(new BasicStroke(1.0f));
+        }
 
-            if (s.showTickLabels) {
-                // Coordinate labels are ALWAYS tangential — radial coordinate text crosses the
-                // band and collides with neighbours. The "Radial" option only rotates the
-                // chromosome numbers (see drawAll), which is the standard circular-genome look.
-                double labelR = s.tickLabelsOutside ? (rOut + 8) : (rIn - 8);
+        if (s.showTickLabels) {
+            // Coordinate labels are ALWAYS tangential — radial coordinate text crosses the
+            // band and collides with neighbours. The "Radial" option only rotates the
+            // chromosome numbers (see drawAll), which is the standard circular-genome look.
+            long first = (long) (Math.ceil(c.viewStart / (double) step) * step);
+            for (long p = first; p <= (long) c.viewEnd; p += step) {
+                if (p < c.viewStart) continue;
+                double f = fStart + span * c.viewFrac(p);
                 String txt = tickLabel(p, step);            // Mb / kb / bp by interval
                 int tw = g2.getFontMetrics(tickFont).stringWidth(txt);
                 if (arcLength(labelR, stepDeg) < tw + 6) continue;   // adjacent labels would collide
                 drawTangentialText(g2, cx, cy, labelR, f, txt, tickFont, new Color(70, 70, 70));
             }
         }
+    }
+
+    /** One radial tick stroke from r0 to r1 at fraction f. */
+    private static void tickLine(Graphics2D g2, double cx, double cy, double r0, double r1, double f) {
+        Point2D a = polar(cx, cy, r0, f), b = polar(cx, cy, r1, f);
+        g2.drawLine((int) Math.round(a.getX()), (int) Math.round(a.getY()),
+                (int) Math.round(b.getX()), (int) Math.round(b.getY()));
     }
 
     // ------------------------------------------------------------------
@@ -1564,7 +1617,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             fillArc(g2, cx, cy, rMid - h, rMid + h, a, b, color);
             if (arcPx >= 14 && bf != null) {
                 drawStrandArrows(g2, cx, cy, rMid, a, b, strandDir(bf),
-                        Math.min(2.4, Math.max(1.2, availH * 0.4)), color);
+                        0, contrastColor(color));
             }
             return;
         }
@@ -1594,28 +1647,28 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             }
         }
 
-        // Direction chevrons sit on the thin intron lines between exons — exactly like IGV's
-        // linear view (IGVFeatureRenderer draws ">>>"/"<<<" on the connecting lines) — instead of
-        // being stamped across the whole transcript (which put them on top of the exon blocks).
-        drawIntronArrows(g2, cx, cy, rMid, f0, span, c, exons, strandDir(bf),
-                Math.min(3.2, Math.max(1.4, availH * 0.16)), color);
-        // In-block white chevrons inside each exon (IGV also draws these), so single-exon genes
-        // like JUN/JUND that have no introns still show the transcription direction.
+        // Intron chevrons: IGVFeatureRenderer.drawExons() draws the strand markers on each
+        // connecting line using the SAME graphics/color as the blocks (not white), via
+        // drawStrandArrows(gene.getStrand(), lastExonEndX, pStart, ..., blockGraphics).
+        drawIntronArrows(g2, cx, cy, rMid, f0, span, c, exons, strandDir(bf), color);
+        // In-block white chevrons inside each exon, mirroring IGV's
+        // drawStrandArrows(..., pStart + ARROW_SPACING/2, pEnd, ..., whiteArrowGraphics).
+        // Single-exon genes (JUN/JUND) therefore still show transcription direction.
         for (Exon exon : exons) {
             double ea = f0 + span * c.viewFrac(exon.getStart());
             double eb = f0 + span * c.viewFrac(exon.getEnd());
             if (eb <= ea) continue;
             drawStrandArrows(g2, cx, cy, rMid, ea, eb, strandDir(bf),
-                    Math.min(cdsH * 0.5, Math.max(1.5, availH * 0.20)), color);
+                    ARROW_SPACING / 2.0, contrastColor(color));
         }
     }
 
-    /** Direction chevrons on the intron lines (between consecutive exons), matching IGV's linear
-     *  gene rendering where the strand markers sit on the thin connecting lines. */
+    /** Direction chevrons on the intron lines (between consecutive exons). Mirrors IGV's linear
+     *  gene rendering: the markers sit on each 1px connecting line, in the feature colour. */
     private static void drawIntronArrows(Graphics2D g2, double cx, double cy, double r,
                                          double f0, double span, ChrInfo c,
-                                         List<Exon> exons, int dir, double size, Color color) {
-        if (dir == 0 || size <= 0 || exons == null || exons.size() < 2) return;
+                                         List<Exon> exons, int dir, Color color) {
+        if (dir == 0 || exons == null || exons.size() < 2) return;
         List<Exon> sorted = new ArrayList<>(exons);
         sorted.sort(java.util.Comparator.comparingLong(Exon::getStart));
         for (int i = 0; i + 1 < sorted.size(); i++) {
@@ -1624,8 +1677,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             if (ge <= gs) continue;
             double ga = f0 + span * c.viewFrac(gs);
             double gb = f0 + span * c.viewFrac(ge);
-            if (arcLength(r, (gb - ga) * 360.0) < 5) continue;   // intron too short for a chevron
-            drawStrandArrows(g2, cx, cy, r, ga, gb, dir, size, color);
+            if (arcLength(r, (gb - ga) * 360.0) < 6) continue;   // IGV: skip very small regions
+            drawStrandArrows(g2, cx, cy, r, ga, gb, dir, 0, color);
         }
     }
 
@@ -1654,29 +1707,62 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return lum > 0.55 ? new Color(20, 20, 20) : new Color(245, 245, 245);
     }
 
-    /** Chevrons along the gene showing the direction of transcription. */
+    /** Matches {@code IGVFeatureRenderer.ARROW_SPACING}: one chevron every 30 screen px. */
+    private static final int ARROW_SPACING = 30;
+    /** Matches {@code IGVFeatureRenderer}'s chevron leg length in collapsed/squished mode
+     *  ({@code sz = 2}; 3 when expanded). Kept fixed so the ring arrows look like the linear ones. */
+    private static final double ARROW_LEG = 2.0;
+
+    /**
+     * Polar port of {@code IGVFeatureRenderer.drawStrandArrows()}. IGV does NOT draw filled
+     * triangles: it strokes two 1px lines from an apex to two trailing arms, i.e. a ">" / "<"
+     * chevron, every {@link #ARROW_SPACING} px starting at half that spacing. The apex points in
+     * the transcription direction. Colour is the caller's responsibility (white inside exon
+     * blocks, the feature colour on intron lines) exactly as in the linear renderer.
+     *
+     * @param startOffsetPx extra leading offset in arc pixels (exons pass ARROW_SPACING/2 to
+     *                      mirror IGV's {@code pStart + ARROW_SPACING/2} call).
+     */
     private static void drawStrandArrows(Graphics2D g2, double cx, double cy, double r,
-                                         double a, double b, int dir, double size, Color color) {
-        if (dir == 0 || size <= 0) return;
+                                         double a, double b, int dir, double startOffsetPx,
+                                         Color color) {
+        if (dir == 0) return;
         double arcPx = arcLength(r, (b - a) * 360.0);
-        int n = Math.max(1, (int) Math.round(arcPx / 26.0));
-        g2.setColor(contrastColor(color));
-        for (int i = 0; i < n; i++) {
-            double t = n == 1 ? 0.5 : (i + 0.5) / n;
-            double f = a + (b - a) * t;
-            double theta = f * 2 * Math.PI;
-            // Tangent for increasing fraction (clockwise): (cos, sin).
-            double tx = Math.cos(theta) * dir, ty = Math.sin(theta) * dir;
-            double nx = -ty, ny = tx;
-            double px = cx + r * Math.sin(theta), py = cy - r * Math.cos(theta);
-            Polygon tri = new Polygon();
-            tri.addPoint((int) Math.round(px + tx * size), (int) Math.round(py + ty * size));
-            tri.addPoint((int) Math.round(px - tx * size * 0.55 + nx * size * 0.8),
-                    (int) Math.round(py - ty * size * 0.55 + ny * size * 0.8));
-            tri.addPoint((int) Math.round(px - tx * size * 0.55 - nx * size * 0.8),
-                    (int) Math.round(py - ty * size * 0.55 - ny * size * 0.8));
-            g2.fillPolygon(tri);
+        if (arcPx < 6) return;                         // IGV: skip very small regions
+        Color oldColor = g2.getColor();
+        Stroke oldStroke = g2.getStroke();
+        g2.setColor(color);
+        g2.setStroke(new BasicStroke(1.0f));           // IGV uses the default 1px stroke
+        double first = ARROW_SPACING / 2.0 + startOffsetPx;
+        // Narrow features (e.g. a single-exon gene or a collapsed locus) would otherwise have
+        // no chevron at all because the first 30px slot does not fit: keep one centred marker
+        // so the strand is never lost.
+        if (first >= arcPx) {
+            chevron(g2, cx, cy, r, a + (b - a) * 0.5, dir);
+        } else {
+            for (double d = first; d < arcPx; d += ARROW_SPACING) {
+                chevron(g2, cx, cy, r, a + (b - a) * (d / arcPx), dir);
+            }
         }
+        g2.setColor(oldColor);
+        g2.setStroke(oldStroke);
+    }
+
+    /** One two-stroke ">" / "<" chevron, apex pointing in the transcription direction. */
+    private static void chevron(Graphics2D g2, double cx, double cy, double r, double f, int dir) {
+        double theta = f * 2 * Math.PI;
+        // Unit tangent for increasing fraction (clockwise); multiply by dir for the
+        // transcription direction. Apex at P, arms trail by ARROW_LEG along -tangent.
+        double ux = Math.cos(theta) * dir, uy = Math.sin(theta) * dir;
+        double nx = -uy, ny = ux;
+        double px = cx + r * Math.sin(theta), py = cy - r * Math.cos(theta);
+        int ax = (int) Math.round(px), ay = (int) Math.round(py);
+        int x1 = (int) Math.round(px - ux * ARROW_LEG + nx * ARROW_LEG);
+        int y1 = (int) Math.round(py - uy * ARROW_LEG + ny * ARROW_LEG);
+        int x2 = (int) Math.round(px - ux * ARROW_LEG - nx * ARROW_LEG);
+        int y2 = (int) Math.round(py - uy * ARROW_LEG - ny * ARROW_LEG);
+        g2.drawLine(ax, ay, x1, y1);
+        g2.drawLine(ax, ay, x2, y2);
     }
 
     // ------------------------------------------------------------------

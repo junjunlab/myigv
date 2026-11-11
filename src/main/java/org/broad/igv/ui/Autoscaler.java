@@ -13,6 +13,14 @@ public class Autoscaler {
 
     public static void autoscale(Collection<Track> trackList) {
         Map<String, List<Track>> autoscaleGroups = new HashMap<>();
+        // "Group scale each gene panel": ungrouped tracks that merely have plain autoscale on
+        // are collected into ONE implicit group, so every sample in a gene panel shares a
+        // single Y range instead of each track scaling itself. Explicit GROUP_AUTOSCALE
+        // groups are still honoured, so users can keep several independent groups.
+        boolean perPanel = FrameManager.isGeneListMode()
+                && FrameManager.getFrames().size() > 1 && isPerPanelAutoscale();
+        List<Track> implicitGroup = new ArrayList<>();
+
         for (Track track : trackList) {
             if (!track.isVisible()) continue;
 
@@ -31,18 +39,20 @@ public class Autoscaler {
             } else if (track.getAutoScale()) {
                 if (track instanceof MergedTracks) {
                     List<Track> memberTracks = new ArrayList(((MergedTracks) track).getMemberTracks());
-                    autoscaleGroup(memberTracks);
-
+                    if (perPanel) implicitGroup.addAll(memberTracks);
+                    else autoscaleGroup(memberTracks);
                 } else {
-                    autoscaleGroup(Arrays.asList(track));
+                    if (perPanel) implicitGroup.add(track);
+                    else autoscaleGroup(Arrays.asList(track));
                 }
             }
         }
 
-        if (autoscaleGroups.size() > 0) {
-            for (List<Track> tracks : autoscaleGroups.values()) {
-                autoscaleGroup(tracks);
-            }
+        if (perPanel && !implicitGroup.isEmpty()) {
+            autoscaleGroup(implicitGroup);      // dispatches to autoscalePerPanel()
+        }
+        for (List<Track> tracks : autoscaleGroups.values()) {
+            autoscaleGroup(tracks);
         }
     }
 
