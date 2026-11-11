@@ -494,6 +494,8 @@ public class IGVContentPane extends JPanel {
         JMenuItem loadHeatmap = new JMenuItem("Load heatmap…");
         loadHeatmap.addActionListener(e -> loadHeatmapFromFile(panel));
         popup.add(loadHeatmap);
+        popup.add(linkCheck("Show heatmap connectors", s.heatmapConnectors,
+                v -> { s.heatmapConnectors = v; panel.refresh(); }));
         popup.addSeparator();
 
         popup.add(linkCheck("Ribbon (filled bands)", s.linkRibbon,

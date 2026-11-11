@@ -167,6 +167,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public int     geneFlankBp = 2000;
         /** Radial thickness (px) of the genomic-heatmap band when a heatmap is loaded. */
         public int     heatmapHeightPx = 50;
+        /** Draw thin connectors tying each heatmap cell to its chromosome position (circlize comb). */
+        public boolean heatmapConnectors = true;
 
         public CircularSettings copy() {
             CircularSettings s = new CircularSettings();
@@ -500,6 +502,56 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 g2.fill(annularPath(cx, cy, rIn, rOut, a0, a1));
             }
         }
+    }
+
+    /**
+     * Draw the circlize "comb": one thin connector per heatmap row, anchoring the row's
+     * chromosome position (at the ideogram inner edge, same angular fraction) to the heatmap
+     * band's outer edge. The connector is coloured by the row's strongest signal (largest
+     * |value - mid|); a grey floor keeps near-zero rows visible so the comb always reads.
+     */
+    private void drawHeatmapConnectors(Graphics2D g2, int cx, int cy, double rIdeoInner,
+                                       double bandInner, double bandOuter,
+                                       List<ChrInfo> chrs, List<double[]> sec, GenomicHeatmap hm) {
+        if (hm == null || hm.rows.isEmpty()) return;
+        java.util.Map<String, Integer> idx = new java.util.HashMap<>();
+        for (int i = 0; i < chrs.size(); i++) idx.put(chrs.get(i).name, i);
+        double denom = (hm.max - hm.min) > 1e-9 ? (hm.max - hm.min) : 1.0;
+        double mid = (hm.min + hm.max) / 2.0;
+        Stroke old = g2.getStroke();
+        g2.setStroke(new BasicStroke(0.6f));
+        for (HeatRow r : hm.rows) {
+            Integer ii = idx.get(r.chr);
+            if (ii == null) continue;
+            ChrInfo c = chrs.get(ii);
+            double f0 = sec.get(ii)[0], span = sec.get(ii)[1] - f0;
+            double vStart = c.viewStart, vSpan = c.viewSpan();
+            if (vSpan <= 0) vSpan = Math.max(1, c.length);
+            double a0 = f0 + span * clamp01(((double) r.start - vStart) / vSpan);
+            double a1 = f0 + span * clamp01(((double) r.end - vStart) / vSpan);
+            if (a1 <= a0) a1 = a0 + 1e-4;
+            double fracMid = (a0 + a1) / 2.0;
+            // strongest signal across the row's samples drives the connector colour
+            double rep = 0, best = -1;
+            for (double v : r.vals) {
+                if (Double.isNaN(v)) continue;
+                double m = Math.abs(v - mid);
+                if (m > best) { best = m; rep = v; }
+            }
+            if (best < 0) continue;                       // all NaN -> skip
+            Color dc = divergingColor(rep, hm.min, hm.max);
+            double mag = Math.min(1.0, best / denom);     // 0..1 signal strength
+            double blend = 0.35 + 0.65 * mag;             // floor so near-zero rows stay visible
+            int gray = 120;
+            int cr = (int) (gray + (dc.getRed()   - gray) * blend);
+            int cg = (int) (gray + (dc.getGreen() - gray) * blend);
+            int cb = (int) (gray + (dc.getBlue()  - gray) * blend);
+            g2.setColor(new Color(cr, cg, cb, 200));
+            Point2D pOut = polar(cx, cy, rIdeoInner, fracMid);
+            Point2D pIn  = polar(cx, cy, bandOuter, fracMid);
+            g2.draw(new Line2D.Double(pOut, pIn));
+        }
+        g2.setStroke(old);
     }
 
     public CircularViewPanel() {
@@ -1438,6 +1490,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double bandOuter = cursor;
             double bandInner = bandOuter - (s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50);
             if (bandInner >= 24) {
+                if (s.heatmapConnectors) {
+                    double rIdeoInner = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx);
+                    drawHeatmapConnectors(g2, cx, cy, rIdeoInner, bandInner, bandOuter, chrs, sec, heatmap);
+                }
                 drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, heatmap);
                 cursor = bandInner - 5;
             }
@@ -1468,6 +1524,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double bandOuter = cursor;
             double bandInner = bandOuter - (s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50);
             if (bandInner >= 24) {
+                if (s.heatmapConnectors) {
+                    double rIdeoInner = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx);
+                    drawHeatmapConnectors(g2, cx, cy, rIdeoInner, bandInner, bandOuter, chrs, sec, heatmap);
+                }
                 drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, heatmap);
                 cursor = bandInner - 5;
             }
