@@ -1461,7 +1461,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      *  ring band. When the panel is too small for any corner to clear the ring, the candidate
      *  with the largest clearance is returned (best effort). */
     static Rectangle legendRect(int w, int h, int index) {
-        final int panelW = 190, panelH = 44, gap = 4;
+        final int panelW = 110, panelH = 150, gap = 4;
         final double R = Math.max(20, Math.min(w, h) / 2.0 - MARGIN);
         int[] xs = {w - panelW - 4, 4, 4, w - panelW - 4};
         int[] y0 = {h - 6 - panelH, h - 6 - panelH, 6, 6};
@@ -1523,7 +1523,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             g2.setFont(oldFont.deriveFont(Font.PLAIN, 10f));
             FontMetrics fm = g2.getFontMetrics();
             String name = trackName == null ? "Hi-C" : trackName;
-            while (fm.stringWidth(name) > panelW - 60 && name.length() > 4) {
+            while (fm.stringWidth(name) > panelW - 44 && name.length() > 4) {
                 name = name.substring(0, name.length() - 2) + "…";
             }
             String tf = transform == null ? "" : transform.getLabel();
@@ -1532,25 +1532,34 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             g2.setColor(new Color(90, 90, 90));
             g2.drawString(tf, x + panelW - 6 - fm.stringWidth(tf), y + 12);
 
-            int barX = x + 6, barY = y + 16, barW = panelW - 12, barH = 8;
+            // Vertical colour bar: narrow ramp, max at TOP / min at BOTTOM. The value->colour
+            // mapping is identical to the old horizontal bar (vmin..vmax, NEG_LOG reversed), just
+            // rotated 90 degrees so the legend no longer runs wide across the panel margin.
+            int barW = 16;
+            int barX = x + 8;
+            int barTop = y + 20;
+            int barH = panelH - 20 - 8;
+            if (barH < 24) barH = 24;
             boolean reverse = transform == HiCTransform.NEG_LOG;
             BufferedImage ramp = new BufferedImage(barW, barH, BufferedImage.TYPE_INT_RGB);
-            for (int k = 0; k < barW; k++) {
-                double t = k / (double) Math.max(1, barW - 1);
-                if (reverse) t = 1.0 - t;
+            for (int j = 0; j < barH; j++) {
+                double pos = barH > 1 ? j / (double) (barH - 1) : 0.0;   // 0 = bottom, 1 = top
+                double t = pos;                                          // bottom = vmin, top = vmax
+                if (reverse) t = 1.0 - t;                                // keep NEG_LOG behaviour
                 int rgb = HiCColorScale.rgb(vmin + (vmax - vmin) * t, vmin, vmax, pal);
-                for (int j = 0; j < barH; j++) ramp.setRGB(k, j, rgb);
+                for (int k = 0; k < barW; k++) ramp.setRGB(k, j, rgb);
             }
-            g2.drawImage(ramp, barX, barY, null);
+            g2.drawImage(ramp, barX, barTop, null);
             g2.setColor(new Color(90, 90, 90));
-            g2.drawRect(barX, barY, barW, barH);
+            g2.drawRect(barX, barTop, barW, barH);
 
             g2.setFont(oldFont.deriveFont(Font.PLAIN, 9f));
             FontMetrics fm2 = g2.getFontMetrics();
             g2.setColor(Color.BLACK);
             String lo = formatCompact(vmin), hi = formatCompact(vmax);
-            g2.drawString(lo, barX, barY + barH + 9);
-            g2.drawString(hi, barX + barW - fm2.stringWidth(hi), barY + barH + 9);
+            int labX = barX + barW + 4;
+            g2.drawString(hi, labX, barTop + fm2.getAscent());     // max at top
+            g2.drawString(lo, labX, barTop + barH - 2);             // min at bottom
         } finally {
             g2.setFont(oldFont);
             g2.setColor(oldColor);
