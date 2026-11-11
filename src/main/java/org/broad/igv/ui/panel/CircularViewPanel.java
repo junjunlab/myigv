@@ -1028,13 +1028,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     drawMessage(ig, w, h, "Gene list empty or no genes recognised");
                 } else {
                     lastChrs = geneChrs;
-                    drawAll(ig, w, h, geneChrs, settings);
+                    drawAll(ig, w, h, geneChrs, settings, hasVisibleLabels());
                     drawTrackRings(ig, w, h, geneChrs, settings);
                 }
             } else if (Globals.CHR_ALL.equals(chr)) {
                 List<ChrInfo> chrs = buildAll(genome, zoom, rangeZoom, settings);
                 lastChrs = chrs;
-                drawAll(ig, w, h, chrs, settings);
+                drawAll(ig, w, h, chrs, settings, hasVisibleLabels());
                 drawTrackRings(ig, w, h, chrs, settings);
                 // Links are an independent z-layer drawn last, like Circos, so they sit on top.
                 drawLinks(ig, w, h, chrs, allLinks(), settings, linkAnchorRadius(w, h, settings));
@@ -1043,7 +1043,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 if (one == null) drawMessage(ig, w, h, "Chromosome not found: " + chr);
                 else {
                     lastChrs = Collections.singletonList(one);
-                    drawSingle(ig, w, h, one, settings);
+                    drawSingle(ig, w, h, one, settings, hasVisibleLabels());
                     drawTrackRingsSingle(ig, w, h, one, settings);
                     drawLinks(ig, w, h, Collections.singletonList(one), allLinks(), settings,
                             linkAnchorRadius(w, h, settings));
@@ -1119,13 +1119,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 return;
             }
             lastChrs = geneChrs;
-            drawAll(g2, w, h, geneChrs, settings);
+            drawAll(g2, w, h, geneChrs, settings, hasVisibleLabels());
             drawTrackRings(g2, w, h, geneChrs, settings);
             drawLinks(g2, w, h, geneChrs, allLinks(), settings, linkAnchorRadius(w, h, settings));
         } else if (Globals.CHR_ALL.equals(chr)) {
             List<ChrInfo> chrs = buildAll(genome, zoom, rangeZoom, settings);
             lastChrs = chrs;
-            drawAll(g2, w, h, chrs, settings);
+            drawAll(g2, w, h, chrs, settings, hasVisibleLabels());
             drawTrackRings(g2, w, h, chrs, settings);
             drawLinks(g2, w, h, chrs, allLinks(), settings, linkAnchorRadius(w, h, settings));
         } else {
@@ -1135,7 +1135,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 return;
             }
             lastChrs = Collections.singletonList(one);
-            drawSingle(g2, w, h, one, settings);
+            drawSingle(g2, w, h, one, settings, hasVisibleLabels());
             drawTrackRingsSingle(g2, w, h, one, settings);
             drawLinks(g2, w, h, Collections.singletonList(one), allLinks(), settings,
                     linkAnchorRadius(w, h, settings));
@@ -1588,11 +1588,16 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     private static void drawAll(Graphics2D g2, int w, int h, List<ChrInfo> chrs, CircularSettings s) {
+        drawAll(g2, w, h, chrs, s, false);
+    }
+
+    private static void drawAll(Graphics2D g2, int w, int h, List<ChrInfo> chrs,
+                                CircularSettings s, boolean reserveLabels) {
         if (chrs == null || chrs.isEmpty()) { drawMessage(g2, w, h, "Circular view — no chromosomes"); return; }
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double rOut = ideogramOuterRadius(w, h, s);
+        double rOut = ideogramOuterRadius(w, h, s, reserveLabels);
         double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
 
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
@@ -1624,11 +1629,16 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     private static void drawSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {
+        drawSingle(g2, w, h, chr, s, false);
+    }
+
+    private static void drawSingle(Graphics2D g2, int w, int h, ChrInfo chr,
+                                   CircularSettings s, boolean reserveLabels) {
         if (chr == null || chr.length <= 0) return;
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double rOut = ideogramOuterRadius(w, h, s);
+        double rOut = ideogramOuterRadius(w, h, s, reserveLabels);
         double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
 
         double[] sec = sectorsFor(Collections.singletonList(chr), s).get(0);
@@ -2461,7 +2471,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 if (vSpan <= 0) vSpan = Math.max(1, c.length);
                 double mid = (row.start + row.end) / 2.0;
                 double f = f0 + span * clamp01((mid - c.viewStart) / vSpan);
-                anchors.add(new double[]{f, fm.stringWidth(row.text) + 3});
+                // horizontal text: its arc footprint is the string WIDTH (left/right aligned
+                // per side), like the reference figure's horizontal call-out labels.
+                anchors.add(new double[]{f, fm.stringWidth(row.text) + 6});
                 texts.add(row.text);
             }
         }
@@ -2478,20 +2490,18 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         for (int oi : order) {
             double f = anchors.get(oi)[0], wpx = anchors.get(oi)[1];
             int level = 0;
-            double r = 0, needed = 0, fStart = 0;
+            double r = 0, needed = 0;
             for (; level < levelEnd.length; level++) {
                 r = rOut + s.labelGapPx + level * (double) s.labelLevelGapPx;
                 needed = wpx / (2 * Math.PI * r);             // arc fraction the text occupies
-                fStart = f + LIFT_PX / r;                     // start just past the radial stub
-                if (fStart > levelEnd[level]) break;
+                if (f - needed / 2.0 > levelEnd[level]) break;
             }
             if (level >= levelEnd.length) level = levelEnd.length - 1;
             r = rOut + s.labelGapPx + level * (double) s.labelLevelGapPx;
             needed = wpx / (2 * Math.PI * r);
-            fStart = f + LIFT_PX / r;
-            levelEnd[level] = fStart + needed;
-            // {anchor fraction, radius, text CENTER fraction}
-            labelLayout.add(new double[]{f, r, fStart + needed / 2.0});
+            levelEnd[level] = f + needed / 2.0;
+            // {anchor fraction, radius, text CENTER fraction = anchor}
+            labelLayout.add(new double[]{f, r, f});
             labelTexts.add(texts.get(oi));
         }
     }
@@ -2510,18 +2520,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 g2.setStroke(new BasicStroke(0.7f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
                 for (int i = 0; i < labelLayout.size(); i++) {
                     double f = labelLayout.get(i)[0], r = labelLayout.get(i)[1];
-                    double fCenter = labelLayout.get(i)[2];
-                    // elbow: radial stub out of the ideogram, then a short arc to where the text
-                    // starts — circlize's genomicLabels connector.
                     Point2D a = polar(cx, cy, rOut + 0.5, f);
-                    Point2D b = polar(cx, cy, r, f);
+                    Point2D b = polar(cx, cy, r - 2.0, f);
                     g2.draw(new Line2D.Double(a, b));
-                    g2.draw(new Line2D.Double(b, polar(cx, cy, r, f + LIFT_PX / r)));
                 }
             }
             for (int i = 0; i < labelLayout.size(); i++) {
-                double fCenter = labelLayout.get(i)[2], r = labelLayout.get(i)[1];
-                drawTangentialText(g2, cx, cy, r, fCenter, labelTexts.get(i), font, s.labelColor);
+                double f = labelLayout.get(i)[0], r = labelLayout.get(i)[1];
+                drawHorizontalLabel(g2, cx, cy, r, f, labelTexts.get(i), font, s.labelColor);
             }
         } finally {
             g2.setStroke(oldStroke);
@@ -3580,6 +3586,23 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double rotDeg = frac * 360.0;
         if (rotDeg > 90 && rotDeg < 270) rotDeg += 180;
         drawRotated(g2, p, rotDeg, text, font, color);
+    }
+
+    /** Horizontal call-out label: always reads left-to-right. On the right half the text starts
+     *  at the anchor and extends right; on the left half it ends at the anchor and extends left. */
+    private static void drawHorizontalLabel(Graphics2D g2, double cx, double cy, double r,
+                                            double frac, String text, Font font, Color color) {
+        if (text == null || text.isEmpty()) return;
+        Point2D p = polar(cx, cy, r, frac);
+        double deg = frac * 360.0;
+        boolean rightSide = deg <= 90 || deg >= 270;
+        FontMetrics fm = g2.getFontMetrics(font);
+        int x = (int) Math.round(p.getX());
+        int y = (int) Math.round(p.getY()) + fm.getAscent() / 2;
+        if (!rightSide) x -= fm.stringWidth(text);
+        g2.setFont(font);
+        g2.setColor(color);
+        g2.drawString(text, x, y);
     }
 
     private static void drawRadialText(Graphics2D g2, double cx, double cy, double r, double frac,
