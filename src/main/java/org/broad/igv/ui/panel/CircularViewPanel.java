@@ -172,6 +172,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** Single-chromosome mode: fraction of the full circle the arc spans.
          *  1.0 = 360° (full ring, default), 0.5 = 180° (half circle), etc. */
         public double singleArcFraction = 1.0;
+        /** Single-chromosome mode: where the arc's 0 position sits, in degrees clockwise
+         *  from the top (0 = top, 90 = right, 180 = bottom, 270 = left). Default 0 (top). */
+        public double singleArcStartDeg = 0.0;
 
         public CircularSettings copy() {
             CircularSettings s = new CircularSettings();
@@ -199,6 +202,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.geneFlankBp = geneFlankBp;
             s.heatmapHeightPx = heatmapHeightPx;
             s.singleArcFraction = singleArcFraction;
+            s.singleArcStartDeg = singleArcStartDeg;
             return s;
         }
 
@@ -784,7 +788,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             // the visible bp window and that interval is drawn as the full ring.
             ChrInfo one = buildOne(genome, frameChr, rangeZoom, settings);
             if (one == null) return;
-            zoomRange(one, frac, zoomIn);
+            double[] sec = sectorsFor(Collections.singletonList(one), settings).get(0);
+            double f0 = sec[0], f1 = sec[1];
+            double ff = frac;
+            if (ff < f0) ff += 1.0;
+            double t = f1 > f0 ? (ff - f0) / (f1 - f0) : 0.5;
+            zoomRange(one, Math.max(0, Math.min(1, t)), zoomIn);
         } else {
             return;
         }
@@ -830,9 +839,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double frac = theta / (2 * Math.PI);
         if (frac < 0) frac += 1.0;
 
-        List<double[]> sec = computeSectors(chrs, settings.gapDeg);
+        List<double[]> sec = sectorsFor(chrs, settings);
         for (int i = 0; i < chrs.size(); i++) {
-            if (frac >= sec.get(i)[0] && frac < sec.get(i)[1]) return chrs.get(i).name;
+            double f0 = sec.get(i)[0], f1 = sec.get(i)[1];
+            double ff = frac;
+            if (ff < f0) ff += 1.0;                   // sector may wrap past 12 o'clock
+            if (ff >= f0 && ff < f1) return chrs.get(i).name;
         }
         return null;
     }
@@ -1127,8 +1139,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double f = s.singleArcFraction;
             if (!(f > 0)) f = 1.0;
             if (f > 1.0) f = 1.0;
+            double start = s.singleArcStartDeg / 360.0;
+            start = start - Math.floor(start);            // normalize into [0,1)
             List<double[]> out = new ArrayList<>();
-            out.add(new double[]{0.0, f, f * 360.0});
+            // f1 may exceed 1 (arc wraps past 12 o'clock); polar()/annularPath() handle that,
+            // and angle->fraction lookups add 1.0 when the folded fraction is below f0.
+            out.add(new double[]{start, start + f, f * 360.0});
             return out;
         }
         return computeSectors(chrs, s.gapDeg);
@@ -1170,9 +1186,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double rOut = R * s.bandOuter;
         double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
 
-        drawIdeogramBand(g2, cx, cy, rIn, rOut, 0.0, s.singleArcFraction, chr);
-        drawBandTicks(g2, cx, cy, rIn, rOut, 0.0, s.singleArcFraction, chr,
-                s.singleArcFraction * 360.0, s);
+        double[] sec = sectorsFor(Collections.singletonList(chr), s).get(0);
+        drawIdeogramBand(g2, cx, cy, rIn, rOut, sec[0], sec[1], chr);
+        drawBandTicks(g2, cx, cy, rIn, rOut, sec[0], sec[1], chr, sec[2], s);
 
         // Centre text removed: keep the ring interior clear for links/tracks.
     }
@@ -1702,8 +1718,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 if (r < bandInner || r > bandOuter) continue;
                 double theta = Math.atan2(dx, -dy);
                 double frac = (theta / TWO_PI + 1.0) % 1.0;
-                if (frac < f0 || frac > f1) continue;
-                double t = (frac - f0) / fSpan;
+                double ff = frac;
+                if (ff < f0) ff += 1.0;               // sector may wrap past 12 o'clock
+                if (ff < f0 || ff > f1) continue;
+                double t = (ff - f0) / fSpan;
                 int tx = clampInt((int) Math.round(t * (tileW - 1)), 0, tileW - 1);
                 int ty = clampInt((int) Math.round((r - bandInner) / rSpan * (tileH - 1)), 0, tileH - 1);
                 dst[py * w + px] = src[ty * tileW + tx] | 0xFF000000;

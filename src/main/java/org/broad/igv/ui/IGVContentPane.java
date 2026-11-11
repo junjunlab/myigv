@@ -325,6 +325,36 @@ public class IGVContentPane extends JPanel {
         arcMenu.add(arcCustom);
         menu.add(arcMenu);
 
+        // ---- Where the arc's 0 position sits (degrees clockwise from top; default top) ----
+        JMenu arcStartMenu = new JMenu("Single-chromosome arc start");
+        ButtonGroup arcStartGroup = new ButtonGroup();
+        String[] startNames = {"Top", "Right", "Bottom", "Left"};
+        double[] startDegs = {0, 90, 180, 270};
+        double curStart = ((s.singleArcStartDeg % 360) + 360) % 360;
+        for (int i = 0; i < startNames.length; i++) {
+            final double deg = startDegs[i];
+            JRadioButtonMenuItem it = new JRadioButtonMenuItem(startNames[i] + "  (" + (int) deg + "°)");
+            it.setSelected(Math.abs(curStart - deg) < 1e-6);
+            it.addActionListener(e -> { s.singleArcStartDeg = deg; panel.refresh(); });
+            arcStartGroup.add(it);
+            arcStartMenu.add(it);
+        }
+        arcStartMenu.addSeparator();
+        JMenuItem startCustom = new JMenuItem("Custom (degrees)…");
+        startCustom.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Arc start position, degrees clockwise from top (0=top, 90=right, 180=bottom, 270=left):",
+                    String.valueOf(Math.round(curStart)));
+            if (v == null) return;
+            try {
+                double deg = Double.parseDouble(v.trim());
+                s.singleArcStartDeg = ((deg % 360) + 360) % 360;
+                panel.refresh();
+            } catch (NumberFormatException ignore) { /* keep current */ }
+        });
+        arcStartMenu.add(startCustom);
+        menu.add(arcStartMenu);
+
         JMenuItem showAllRing = new JMenuItem("Show all ring tracks");
         showAllRing.addActionListener(e -> { panel.clearHiddenRingTracks(); refreshDataColumn(); });
         menu.add(showAllRing);
