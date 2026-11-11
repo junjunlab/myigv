@@ -629,6 +629,8 @@ public class IGVContentPane extends JPanel {
     /** Parameters for a labels layer (font, colours, connector lines), same menu pattern as heatmap. */
     private void addLabelItems(JPopupMenu popup, CircularViewPanel panel) {
         CircularViewPanel.CircularSettings s = panel.getSettings();
+        popup.add(linkCheck("Labels inside the ring (radial)", s.labelInside,
+                v -> { s.labelInside = v; panel.refresh(); }));
         popup.add(linkCheck("Show connector lines", s.labelShowLines,
                 v -> { s.labelShowLines = v; panel.refresh(); }));
         popup.add(linkCheck("Bold labels", s.labelBold,

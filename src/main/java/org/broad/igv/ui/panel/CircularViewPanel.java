@@ -195,6 +195,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public boolean labelShowLines = true;
         /** Distance from the ideogram outer edge to the first label ring, in px. */
         public int     labelGapPx = 16;
+        /** true = label ring INSIDE the ideogram (radial text), false = outside (horizontal). */
+        public boolean labelInside = true;
         /** Extra radius for each overlap level (labels pushed outward to avoid each other). */
         public int     labelLevelGapPx = 13;
         /** Heatmap colour-bar legend, drawn OUTSIDE the ring (same corner set as the Hi-C legend). */
@@ -246,6 +248,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.labelFontSize = labelFontSize; s.labelBold = labelBold;
             s.labelColor = labelColor; s.labelLineColor = labelLineColor;
             s.labelShowLines = labelShowLines; s.labelGapPx = labelGapPx;
+            s.labelInside = labelInside;
             s.labelLevelGapPx = labelLevelGapPx;
             s.heatmapLegend = heatmapLegend;
             s.heatmapLegendPosition = heatmapLegendPosition;
@@ -439,6 +442,21 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         invalidateRing();
         log.info("Circular labels layer '" + name + "': " + l.labels.size() + " label(s)");
         return l;
+    }
+
+    /** Radial room the inner label ring needs, so track bands start beyond it. */
+    static double labelRingReserve(CircularSettings s) {
+        return s.labelGapPx + 3.0 * s.labelLevelGapPx + 4;
+    }
+
+    /** Radius the labels hang from: the ideogram's INNER edge when inside, outer when outside. */
+    static double labelBaseRadius(int w, int h, CircularSettings s) {
+        double rOut = ideogramOuterRadius(w, h, s, !s.labelInside ? true : false);
+        if (s.labelInside) {
+            double R = Math.min(w, h) / 2.0 - MARGIN;
+            return Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
+        }
+        return rOut;
     }
 
     /** True when at least one visible labels layer exists (drives the ring shrink). */
@@ -1749,7 +1767,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double half = Math.min(w, h) / 2.0;
         double R = half - MARGIN;
         double rOut = R * s.bandOuter;
-        if (reserveLabels) rOut = Math.min(rOut, R * 0.76);   // room for the label ring outside
+        if (reserveLabels && !s.labelInside) rOut = Math.min(rOut, R * 0.76);  // room outside
         if (!s.heatmapOutside) return rOut;
         double need = outsideAxisClearance(s) + connectionTrackHeight(s)
                 + Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50) + 18;
@@ -2072,6 +2090,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (R <= 20) return;
         double rOut = ideogramOuterRadius(w, h, s);
         double cursor = bandStartRadius(R, rOut, s);   // leaves room for inside tick labels
+        if (s.labelInside && hasVisibleLabels()) cursor -= labelRingReserve(s);
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
@@ -2107,6 +2126,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (R <= 20) return;
         double rOut = ideogramOuterRadius(w, h, s);
         double cursor = bandStartRadius(R, rOut, s);   // leaves room for inside tick labels
+        if (s.labelInside && hasVisibleLabels()) cursor -= labelRingReserve(s);
         List<ChrInfo> chrs = Collections.singletonList(chr);
         List<double[]> sec = sectorsFor(chrs, s);
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
@@ -2457,7 +2477,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         FontMetrics fm = pg.getFontMetrics();
         pg.dispose();
 
-        double rOut = ideogramOuterRadius(w, h, s, true);
+        double rBase = labelBaseRadius(w, h, s);
+        double dir = s.labelInside ? -1.0 : 1.0;
         // {a0, a1, widthPx} in anchor order; texts aligned with the same indices
         List<double[]> anchors = new ArrayList<>();
         List<String> texts = new ArrayList<>();
@@ -2473,7 +2494,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 double a0 = f0 + span * clamp01(((double) row.start - c.viewStart) / vSpan);
                 double a1 = f0 + span * clamp01(((double) row.end - c.viewStart) / vSpan);
                 if (a1 < a0) { double t = a0; a0 = a1; a1 = t; }
-                anchors.add(new double[]{a0, a1, fm.stringWidth(row.text) + 6});
+                // radial text: its arc footprint is the line height; horizontal: the width
+                double fp = s.labelInside ? fm.getHeight() + 3 : fm.stringWidth(row.text) + 6;
+                anchors.add(new double[]{a0, a1, fp});
                 texts.add(row.text);
             }
         }
@@ -2494,7 +2517,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             int level = 0;
             double r = 0, needed = 0, fText = 0;
             for (; level < levelEnd.length; level++) {
-                r = rOut + s.labelGapPx + level * (double) s.labelLevelGapPx;
+                r = rBase + dir * (s.labelGapPx + level * (double) s.labelLevelGapPx);
                 needed = wpx / (2 * Math.PI * r);
                 // nudge the text clockwise past the previous label, but only up to one text
                 // width; beyond that the label moves one level further out (so the anchor and
@@ -2503,7 +2526,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 if (fText - fReal <= needed) break;
             }
             if (level >= levelEnd.length) level = levelEnd.length - 1;
-            r = rOut + s.labelGapPx + level * (double) s.labelLevelGapPx;
+            r = rBase + dir * (s.labelGapPx + level * (double) s.labelLevelGapPx);
             needed = wpx / (2 * Math.PI * r);
             fText = Math.max(fReal, levelEnd[level] + needed / 2.0);
             levelEnd[level] = fText + needed / 2.0;
@@ -2521,7 +2544,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     void drawLabelLayers(Graphics2D g2, int w, int h, CircularSettings s) {
         if (labelLayout.isEmpty()) return;
         int cx = w / 2, cy = h / 2;
-        double rOut = ideogramOuterRadius(w, h, s, true);
+        double rBase = labelBaseRadius(w, h, s);
+        double dir = s.labelInside ? -1.0 : 1.0;
         Font font = new Font("SansSerif", s.labelBold ? Font.BOLD : Font.PLAIN, s.labelFontSize);
         Stroke oldStroke = g2.getStroke();
         Color oldColor = g2.getColor();
@@ -2533,15 +2557,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     double a0 = labelLayout.get(i)[0], a1 = labelLayout.get(i)[1];
                     double r = labelLayout.get(i)[2], fText = labelLayout.get(i)[3];
                     double fReal = (a0 + a1) / 2.0;
-                    double hT = r - rOut;
+                    double hT = Math.abs(r - rBase);
                     if (hT < 2) continue;
-                    double rMid = rOut + hT / 3.0;
-                    double rLow = rOut + 2 * hT / 3.0;
+                    double rMid = rBase + dir * hT / 3.0;
+                    double rLow = rBase + dir * 2 * hT / 3.0;
 
-                    // horizontal cap over the gene's real interval, hugging the ideogram edge
-                    g2.fill(annularPath(cx, cy, rOut - 0.4, rOut + 0.4, a0, a1));
+                    // cap over the gene's real interval, hugging the ideogram edge
+                    g2.fill(annularPath(cx, cy, rBase - 0.4, rBase + 0.4, a0, a1));
 
-                    Point2D pTop = polar(cx, cy, rOut, fReal);
+                    Point2D pTop = polar(cx, cy, rBase, fReal);
                     Point2D pMid = polar(cx, cy, rMid, fReal);
                     Point2D pLow = polar(cx, cy, rLow, fText);
                     Point2D pBot = polar(cx, cy, r, fText);
@@ -2552,7 +2576,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             }
             for (int i = 0; i < labelLayout.size(); i++) {
                 double r = labelLayout.get(i)[2], fText = labelLayout.get(i)[3];
-                drawHorizontalLabel(g2, cx, cy, r, fText, labelTexts.get(i), font, s.labelColor);
+                if (s.labelInside) {
+                    // radial: reads outward along the radius, niceFacing flips the left half
+                    drawRadialText(g2, cx, cy, r, fText, labelTexts.get(i), font, s.labelColor);
+                } else {
+                    drawHorizontalLabel(g2, cx, cy, r, fText, labelTexts.get(i), font, s.labelColor);
+                }
             }
         } finally {
             g2.setStroke(oldStroke);
