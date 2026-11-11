@@ -631,6 +631,8 @@ public class IGVContentPane extends JPanel {
         CircularViewPanel.CircularSettings s = panel.getSettings();
         popup.add(linkCheck("Labels inside the ring (radial)", s.labelInside,
                 v -> { s.labelInside = v; panel.refresh(); }));
+        popup.add(linkCheck("Read labels toward the centre", s.labelInward,
+                v -> { s.labelInward = v; panel.refresh(); }));
         popup.add(linkCheck("Show connector lines", s.labelShowLines,
                 v -> { s.labelShowLines = v; panel.refresh(); }));
         popup.add(linkCheck("Bold labels", s.labelBold,

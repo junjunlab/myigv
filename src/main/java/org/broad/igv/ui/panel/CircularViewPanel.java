@@ -197,6 +197,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public int     labelGapPx = 16;
         /** true = label ring INSIDE the ideogram (radial text), false = outside (horizontal). */
         public boolean labelInside = true;
+        /** false = radial text reads outward (B->1), true = reads toward the centre (1->B). */
+        public boolean labelInward = false;
         /** Extra radius for each overlap level (labels pushed outward to avoid each other). */
         public int     labelLevelGapPx = 13;
         /** Heatmap colour-bar legend, drawn OUTSIDE the ring (same corner set as the Hi-C legend). */
@@ -248,7 +250,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.labelFontSize = labelFontSize; s.labelBold = labelBold;
             s.labelColor = labelColor; s.labelLineColor = labelLineColor;
             s.labelShowLines = labelShowLines; s.labelGapPx = labelGapPx;
-            s.labelInside = labelInside;
+            s.labelInside = labelInside; s.labelInward = labelInward;
             s.labelLevelGapPx = labelLevelGapPx;
             s.heatmapLegend = heatmapLegend;
             s.heatmapLegendPosition = heatmapLegendPosition;
@@ -2508,30 +2510,63 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         java.util.Arrays.sort(order, (x, y) -> Double.compare(
                 (a.get(x)[0] + a.get(x)[1]) / 2.0, (a.get(y)[0] + a.get(y)[1]) / 2.0));
 
-        double[] levelEnd = new double[16];
-        java.util.Arrays.fill(levelEnd, -1e9);
-        for (int oi : order) {
-            double a0 = anchors.get(oi)[0], a1 = anchors.get(oi)[1];
-            double fReal = (a0 + a1) / 2.0;
-            double wpx = anchors.get(oi)[2];
-            int level = 0;
-            double r = 0, needed = 0, fText = 0;
-            for (; level < levelEnd.length; level++) {
-                r = rBase + dir * (s.labelGapPx + level * (double) s.labelLevelGapPx);
-                needed = wpx / (2 * Math.PI * r);
-                // nudge the text clockwise past the previous label, but only up to one text
-                // width; beyond that the label moves one level further out (so the anchor and
-                // the text stay near each other, and the comb's diagonal stays short).
-                fText = Math.max(fReal, levelEnd[level] + needed / 2.0);
-                if (fText - fReal <= needed) break;
+        // ---- circlize's smartAlign(): tile overlapping labels end to end ----
+        // Every label starts centred on its own anchor; labels whose extents overlap are grouped
+        // into a cluster and re-tiled end to end around the cluster's midpoint, so a dense group
+        // fans out clockwise AND counter-clockwise instead of stacking at the same angle.
+        int n = anchors.size();
+        double rLbl = rBase + dir * s.labelGapPx;
+        double wl = (fm.getHeight() + 3) / (2 * Math.PI * Math.max(8.0, rLbl));  // arc per label
+        double[] s1 = new double[n], s2 = new double[n];
+        for (int k = 0; k < n; k++) {
+            int oi = order[k];
+            double f = (anchors.get(oi)[0] + anchors.get(oi)[1]) / 2.0;
+            s1[k] = f - wl / 2.0;
+            s2[k] = f + wl / 2.0;
+        }
+        int nclBefore = -1;
+        for (int guard = 0; guard < 200; guard++) {
+            // cluster consecutive overlapping extents
+            int[] cluster = new int[n];
+            int ncl = 0;
+            for (int k = 0; k < n; k++) {
+                if (k == 0 || s1[k] > s2[k - 1]) ncl++;
+                cluster[k] = ncl;
             }
-            if (level >= levelEnd.length) level = levelEnd.length - 1;
-            r = rBase + dir * (s.labelGapPx + level * (double) s.labelLevelGapPx);
-            needed = wpx / (2 * Math.PI * r);
-            fText = Math.max(fReal, levelEnd[level] + needed / 2.0);
-            levelEnd[level] = fText + needed / 2.0;
-            // r = the end of the text that FACES THE RING; the text itself extends away from it
-            labelLayout.add(new double[]{a0, a1, r, fText, anchors.get(oi)[3]});
+            if (ncl == nclBefore) break;             // stable
+            nclBefore = ncl;
+            double[] n1 = new double[n], n2 = new double[n];
+            for (int c = 1; c <= ncl; c++) {
+                int first = -1, last = -1;
+                double total = 0, lo = Double.MAX_VALUE, hi = -Double.MAX_VALUE;
+                for (int k = 0; k < n; k++) {
+                    if (cluster[k] != c) continue;
+                    if (first < 0) first = k;
+                    last = k;
+                    total += s2[k] - s1[k];
+                    lo = Math.min(lo, s1[k]);
+                    hi = Math.max(hi, s2[k]);
+                }
+                if (first < 0) continue;
+                double mid = (lo + hi) / 2.0;
+                double p = mid - total / 2.0;
+                if (p < 0) p = 0;
+                if (p + total > 1) p = 1 - total;
+                for (int k = first; k <= last; k++) {
+                    if (cluster[k] != c) continue;
+                    double len = s2[k] - s1[k];
+                    n1[k] = p;
+                    n2[k] = p + len;
+                    p += len;
+                }
+            }
+            s1 = n1;
+            s2 = n2;
+        }
+        for (int k = 0; k < n; k++) {
+            int oi = order[k];
+            labelLayout.add(new double[]{anchors.get(oi)[0], anchors.get(oi)[1], rLbl,
+                    (s1[k] + s2[k]) / 2.0, anchors.get(oi)[3]});
             labelTexts.add(texts.get(oi));
         }
     }
@@ -2583,7 +2618,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 double rCenter = r + dir * len / 2.0;      // text centre, away from the ring
                 if (s.labelInside) {
                     // radial: reads outward along the radius, niceFacing flips the left half
-                    drawRadialText(g2, cx, cy, rCenter, fText, labelTexts.get(i), font, s.labelColor);
+                    drawRadialText(g2, cx, cy, rCenter, fText, labelTexts.get(i), font, s.labelColor,
+                            s.labelInward);
                 } else {
                     drawHorizontalLabel(g2, cx, cy, rCenter, fText, labelTexts.get(i), font, s.labelColor);
                 }
@@ -3666,11 +3702,28 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
     private static void drawRadialText(Graphics2D g2, double cx, double cy, double r, double frac,
                                        String text, Font font, Color color) {
+        drawRadialText(g2, cx, cy, r, frac, text, font, color, false);
+    }
+
+    /** @param inward true = the text reads toward the centre instead of away from it. */
+    private static void drawRadialText(Graphics2D g2, double cx, double cy, double r, double frac,
+                                       String text, Font font, Color color, boolean inward) {
         if (text == null || text.isEmpty()) return;
         Point2D p = polar(cx, cy, r, frac);
-        double rotDeg = frac * 360.0 - 90.0;
-        double a = ((rotDeg % 360) + 360) % 360;
-        if (a > 90 && a < 270) rotDeg += 180;
+        double rotDeg;
+        if (inward) {
+            // Reading TOWARD the centre: every baseline points inward, so on the far side the
+            // glyphs are upside down. niceFacing cannot be applied here — it would rotate the
+            // text back and silently cancel this option.
+            rotDeg = frac * 360.0 + 90.0;
+            while (rotDeg > 180) rotDeg -= 360;
+            while (rotDeg <= -180) rotDeg += 360;
+        } else {
+            // Reading away from the centre, niceFacing keeps the left half upright.
+            rotDeg = frac * 360.0 - 90.0;
+            double a = ((rotDeg % 360) + 360) % 360;
+            if (a > 90 && a < 270) rotDeg += 180;
+        }
         drawRotated(g2, p, rotDeg, text, font, color);
     }
 
