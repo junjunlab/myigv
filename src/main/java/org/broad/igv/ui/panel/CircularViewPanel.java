@@ -201,6 +201,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public boolean labelInward = false;
         /** Gap (px) inserted between two adjacent labels when they are tiled end to end. */
         public int     labelLevelGapPx = 3;
+        /** Radial height (px) reserved for the label ring — circlize's labels_height. */
+        public int     labelHeightPx = 40;
         /** Heatmap colour-bar legend, drawn OUTSIDE the ring (same corner set as the Hi-C legend). */
         public boolean heatmapLegend = true;
         public org.broad.igv.hic.HiCTrack.LegendPosition heatmapLegendPosition =
@@ -251,7 +253,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.labelColor = labelColor; s.labelLineColor = labelLineColor;
             s.labelShowLines = labelShowLines; s.labelGapPx = labelGapPx;
             s.labelInside = labelInside; s.labelInward = labelInward;
-            s.labelLevelGapPx = labelLevelGapPx;
+            s.labelLevelGapPx = labelLevelGapPx; s.labelHeightPx = labelHeightPx;
             s.heatmapLegend = heatmapLegend;
             s.heatmapLegendPosition = heatmapLegendPosition;
             s.singleArcFraction = singleArcFraction;
@@ -448,8 +450,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
     /** Radial room the inner label ring needs, so track bands start beyond it. */
     static double labelRingReserve(CircularSettings s) {
-        // one row of radial text plus the connector track; smartAlign keeps everything on one ring
-        return s.labelGapPx + 2.0 * (s.labelFontSize + 6);
+        // connector track + the radial height the labels themselves occupy
+        double h = Math.max(s.labelFontSize + 8, s.labelHeightPx);
+        return s.labelGapPx + h;
     }
 
     /** Radius the labels hang from: the ideogram's INNER edge when inside, outer when outside. */

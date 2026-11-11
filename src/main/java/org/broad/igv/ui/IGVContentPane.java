@@ -629,8 +629,10 @@ public class IGVContentPane extends JPanel {
     /** Parameters for a labels layer (font, colours, connector lines), same menu pattern as heatmap. */
     private void addLabelItems(JPopupMenu popup, CircularViewPanel panel) {
         CircularViewPanel.CircularSettings s = panel.getSettings();
-        popup.add(linkCheck("Labels inside the ring (radial)", s.labelInside,
-                v -> { s.labelInside = v; panel.refresh(); }));
+        JCheckBoxMenuItem outside = new JCheckBoxMenuItem("Labels outside the ideogram",
+                !s.labelInside);
+        outside.addActionListener(e -> { s.labelInside = !outside.isSelected(); panel.refresh(); });
+        popup.add(outside);
         popup.add(linkCheck("Read labels toward the centre", s.labelInward,
                 v -> { s.labelInward = v; panel.refresh(); }));
         popup.add(linkCheck("Show connector lines", s.labelShowLines,
@@ -664,12 +666,12 @@ public class IGVContentPane extends JPanel {
         });
         popup.add(lineCol);
 
-        JMenuItem connLen = new JMenuItem("Connector length… (" + s.labelGapPx + " px)");
+        JMenuItem connLen = new JMenuItem("Connector height… (" + s.labelGapPx + " px)");
         connLen.setToolTipText("Distance from the ideogram edge to the label ring "
                 + "(the comb lives in this gap).");
         connLen.addActionListener(e -> {
             String v = JOptionPane.showInputDialog(panel,
-                    "Connector length, ideogram edge to label ring (px):", s.labelGapPx);
+                    "Connector height, ideogram edge to label ring (px):", s.labelGapPx);
             if (v != null) {
                 try {
                     s.labelGapPx = Math.max(2, Math.min(80, Integer.parseInt(v.trim())));
@@ -678,6 +680,20 @@ public class IGVContentPane extends JPanel {
             }
         });
         popup.add(connLen);
+
+        JMenuItem labH = new JMenuItem("Label height… (" + s.labelHeightPx + " px)");
+        labH.setToolTipText("Radial room reserved for the label ring (circlize labels_height).");
+        labH.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Label ring height (px):", s.labelHeightPx);
+            if (v != null) {
+                try {
+                    s.labelHeightPx = Math.max(10, Math.min(160, Integer.parseInt(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(labH);
 
         JMenuItem spacing = new JMenuItem("Label spacing… (" + s.labelLevelGapPx + " px)");
         spacing.setToolTipText("Gap between two adjacent labels when they are tiled end to end.");
