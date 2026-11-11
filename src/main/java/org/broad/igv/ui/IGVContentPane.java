@@ -44,6 +44,7 @@ import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.broad.igv.feature.genome.Genome;
@@ -356,10 +357,6 @@ public class IGVContentPane extends JPanel {
         });
         arcStartMenu.add(startCustom);
         menu.add(arcStartMenu);
-
-        JMenuItem showAllRing = new JMenuItem("Show all ring tracks");
-        showAllRing.addActionListener(e -> { panel.clearHiddenRingTracks(); refreshDataColumn(); });
-        menu.add(showAllRing);
         menu.addSeparator();
 
         // ---- Circos links (bezier chords / ribbons between two genomic intervals) ----
@@ -874,6 +871,30 @@ public class IGVContentPane extends JPanel {
         circularDrawingArea.setTrackLinks(autoLinks);
     }
 
+    /**
+     * Delete tracks for real. Unlike hiding, the track is unloaded from the session: it leaves
+     * the Data Tracks list, the horizontal view and the ring, and a later import of the same
+     * file starts from a clean slate (no leftover "(hidden)" marker, no stale cached matrix).
+     */
+    private void deleteTracks(List<Track> tracks) {
+        if (tracks == null || tracks.isEmpty()) return;
+        List<Track> unique = new ArrayList<>(new LinkedHashSet<>(tracks));
+        unique.removeIf(java.util.Objects::isNull);
+        if (unique.isEmpty()) return;
+        // Drop the ring-side state first: nothing should try to draw a track that is unloading.
+        for (Track t : unique) circularDrawingArea.forgetRingTrack(t);
+        try {
+            if (igv != null) igv.deleteTracks(unique);
+            else IGV.getInstance().deleteTracks(unique);
+        } finally {
+            // Rebuild the list from IGV's remaining tracks even if a panel refused the removal,
+            // so the column can never show a row that the ring no longer draws.
+            refreshDataColumn();
+            circularDrawingArea.refresh();
+            if (igv != null) igv.repaint();
+        }
+    }
+
     /** Right-click popup on the data column: per-track ring band height + collapse/expand. */
     private void maybeShowTrackPopup(MouseEvent e) {
         if (!e.isPopupTrigger()) return;
@@ -939,18 +960,14 @@ public class IGVContentPane extends JPanel {
             // Only interaction tracks selected: they contribute links, so allow removing those.
             JPopupMenu menu = new JPopupMenu();
             String manyLinks = linkNames.size() > 1 ? " (" + linkNames.size() + " tracks)" : "";
-            JMenuItem removeLinks = new JMenuItem("Remove track from ring" + manyLinks);
+            JMenuItem removeLinks = new JMenuItem("Delete track" + manyLinks);
             removeLinks.addActionListener(a -> {
                 try {
-                    for (Track t : linkTracksSel) {
-                        circularDrawingArea.hideRingTrack(t);
-                    }
-                    refreshDataColumn();
-                    circularDrawingArea.refresh();
-                    log.info("Removed links track(s) " + linkNames
+                    deleteTracks(new ArrayList<>(linkTracksSel));
+                    log.info("Deleted links track(s) " + linkNames
                             + "; links remaining=" + circularDrawingArea.getRingLinkCount());
                 } catch (Exception ex) {
-                    log.error("Failed to remove links track from ring", ex);
+                    log.error("Failed to delete links track", ex);
                 }
             });
             menu.add(removeLinks);
@@ -1121,22 +1138,17 @@ public class IGVContentPane extends JPanel {
         menu.add(colorItem);
 
         menu.addSeparator();
-        JMenuItem removeRing = new JMenuItem("Remove track from ring" + many);
+        JMenuItem removeRing = new JMenuItem("Delete track" + many);
         removeRing.addActionListener(a -> {
             try {
-                for (Track t : ringTracksSel) {
-                    circularDrawingArea.hideRingTrack(t);
-                }
                 // A mixed selection can also contain interaction tracks, which contribute links.
-                for (Track t : linkTracksSel) {
-                    circularDrawingArea.hideRingTrack(t);
-                }
-                refreshDataColumn();
-                circularDrawingArea.refresh();
-                log.info("Removed from ring: bands=" + ringNames + " links=" + linkNames
+                List<Track> doomed = new ArrayList<>(ringTracksSel);
+                doomed.addAll(linkTracksSel);
+                deleteTracks(doomed);
+                log.info("Deleted track(s): bands=" + ringNames + " links=" + linkNames
                         + "; links remaining=" + circularDrawingArea.getRingLinkCount());
             } catch (Exception ex) {
-                log.error("Failed to remove track from ring", ex);
+                log.error("Failed to delete track", ex);
             }
         });
         menu.add(removeRing);

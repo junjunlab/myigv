@@ -1410,7 +1410,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         repaint();
     }
 
-    /** Remove a track from the ring (e.g. the RefSeq gene track) without unloading it. */
+    /**
+     * Remove a track from the ring without unloading it.
+     *
+     * @deprecated removing a track now DELETES it (see {@link #forgetRingTrack(Track)}); the
+     *            hide-and-keep-loaded behaviour left the Data Tracks row reading "(hidden)".
+     */
+    @Deprecated
     public void removeRingTrack(String name) {
         hiddenRingTracks.add(name);
         ringTracks.removeIf(t -> name.equals(t.getName()));
@@ -1442,6 +1448,38 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (t == null) return false;
         return hiddenTrackObjects.contains(t)
                 || (t.getName() != null && hiddenRingTracks.contains(t.getName()));
+    }
+
+    /**
+     * Drop every ring-side trace of a track that is about to be DELETED (not just hidden):
+     * the band entry, any hide mark, its band config, and every cache entry keyed by its name
+     * (features, bigWig bins, adaptive zoom bins, Hi-C tiles and their colour limits).
+     *
+     * <p>Call this immediately before {@code IGV.deleteTracks(...)}. Afterwards the "(hidden)"
+     * marker can no longer match a re-imported track of the same name, and no stale matrix or
+     * feature list can be served for the deleted object.
+     */
+    public void forgetRingTrack(Track t) {
+        if (t == null) return;
+        ringTracks.remove(t);
+        hiddenTrackObjects.remove(t);
+        final String name = t.getName();
+        if (name != null) {
+            hiddenRingTracks.remove(name);
+            ringConfig.remove(name);
+            final String p = name + "|";
+            featureCache.keySet().removeIf(k -> k.startsWith(p));
+            dataCache.keySet().removeIf(k -> k.startsWith(p));
+            adaptiveCache.keySet().removeIf(k -> k.startsWith(p));
+            hicTileCache.keySet().removeIf(k -> k.startsWith(p));
+            hicTileLimits.keySet().removeIf(k -> k.startsWith(p));
+            hicLimitsByTrack.remove(name);
+            trackLoaded.remove(name);
+            loadAttempts.keySet().removeIf(k -> k.startsWith(p));
+            lastAttemptMs.keySet().removeIf(k -> k.startsWith(p));
+        }
+        invalidateHiCTiles();
+        ringKey = null;
     }
 
     /** True when the user removed this track from the ring (it stays loaded, just is not drawn). */
