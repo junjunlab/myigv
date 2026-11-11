@@ -37,6 +37,8 @@ import org.broad.igv.feature.genome.Genome;
 import org.broad.igv.feature.genome.GenomeManager;
 import org.broad.igv.Globals;
 import org.broad.igv.ui.IGV;
+import org.broad.igv.bedpe.BedPEFeature;
+import org.broad.igv.bedpe.InteractionTrack;
 import org.broad.igv.lists.GeneList;
 import org.broad.igv.session.Session;
 import org.broad.igv.util.ChromosomeColors;
@@ -329,6 +331,34 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         all.addAll(fileLinks);
         all.addAll(trackLinks);
         return all;
+    }
+
+    /**
+     * Auto-collect links from every loaded interaction track (BEDPE). Each {@link BedPEFeature}
+     * is one connection between two genomic intervals — exactly the Circos / circlize {@code links}
+     * semantic. This is what makes a BEDPE / Circos-link file loaded through File &gt; Load from
+     * File (which becomes an {@link InteractionTrack}) appear in the circular view automatically.
+     * Called from {@link #setRingTracks}, so the link layer re-syncs whenever the track set changes.
+     */
+    public void refreshTrackLinks() {
+        List<RingLink> links = new ArrayList<>();
+        IGV igv = IGV.getInstance();
+        if (igv != null) {
+            for (Track t : igv.getAllTracks()) {
+                if (t instanceof InteractionTrack) {
+                    for (BedPEFeature f : ((InteractionTrack) t).getAllFeatures()) {
+                        if (f.chr1 == null || f.chr2 == null) continue;
+                        RingLink l = new RingLink(f.chr1, f.start1, f.end1, f.chr2, f.start2, f.end2);
+                        l.score = f.getScore();
+                        l.color = f.getColor();
+                        l.thickness = f.getThickness();
+                        l.label = f.getValueString();
+                        links.add(l);
+                    }
+                }
+            }
+        }
+        setTrackLinks(links);
     }
 
     public CircularViewPanel() {
@@ -1093,6 +1123,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     ringTracks.add(t);  // order == top->bottom == outer->inner
             }
         }
+        refreshTrackLinks();   // re-sync the link layer from any loaded interaction tracks
         log.info("Circular ring tracks: " + ringTracks.size());
         invalidateHiCTiles();
         ringKey = null;

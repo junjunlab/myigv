@@ -413,6 +413,43 @@ public class IGVContentPane extends JPanel {
      * Append every Circos-link parameter to a popup. Shared by the "View options" dropdown and
      * the Data Tracks right-click menu, so both expose exactly the same set of actions.
      */
+    /** Load a Circos / BEDPE link file directly into the circular links layer, bypassing the
+     *  track-format router (so a .bed / .links file works too). Reuses BedPEParser, which already
+     *  auto-detects UTF-8 / UTF-16LE / UTF-16BE with BOM. */
+    private static void loadLinksFromFile(CircularViewPanel panel) {
+        java.awt.FileDialog fd = new java.awt.FileDialog(
+                (java.awt.Frame) null, "Load Circos / BEDPE links", java.awt.FileDialog.LOAD);
+        fd.setVisible(true);
+        String dir = fd.getDirectory();
+        String file = fd.getFile();
+        if (dir == null || file == null) return;
+        String path = dir + file;
+        try {
+            org.broad.igv.util.ResourceLocator locator = new org.broad.igv.util.ResourceLocator(path);
+            org.broad.igv.feature.genome.Genome genome =
+                    org.broad.igv.feature.genome.GenomeManager.getInstance().getCurrentGenome();
+            org.broad.igv.bedpe.BedPEParser.Dataset ds =
+                    org.broad.igv.bedpe.BedPEParser.parse(locator, genome);
+            java.util.List<CircularViewPanel.RingLink> rings = new java.util.ArrayList<>();
+            for (org.broad.igv.bedpe.BedPEFeature f : ds.features) {
+                if (f.chr1 == null || f.chr2 == null) continue;
+                CircularViewPanel.RingLink l = new CircularViewPanel.RingLink(
+                        f.chr1, f.start1, f.end1, f.chr2, f.start2, f.end2);
+                l.score = f.getScore();
+                l.color = f.getColor();
+                l.thickness = f.getThickness();
+                l.label = f.getValueString();
+                rings.add(l);
+            }
+            panel.setRingLinks(rings);
+            log.info("Loaded " + rings.size() + " circular links from " + path);
+        } catch (Throwable ex) {
+            log.error("Failed to load links from " + path, ex);
+            javax.swing.JOptionPane.showMessageDialog(panel, "Could not load links:\n" + ex.getMessage(),
+                    "Load links", javax.swing.JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
     public static void addLinkItems(JPopupMenu popup, CircularViewPanel panel) {
         CircularViewPanel.CircularSettings s = panel.getSettings();
 
@@ -423,6 +460,10 @@ public class IGVContentPane extends JPanel {
 
         popup.add(linkCheck("Draw inside data tracks", s.linkEndsInsideTracks,
                 v -> { s.linkEndsInsideTracks = v; panel.refresh(); }));
+
+        JMenuItem loadLinks = new JMenuItem("Load links…");
+        loadLinks.addActionListener(e -> loadLinksFromFile(panel));
+        popup.add(loadLinks);
         popup.addSeparator();
 
         popup.add(linkCheck("Ribbon (filled bands)", s.linkRibbon,
