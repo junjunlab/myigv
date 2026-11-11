@@ -194,7 +194,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public Color   labelLineColor = new Color(120, 120, 120);
         public boolean labelShowLines = true;
         /** Distance from the ideogram outer edge to the first label ring, in px. */
-        public int     labelGapPx = 7;
+        public int     labelGapPx = 16;
         /** Extra radius for each overlap level (labels pushed outward to avoid each other). */
         public int     labelLevelGapPx = 13;
         /** Heatmap colour-bar legend, drawn OUTSIDE the ring (same corner set as the Hi-C legend). */
@@ -2439,9 +2439,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     private final List<String> labelTexts = new ArrayList<>();
 
     /**
-     * Lay out the label ring: every label is anchored at its interval's midpoint on the ideogram
-     * and placed just outside it, rotated tangentially (niceFacing). Labels that would collide are
-     * pushed one level further out, which is circlize's overlap avoidance for genomicLabels.
+     * Lay out the label ring. Each label keeps its GENOMIC anchor (for the cap + upper stem,
+     * exactly like the heatmap comb) and gets a text slot pushed clockwise when it would overlap
+     * the previous label on the same level — that tangential shift is what bends the diagonal.
+     * Stored per label: {a0, a1, radius, textAngle}.
      */
     void layoutLabels(int w, int h, List<ChrInfo> chrs, CircularSettings s) {
         labelLayout.clear();
@@ -2450,7 +2451,6 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         java.util.Map<String, Integer> idx = chromosomeIndex(chrs);
         List<double[]> sec = sectorsFor(chrs, s);
         Font font = new Font("SansSerif", s.labelBold ? Font.BOLD : Font.PLAIN, s.labelFontSize);
-        // measure without a Graphics2D context: a throwaway 1x1 image gives real font metrics
         BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
         Graphics2D pg = probe.createGraphics();
         pg.setFont(font);
@@ -2458,7 +2458,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         pg.dispose();
 
         double rOut = ideogramOuterRadius(w, h, s, true);
-        List<double[]> anchors = new ArrayList<>();   // {fraction, widthPx}
+        // {a0, a1, widthPx} in anchor order; texts aligned with the same indices
+        List<double[]> anchors = new ArrayList<>();
         List<String> texts = new ArrayList<>();
         for (CircularLayer l : layers) {
             if (l.kind != CircularLayer.Kind.LABELS || !l.visible) continue;
@@ -2469,44 +2470,54 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 double f0 = sec.get(i)[0], span = sec.get(i)[1] - f0;
                 double vSpan = c.viewSpan();
                 if (vSpan <= 0) vSpan = Math.max(1, c.length);
-                double mid = (row.start + row.end) / 2.0;
-                double f = f0 + span * clamp01((mid - c.viewStart) / vSpan);
-                // horizontal text: its arc footprint is the string WIDTH (left/right aligned
-                // per side), like the reference figure's horizontal call-out labels.
-                anchors.add(new double[]{f, fm.stringWidth(row.text) + 6});
+                double a0 = f0 + span * clamp01(((double) row.start - c.viewStart) / vSpan);
+                double a1 = f0 + span * clamp01(((double) row.end - c.viewStart) / vSpan);
+                if (a1 < a0) { double t = a0; a0 = a1; a1 = t; }
+                anchors.add(new double[]{a0, a1, fm.stringWidth(row.text) + 6});
                 texts.add(row.text);
             }
         }
         if (anchors.isEmpty()) return;
 
-        // sort by fraction so the greedy level assignment walks around the ring
         Integer[] order = new Integer[anchors.size()];
         for (int i = 0; i < order.length; i++) order[i] = i;
         final List<double[]> a = anchors;
-        java.util.Arrays.sort(order, (x, y) -> Double.compare(a.get(x)[0], a.get(y)[0]));
+        java.util.Arrays.sort(order, (x, y) -> Double.compare(
+                (a.get(x)[0] + a.get(x)[1]) / 2.0, (a.get(y)[0] + a.get(y)[1]) / 2.0));
 
         double[] levelEnd = new double[16];
         java.util.Arrays.fill(levelEnd, -1e9);
         for (int oi : order) {
-            double f = anchors.get(oi)[0], wpx = anchors.get(oi)[1];
+            double a0 = anchors.get(oi)[0], a1 = anchors.get(oi)[1];
+            double fReal = (a0 + a1) / 2.0;
+            double wpx = anchors.get(oi)[2];
             int level = 0;
-            double r = 0, needed = 0;
+            double r = 0, needed = 0, fText = 0;
             for (; level < levelEnd.length; level++) {
                 r = rOut + s.labelGapPx + level * (double) s.labelLevelGapPx;
-                needed = wpx / (2 * Math.PI * r);             // arc fraction the text occupies
-                if (f - needed / 2.0 > levelEnd[level]) break;
+                needed = wpx / (2 * Math.PI * r);
+                // nudge the text clockwise past the previous label, but only up to one text
+                // width; beyond that the label moves one level further out (so the anchor and
+                // the text stay near each other, and the comb's diagonal stays short).
+                fText = Math.max(fReal, levelEnd[level] + needed / 2.0);
+                if (fText - fReal <= needed) break;
             }
             if (level >= levelEnd.length) level = levelEnd.length - 1;
             r = rOut + s.labelGapPx + level * (double) s.labelLevelGapPx;
             needed = wpx / (2 * Math.PI * r);
-            levelEnd[level] = f + needed / 2.0;
-            // {anchor fraction, radius, text CENTER fraction = anchor}
-            labelLayout.add(new double[]{f, r, f});
+            fText = Math.max(fReal, levelEnd[level] + needed / 2.0);
+            levelEnd[level] = fText + needed / 2.0;
+            labelLayout.add(new double[]{a0, a1, r, fText});
             labelTexts.add(texts.get(oi));
         }
     }
 
-    /** Draw the cached label ring: connector stub + tangential text outside the ideogram. */
+    /**
+     * Draw the cached label ring. The connector is the SAME comb as the heatmap
+     * (circos.genomicPosTransformLines, direction outside): a horizontal cap over the gene's real
+     * interval hugging the ideogram, a radial stem at its midpoint, a diagonal to the label's
+     * (tangentially pushed) text slot, and a final radial stem into the horizontal text.
+     */
     void drawLabelLayers(Graphics2D g2, int w, int h, CircularSettings s) {
         if (labelLayout.isEmpty()) return;
         int cx = w / 2, cy = h / 2;
@@ -2519,15 +2530,29 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 g2.setColor(s.labelLineColor);
                 g2.setStroke(new BasicStroke(0.7f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
                 for (int i = 0; i < labelLayout.size(); i++) {
-                    double f = labelLayout.get(i)[0], r = labelLayout.get(i)[1];
-                    Point2D a = polar(cx, cy, rOut + 0.5, f);
-                    Point2D b = polar(cx, cy, r - 2.0, f);
-                    g2.draw(new Line2D.Double(a, b));
+                    double a0 = labelLayout.get(i)[0], a1 = labelLayout.get(i)[1];
+                    double r = labelLayout.get(i)[2], fText = labelLayout.get(i)[3];
+                    double fReal = (a0 + a1) / 2.0;
+                    double hT = r - rOut;
+                    if (hT < 2) continue;
+                    double rMid = rOut + hT / 3.0;
+                    double rLow = rOut + 2 * hT / 3.0;
+
+                    // horizontal cap over the gene's real interval, hugging the ideogram edge
+                    g2.fill(annularPath(cx, cy, rOut - 0.4, rOut + 0.4, a0, a1));
+
+                    Point2D pTop = polar(cx, cy, rOut, fReal);
+                    Point2D pMid = polar(cx, cy, rMid, fReal);
+                    Point2D pLow = polar(cx, cy, rLow, fText);
+                    Point2D pBot = polar(cx, cy, r, fText);
+                    g2.draw(new Line2D.Double(pTop, pMid));
+                    g2.draw(new Line2D.Double(pMid, pLow));
+                    g2.draw(new Line2D.Double(pLow, pBot));
                 }
             }
             for (int i = 0; i < labelLayout.size(); i++) {
-                double f = labelLayout.get(i)[0], r = labelLayout.get(i)[1];
-                drawHorizontalLabel(g2, cx, cy, r, f, labelTexts.get(i), font, s.labelColor);
+                double r = labelLayout.get(i)[2], fText = labelLayout.get(i)[3];
+                drawHorizontalLabel(g2, cx, cy, r, fText, labelTexts.get(i), font, s.labelColor);
             }
         } finally {
             g2.setStroke(oldStroke);
