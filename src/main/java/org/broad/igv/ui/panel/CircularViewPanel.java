@@ -166,7 +166,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public int     linkArrow = 0;
         /** Arrow length in px and base width as a multiple of the band width (circlize
          *  arr.length / arr.width). */
-        public double  linkArrowLength = 11.0;
+        public double  linkArrowLength = 9.0;
         public double  linkArrowWidth = 1.7;
         /** Cap on the number of links drawn per frame (Circos {@code record_limit}). */
         public int     linkRecordLimit = 5000;
@@ -3083,10 +3083,19 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             if (ribbon) {
                 double[] e1 = ribbonEnd(a1s, a1e, s.linkRibbonMinDeg);
                 double[] e2 = ribbonEnd(a2s, a2e, s.linkRibbonMinDeg);
+                boolean wantStart = s.linkArrow == 1 || s.linkArrow == 3;
+                boolean wantEnd = s.linkArrow == 2 || s.linkArrow == 3;
+                // An interval end gets the flared head built into the polygon; a point end of a
+                // mixed link gets a thin triangle on the curve instead.
+                boolean bandArrowStart = wantStart && !point1;
+                boolean bandArrowEnd = wantEnd && !point2;
                 Path2D.Double path = ribbonBand(cx, cy, rEnd, rBez,
-                        clamp01(s.linkBezierPurity), e1, e2, s.linkTwist);
+                        clamp01(s.linkBezierPurity), e1, e2, s.linkTwist,
+                        bandArrowStart, bandArrowEnd, Math.max(3.0, s.linkArrowLength));
                 g2.fill(path);
-                drawLinkArrows(g2, cx, cy, rEnd, e1, e2, point1, point2, s);
+                if (s.linkArrow > 0 && (point1 || point2)) {
+                    drawLinkArrows(g2, cx, cy, rEnd, e1, e2, point1, point2, s);
+                }
                 if (s.linkRibbonStroke && s.linkRibbonStrokeThickness > 0) {
                     // A tapered band is only a few pixels wide mid-span; the outline keeps that
                     // thin section from washing out against the white background.
@@ -3179,16 +3188,22 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * @param twist    cross the edges (circlize {@code inverse = TRUE}): edge A runs
      *                 start1 -> end2 and edge B end1 -> start2
      */
-    private static Path2D.Double ribbonBand(double cx, double cy, double rEnd, double rBez,
-                                            double purity, double[] e1, double[] e2, boolean twist) {
+    static Path2D.Double ribbonBand(double cx, double cy, double rEnd, double rBez,
+                                    double purity, double[] e1, double[] e2, boolean twist,
+                                    boolean arrowStart, boolean arrowEnd, double arrLen) {
         double a1s = e1[0], a1e = e1[1], a2s = e2[0], a2e = e2[1];
-        double edgeAFrom = a1s, edgeATo = twist ? a2e : a2s;
-        double edgeBFrom = a1e, edgeBTo = twist ? a2s : a2e;
+        double edgeAFrom = a1s, edgeATo = a2s;
+        double edgeBFrom = a1e, edgeBTo = a2e;
+        // An arrow end pulls the two EDGES back by arrLen and then runs the closing edge along the
+        // ring arc: the band flares out into a head whose base is the whole arc at rEnd. That is
+        // circos.link's d1x/d2x + arc.points(theta22, theta21, rou2) construction.
+        double rFrom = arrowStart ? Math.max(4, rEnd - arrLen) : rEnd;
+        double rTo = arrowEnd ? Math.max(4, rEnd - arrLen) : rEnd;
 
-        Point2D A0 = polar(cx, cy, rEnd, edgeAFrom);
-        Point2D A1 = polar(cx, cy, rEnd, edgeATo);
-        Point2D B0 = polar(cx, cy, rEnd, edgeBFrom);
-        Point2D B1 = polar(cx, cy, rEnd, edgeBTo);
+        Point2D A0 = polar(cx, cy, rFrom, edgeAFrom);
+        Point2D A1 = polar(cx, cy, rTo, edgeATo);
+        Point2D B0 = polar(cx, cy, rFrom, edgeBFrom);
+        Point2D B1 = polar(cx, cy, rTo, edgeBTo);
         Point2D cA = linkControl(cx, cy, rEnd, rBez, edgeAFrom, edgeATo, purity);
         Point2D cB = linkControl(cx, cy, rEnd, rBez, edgeBFrom, edgeBTo, purity);
         if (twist) {
@@ -3207,9 +3222,20 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         Path2D.Double path = new Path2D.Double();
         path.moveTo(A0.getX(), A0.getY());
         path.quadTo(cA.getX(), cA.getY(), A1.getX(), A1.getY());
-        path.lineTo(B1.getX(), B1.getY());          // flat cap at the second ring
+        if (arrowEnd) {
+            // circos.link "big.arrow": both edges stop at rEnd - arr.length and the polygon
+            // closes on ONE point at the middle of the arc, so the band narrows into a tip that
+            // touches the ring (a triangular head, base = band width).
+            Point2D tip = polar(cx, cy, rEnd, (edgeATo + edgeBTo) / 2.0);
+            path.lineTo(tip.getX(), tip.getY());
+        }
+        path.lineTo(B1.getX(), B1.getY());
         path.quadTo(cB.getX(), cB.getY(), B0.getX(), B0.getY());
-        path.closePath();                            // flat cap at the first ring
+        if (arrowStart) {
+            Point2D tip = polar(cx, cy, rEnd, (edgeAFrom + edgeBFrom) / 2.0);
+            path.lineTo(tip.getX(), tip.getY());
+        }
+        path.closePath();
         return path;
     }
 
