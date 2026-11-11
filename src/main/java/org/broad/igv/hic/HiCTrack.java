@@ -212,6 +212,59 @@ public class HiCTrack extends AbstractTrack {
         this.maxValue = max;
     }
 
+    /**
+     * Lower explicit colour limit, in raw contact counts.
+     *
+     * @return the configured minimum, or {@link Double#NaN} when no limit is set and the
+     *         value is computed automatically from the visible matrix ("auto" scaling)
+     */
+    public double getMinValue() {
+        return minValue;
+    }
+
+    /**
+     * Upper explicit colour limit, in raw contact counts.
+     *
+     * @return the configured maximum, or {@link Double#NaN} when no limit is set and the
+     *         value is computed automatically from the visible matrix ("auto" scaling)
+     */
+    public double getMaxValue() {
+        return maxValue;
+    }
+
+    /**
+     * Forced bin size (resolution) for multi-resolution Hi-C files, in base pairs.
+     *
+     * @return the forced bin size in bp, or {@code -1} when the resolution follows the
+     *         zoom level automatically
+     */
+    public int getForcedResolution() {
+        return forcedResolution;
+    }
+
+    /**
+     * Force a bin size (resolution) for multi-resolution Hi-C files, or restore the
+     * zoom-dependent automatic selection. This is the single place that applies a
+     * resolution change: the "Resolution" menu items and external callers share it.
+     *
+     * @param bp bin size in base pairs; {@code -1} (or any value &lt;= 0) selects automatic
+     *           zoom-based resolution
+     */
+    public void setForcedResolution(int bp) {
+        this.forcedResolution = bp;
+        repaintSelf();
+    }
+
+    /**
+     * Ramp anchors for the {@link HiCColorScale.Palette#CUSTOM} colour palette.
+     *
+     * @return the anchor array, or {@code null} when no custom ramp has been configured
+     *         (one of the built-in palettes is in use)
+     */
+    public int[][] getCustomAnchors() {
+        return customAnchors;
+    }
+
     @Override
     public TrackType getTrackType() {
         return TrackType.OTHER;
@@ -640,15 +693,43 @@ public class HiCTrack extends AbstractTrack {
         removeMenuItem(menu, "Change Track Color...");
         removeMenuItem(menu, "Change Track Color (Negative Values or Strand)...");
 
-        menu.addSeparator();
-
-        menu.add(buildDisplayMenu(te));
-        menu.add(buildColorMenu(te));
-        menu.add(buildDomainMenu(te));
+        // The linear view has the real click event (keeps dialogs parented to the clicked
+        // component); every parameter change repaints through the shared onChange hook.
+        attachSubmenus(menu, te, () -> repaintTrack(te));
         return menu;
     }
 
-    private JMenu buildDisplayMenu(TrackClickEvent te) {
+    /**
+     * Attach the Hi-C parameter submenus to an arbitrary popup menu, for example the
+     * circular genome view's own right-click menu. The three submenus are exactly the ones
+     * {@link #getPopupMenu(TrackClickEvent)} exposes ("Hi-C display", "Hi-C color" and
+     * "TAD domains") and are built by the same methods, so both views stay in sync.
+     *
+     * @param menu     popup menu the submenus are appended to
+     * @param track    Hi-C track whose parameters the submenus edit
+     * @param onChange run after every parameter change so the owning view can refresh;
+     *                 may be {@code null}, which is treated as a no-op
+     */
+    public static void addHiCSubmenus(javax.swing.JPopupMenu menu, HiCTrack track, Runnable onChange) {
+        if (menu == null || track == null) {
+            return;
+        }
+        Runnable notify = onChange;
+        if (notify == null) {
+            notify = () -> { };
+        }
+        track.attachSubmenus(menu, null, notify);
+    }
+
+    /** Single attachment point shared by the linear and circular popup menus. */
+    private void attachSubmenus(JPopupMenu menu, TrackClickEvent te, Runnable onChange) {
+        menu.addSeparator();
+        menu.add(buildDisplayMenu(te, onChange));
+        menu.add(buildColorMenu(te, onChange));
+        menu.add(buildDomainMenu(te, onChange));
+    }
+
+    private JMenu buildDisplayMenu(TrackClickEvent te, Runnable onChange) {
 
         JMenu displayMenu = new JMenu("Hi-C display");
         ButtonGroup group = new ButtonGroup();
@@ -656,7 +737,7 @@ public class HiCTrack extends AbstractTrack {
         JRadioButtonMenuItem triangle = new JRadioButtonMenuItem("Triangle (rotated 45°)", mode == Mode.TRIANGLE);
         triangle.addActionListener(e -> {
             setMode(Mode.TRIANGLE);
-            repaintTrack(te);
+            onChange.run();
         });
         group.add(triangle);
         displayMenu.add(triangle);
@@ -666,7 +747,7 @@ public class HiCTrack extends AbstractTrack {
             setMode(Mode.SQUARE);
             squareHeightAdjusted = true;
             makeTrackSquare();
-            repaintTrack(te);
+            onChange.run();
         });
         group.add(square);
         displayMenu.add(square);
@@ -677,7 +758,7 @@ public class HiCTrack extends AbstractTrack {
         flip.setToolTipText("Mirror the whole track: the diagonal moves to the top and all TAD overlays flip with it.");
         flip.addActionListener(e -> {
             setFlipped(flip.isSelected());
-            repaintTrack(te);
+            onChange.run();
         });
         displayMenu.add(flip);
 
@@ -688,7 +769,7 @@ public class HiCTrack extends AbstractTrack {
                     lp == legendPosition);
             legendItem.addActionListener(e -> {
                 setLegendPosition(lp);
-                repaintTrack(te);
+                onChange.run();
             });
             legendGroup.add(legendItem);
             legendMenu.add(legendItem);
@@ -700,7 +781,7 @@ public class HiCTrack extends AbstractTrack {
         JMenuItem setDepth = new JMenuItem("Set maximum depth...");
         setDepth.addActionListener(e -> {
             String current = Double.isNaN(depth) ? "" : String.valueOf((long) depth);
-            String input = JOptionPane.showInputDialog(te.getMouseEvent().getComponent(),
+            String input = JOptionPane.showInputDialog(menuParent(te),
                     "Maximum distance to plot (bp), blank = automatic:", current);
             if (input == null) {
                 return;
@@ -709,10 +790,10 @@ public class HiCTrack extends AbstractTrack {
                 double value = input.trim().isEmpty() ? Double.NaN : Double.parseDouble(input.trim());
                 if (Double.isNaN(value) || value > 0) {
                     setDepth(value);
-                    repaintTrack(te);
+                    onChange.run();
                 }
             } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(te.getMouseEvent().getComponent(),
+                JOptionPane.showMessageDialog(menuParent(te),
                         "Please enter a positive number, or leave the field blank for automatic.");
             }
         });
@@ -721,7 +802,7 @@ public class HiCTrack extends AbstractTrack {
         JMenuItem setRatio = new JMenuItem("Set triangle height (0-1)...");
         setRatio.addActionListener(e -> {
             String current = Double.isNaN(heightRatio) ? "" : String.valueOf(heightRatio);
-            String input = JOptionPane.showInputDialog(te.getMouseEvent().getComponent(),
+            String input = JOptionPane.showInputDialog(menuParent(te),
                     "Triangle height, 0-1 (1 = whole triangle up to the apex), blank = automatic:",
                     current);
             if (input == null) {
@@ -730,14 +811,14 @@ public class HiCTrack extends AbstractTrack {
             try {
                 double value = input.trim().isEmpty() ? Double.NaN : Double.parseDouble(input.trim());
                 if (!Double.isNaN(value) && (value <= 0 || value > 1.25)) {
-                    JOptionPane.showMessageDialog(te.getMouseEvent().getComponent(),
+                    JOptionPane.showMessageDialog(menuParent(te),
                             "Please enter a value between 0 and 1.");
                     return;
                 }
                 setHeightRatio(value);
-                repaintTrack(te);
+                onChange.run();
             } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(te.getMouseEvent().getComponent(),
+                JOptionPane.showMessageDialog(menuParent(te),
                         "Please enter a number between 0 and 1, or leave the field blank.");
             }
         });
@@ -752,8 +833,8 @@ public class HiCTrack extends AbstractTrack {
         JRadioButtonMenuItem autoRes = new JRadioButtonMenuItem("Automatic", forcedResolution < 0);
         autoRes.setEnabled(!resolutions.isEmpty());
         autoRes.addActionListener(e -> {
-            forcedResolution = -1;
-            repaintTrack(te);
+            setForcedResolution(-1);
+            onChange.run();
         });
         resolutionGroup.add(autoRes);
         resolutionMenu.add(autoRes);
@@ -763,8 +844,8 @@ public class HiCTrack extends AbstractTrack {
             for (int bp : resolutions) {
                 JRadioButtonMenuItem item = new JRadioButtonMenuItem(formatBinSize(bp), forcedResolution == bp);
                 item.addActionListener(e -> {
-                    forcedResolution = bp;
-                    repaintTrack(te);
+                    setForcedResolution(bp);
+                    onChange.run();
                 });
                 resolutionGroup.add(item);
                 resolutionMenu.add(item);
@@ -779,7 +860,7 @@ public class HiCTrack extends AbstractTrack {
         makeSquare.addActionListener(e -> {
             squareHeightAdjusted = true;
             makeTrackSquare();
-            repaintSelf();
+            onChange.run();
         });
         displayMenu.add(makeSquare);
 
@@ -791,7 +872,7 @@ public class HiCTrack extends AbstractTrack {
      * Style changes apply to every outline of this Hi-C track, which keeps the controls
      * small; per-track colours are assigned automatically so two BEDs stay distinguishable.
      */
-    private JMenu buildDomainMenu(TrackClickEvent te) {
+    private JMenu buildDomainMenu(TrackClickEvent te, Runnable onChange) {
 
         // Reflect the orientation here too: overlays are mirrored with the matrix, so a BED
         // bound after flipping lands on the same (inverted) geometry without extra settings.
@@ -815,7 +896,7 @@ public class HiCTrack extends AbstractTrack {
         // Defer: opening a modal dialog straight from a menu item can leave the popup painted
         // until the dialog is dismissed.
         multi.addActionListener(e ->
-                SwingUtilities.invokeLater(() -> showDomainDialog(te, featureTracks)));
+                SwingUtilities.invokeLater(() -> showDomainDialog(te, featureTracks, onChange)));
         menu.add(multi);
         menu.addSeparator();
 
@@ -835,17 +916,17 @@ public class HiCTrack extends AbstractTrack {
                 } else {
                     removeOverlay(ft);
                 }
-                repaintTrack(te);
+                onChange.run();
             });
             fileMenu.add(show);
             if (ov != null) {
                 List<HiCDomainOverlay> only = Collections.singletonList(ov);
                 fileMenu.addSeparator();
-                fileMenu.add(buildWidthMenu(only, te, "Line width"));
-                fileMenu.add(buildStyleMenu(only, te, "Line style"));
-                fileMenu.add(buildLineColorMenu(only, te, "Line color"));
-                fileMenu.add(buildFillColorMenu(only, te, "Fill color"));
-                fileMenu.add(buildFillOpacityMenu(only, te));
+                fileMenu.add(buildWidthMenu(only, te, onChange, "Line width"));
+                fileMenu.add(buildStyleMenu(only, te, onChange, "Line style"));
+                fileMenu.add(buildLineColorMenu(only, te, onChange, "Line color"));
+                fileMenu.add(buildFillColorMenu(only, te, onChange, "Fill color"));
+                fileMenu.add(buildFillOpacityMenu(only, te, onChange));
             }
             menu.add(fileMenu);
         }
@@ -859,18 +940,18 @@ public class HiCTrack extends AbstractTrack {
                     }
                 }
                 domainOverlays.clear();
-                repaintTrack(te);
+                onChange.run();
             });
             menu.add(clear);
         }
 
         if (domainOverlays.size() > 1) {
             JMenu allMenu = new JMenu("All outlines");
-            allMenu.add(buildWidthMenu(domainOverlays, te, "Line width"));
-            allMenu.add(buildStyleMenu(domainOverlays, te, "Line style"));
-            allMenu.add(buildLineColorMenu(domainOverlays, te, "Line color"));
-            allMenu.add(buildFillColorMenu(domainOverlays, te, "Fill color"));
-            allMenu.add(buildFillOpacityMenu(domainOverlays, te));
+            allMenu.add(buildWidthMenu(domainOverlays, te, onChange, "Line width"));
+            allMenu.add(buildStyleMenu(domainOverlays, te, onChange, "Line style"));
+            allMenu.add(buildLineColorMenu(domainOverlays, te, onChange, "Line color"));
+            allMenu.add(buildFillColorMenu(domainOverlays, te, onChange, "Fill color"));
+            allMenu.add(buildFillOpacityMenu(domainOverlays, te, onChange));
             menu.addSeparator();
             menu.add(allMenu);
         }
@@ -890,7 +971,7 @@ public class HiCTrack extends AbstractTrack {
         return new ImageIcon(img);
     }
 
-    private JMenu buildWidthMenu(List<HiCDomainOverlay> targets, TrackClickEvent te, String label) {
+    private JMenu buildWidthMenu(List<HiCDomainOverlay> targets, TrackClickEvent te, Runnable onChange, String label) {
         JMenu widthMenu = new JMenu(label);
         ButtonGroup group = new ButtonGroup();
         float current = targets.isEmpty() ? 2f : targets.get(0).getLineWidth();
@@ -900,7 +981,7 @@ public class HiCTrack extends AbstractTrack {
                 for (HiCDomainOverlay ov : targets) {
                     ov.setLineWidth(px);
                 }
-                repaintTrack(te);
+                onChange.run();
             });
             group.add(item);
             widthMenu.add(item);
@@ -908,7 +989,7 @@ public class HiCTrack extends AbstractTrack {
         return widthMenu;
     }
 
-    private JMenu buildStyleMenu(List<HiCDomainOverlay> targets, TrackClickEvent te, String label) {
+    private JMenu buildStyleMenu(List<HiCDomainOverlay> targets, TrackClickEvent te, Runnable onChange, String label) {
         JMenu styleMenu = new JMenu(label);
         ButtonGroup group = new ButtonGroup();
         HiCDomainOverlay.LineStyle current = targets.isEmpty()
@@ -919,7 +1000,7 @@ public class HiCTrack extends AbstractTrack {
                 for (HiCDomainOverlay ov : targets) {
                     ov.setLineStyle(ls);
                 }
-                repaintTrack(te);
+                onChange.run();
             });
             group.add(item);
             styleMenu.add(item);
@@ -928,7 +1009,7 @@ public class HiCTrack extends AbstractTrack {
     }
 
     /** Preset colours plus the colour chooser, so one overlay can be recoloured in two clicks. */
-    private JMenu buildLineColorMenu(List<HiCDomainOverlay> targets, TrackClickEvent te, String label) {
+    private JMenu buildLineColorMenu(List<HiCDomainOverlay> targets, TrackClickEvent te, Runnable onChange, String label) {
         JMenu colorMenu = new JMenu(label);
         Color current = targets.isEmpty() ? Color.BLACK : targets.get(0).getLineColor();
         for (int i = 0; i < 6; i++) {
@@ -941,7 +1022,7 @@ public class HiCTrack extends AbstractTrack {
                 for (HiCDomainOverlay ov : targets) {
                     ov.setLineColor(preset);
                 }
-                repaintTrack(te);
+                onChange.run();
             });
             colorMenu.add(item);
         }
@@ -949,13 +1030,13 @@ public class HiCTrack extends AbstractTrack {
         JMenuItem more = new JMenuItem("More colors...");
         more.addActionListener(e -> {
             Color chosen = JColorChooser.showDialog(
-                    te.getMouseEvent() == null ? null : te.getMouseEvent().getComponent(),
+                    menuParent(te),
                     "Outline color", current);
             if (chosen != null) {
                 for (HiCDomainOverlay ov : targets) {
                     ov.setLineColor(chosen);
                 }
-                repaintTrack(te);
+                onChange.run();
             }
         });
         colorMenu.add(more);
@@ -973,7 +1054,7 @@ public class HiCTrack extends AbstractTrack {
         }
     }
 
-    private JMenu buildFillColorMenu(List<HiCDomainOverlay> targets, TrackClickEvent te, String label) {
+    private JMenu buildFillColorMenu(List<HiCDomainOverlay> targets, TrackClickEvent te, Runnable onChange, String label) {
         JMenu fillMenu = new JMenu(label);
         for (int i = 0; i < 6; i++) {
             Color preset = HiCDomainOverlay.defaultColor(i);
@@ -982,7 +1063,7 @@ public class HiCTrack extends AbstractTrack {
                 for (HiCDomainOverlay ov : targets) {
                     ov.setFillColor(preset);
                 }
-                repaintTrack(te);
+                onChange.run();
             });
             fillMenu.add(item);
         }
@@ -990,20 +1071,20 @@ public class HiCTrack extends AbstractTrack {
         JMenuItem more = new JMenuItem("More colors...");
         more.addActionListener(e -> {
             Color chosen = JColorChooser.showDialog(
-                    te.getMouseEvent() == null ? null : te.getMouseEvent().getComponent(),
+                    menuParent(te),
                     "Fill color", targets.isEmpty() ? Color.BLACK : targets.get(0).getFillColor());
             if (chosen != null) {
                 for (HiCDomainOverlay ov : targets) {
                     ov.setFillColor(chosen);
                 }
-                repaintTrack(te);
+                onChange.run();
             }
         });
         fillMenu.add(more);
         return fillMenu;
     }
 
-    private JMenu buildFillOpacityMenu(List<HiCDomainOverlay> targets, TrackClickEvent te) {
+    private JMenu buildFillOpacityMenu(List<HiCDomainOverlay> targets, TrackClickEvent te, Runnable onChange) {
         JMenu fillMenu = new JMenu("Fill opacity");
         ButtonGroup group = new ButtonGroup();
         int currentAlpha = targets.isEmpty() ? 0 : targets.get(0).getFillAlpha();
@@ -1016,7 +1097,7 @@ public class HiCTrack extends AbstractTrack {
                 for (HiCDomainOverlay ov : targets) {
                     ov.setFillAlpha(alpha);
                 }
-                repaintTrack(te);
+                onChange.run();
             });
             group.add(item);
             fillMenu.add(item);
@@ -1024,7 +1105,7 @@ public class HiCTrack extends AbstractTrack {
         return fillMenu;
     }
 
-    private JMenu buildColorMenu(TrackClickEvent te) {
+    private JMenu buildColorMenu(TrackClickEvent te, Runnable onChange) {
 
         JMenu colorMenu = new JMenu("Hi-C color");
 
@@ -1034,7 +1115,7 @@ public class HiCTrack extends AbstractTrack {
             JRadioButtonMenuItem item = new JRadioButtonMenuItem(t.getLabel(), t == transform);
             item.addActionListener(e -> {
                 setTransform(t);
-                repaintTrack(te);
+                onChange.run();
             });
             transformGroup.add(item);
             transformMenu.add(item);
@@ -1051,7 +1132,7 @@ public class HiCTrack extends AbstractTrack {
                     return;
                 }
                 setPalette(p);
-                repaintTrack(te);
+                onChange.run();
             });
             group.add(item);
             paletteMenu.add(item);
@@ -1061,17 +1142,17 @@ public class HiCTrack extends AbstractTrack {
         colorMenu.addSeparator();
 
         JMenuItem setMax = new JMenuItem("Set maximum value...");
-        setMax.addActionListener(e -> editLimit(te, "Maximum contact value", true));
+        setMax.addActionListener(e -> editLimit(te, "Maximum contact value", true, onChange));
         colorMenu.add(setMax);
 
         JMenuItem setMin = new JMenuItem("Set minimum value...");
-        setMin.addActionListener(e -> editLimit(te, "Minimum contact value", false));
+        setMin.addActionListener(e -> editLimit(te, "Minimum contact value", false, onChange));
         colorMenu.add(setMin);
 
         JMenuItem reset = new JMenuItem("Reset to automatic");
         reset.addActionListener(e -> {
             setColorLimits(Double.NaN, Double.NaN);
-            repaintTrack(te);
+            onChange.run();
         });
         colorMenu.add(reset);
 
@@ -1085,7 +1166,7 @@ public class HiCTrack extends AbstractTrack {
      */
     private boolean editCustomColors(TrackClickEvent te) {
 
-        Component parent = te.getMouseEvent().getComponent();
+        Component parent = menuParent(te);
 
         Color low = JColorChooser.showDialog(parent, "Low contact color", customLow);
         if (low == null) {
@@ -1121,10 +1202,10 @@ public class HiCTrack extends AbstractTrack {
         return true;
     }
 
-    private void editLimit(TrackClickEvent te, String what, boolean isMax) {
+    private void editLimit(TrackClickEvent te, String what, boolean isMax, Runnable onChange) {
         double current = isMax ? maxValue : minValue;
         String defaultValue = Double.isNaN(current) ? "" : formatValue(current);
-        String input = JOptionPane.showInputDialog(te.getMouseEvent().getComponent(),
+        String input = JOptionPane.showInputDialog(menuParent(te),
                 what + " (blank = automatic):", defaultValue);
         if (input == null) {
             return;
@@ -1136,9 +1217,9 @@ public class HiCTrack extends AbstractTrack {
             } else {
                 setColorLimits(value, maxValue);
             }
-            repaintTrack(te);
+            onChange.run();
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(te.getMouseEvent().getComponent(),
+            JOptionPane.showMessageDialog(menuParent(te),
                     "Please enter a number, or leave the field blank for automatic scaling.");
         }
     }
@@ -1352,10 +1433,9 @@ public class HiCTrack extends AbstractTrack {
      * the popup menu is painful because every click closes the popup, and a plain JList cannot
      * show which files are already overlaid.
      */
-    private void showDomainDialog(TrackClickEvent te, List<FeatureTrack> candidates) {
+    private void showDomainDialog(TrackClickEvent te, List<FeatureTrack> candidates, Runnable onChange) {
 
-        Component parent = te == null || te.getMouseEvent() == null
-                ? null : te.getMouseEvent().getComponent();
+        Component parent = menuParent(te);
         Window owner = parent == null ? null : SwingUtilities.getWindowAncestor(parent);
         final JDialog dialog = new JDialog(owner, "TAD domains - " + getName(),
                 Dialog.ModalityType.APPLICATION_MODAL);
@@ -1389,7 +1469,7 @@ public class HiCTrack extends AbstractTrack {
         ok.addActionListener(e -> {
             applyDomainSelection(candidates, boxes);
             dialog.dispose();
-            repaintTrack(te);
+            onChange.run();
         });
         cancel.addActionListener(e -> dialog.dispose());
 
@@ -1427,6 +1507,12 @@ public class HiCTrack extends AbstractTrack {
         }
     }
 
+    /** Parent component for menu dialogs; null when no originating mouse event exists. */
+    private static Component menuParent(TrackClickEvent te) {
+        return (te == null || te.getMouseEvent() == null)
+                ? null : te.getMouseEvent().getComponent();
+    }
+
     private void repaintSelf() {
         if (IGV.hasInstance()) {
             IGV.getInstance().repaint(Collections.singletonList(this));
@@ -1436,9 +1522,9 @@ public class HiCTrack extends AbstractTrack {
     private void repaintTrack(TrackClickEvent te) {
         if (IGV.hasInstance()) {
             IGV.getInstance().repaint(Collections.singletonList(this));
-        } else {
+        } else if (te != null && te.getMouseEvent() != null) {
             Component component = te.getMouseEvent().getComponent();
-            if (component != null) {
+            if (component != null && component.getParent() != null) {
                 component.getParent().repaint();
             }
         }

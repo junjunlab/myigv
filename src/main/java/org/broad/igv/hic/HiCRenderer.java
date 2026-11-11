@@ -192,7 +192,7 @@ public final class HiCRenderer {
      *
      * @return {transformedMin, transformedMax, positiveFloor}
      */
-    static double[] colorLimits(HiCSource data, String chr, double origin, double end,
+    public static double[] colorLimits(HiCSource data, String chr, double origin, double end,
                                 double horizon, double minValue, double maxValue,
                                 HiCTransform transform) {
 
