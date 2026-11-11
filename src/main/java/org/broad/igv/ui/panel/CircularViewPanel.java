@@ -165,6 +165,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public boolean linkEndsInsideTracks = true;
         /** Flank (bp) added to each gene interval in gene-list mode so sectors aren't edge-to-edge. */
         public int     geneFlankBp = 2000;
+        /** Radial thickness (px) of the genomic-heatmap band when a heatmap is loaded. */
+        public int     heatmapHeightPx = 50;
 
         public CircularSettings copy() {
             CircularSettings s = new CircularSettings();
@@ -190,6 +192,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.linkColorByChromosome = linkColorByChromosome;
             s.linkEndsInsideTracks = linkEndsInsideTracks;
             s.geneFlankBp = geneFlankBp;
+            s.heatmapHeightPx = heatmapHeightPx;
             return s;
         }
 
@@ -359,6 +362,144 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             }
         }
         setTrackLinks(links);
+    }
+
+    // ------------------------------------------------------------------
+    //  Genomic heatmap (rows x samples matrix, e.g. hg38_heatmap.bed)
+    //  Rendered as a ring band: angular = genomic position, radial = the
+    //  samples stacked as sub-bands, colour = diverging (blue .. white .. red).
+    //  This is the inner heatmap of a circlize genomicHeatmap plot.
+    // ------------------------------------------------------------------
+
+    /** User-loaded genomic heatmap (from "Load heatmap…"). */
+    private GenomicHeatmap heatmap = null;
+
+    /** Replace the genomic heatmap. {@code null} clears it. */
+    public void setHeatmap(GenomicHeatmap hm) {
+        this.heatmap = hm;
+        invalidateRing();
+        log.info("Circular heatmap: " + (hm == null ? 0 : hm.rows.size()) + " row(s), "
+                + (hm == null ? 0 : hm.samples) + " sample(s)");
+    }
+
+    public GenomicHeatmap getHeatmap() { return heatmap; }
+
+    /** One heatmap row: a genomic interval carrying {@code samples} numeric values. */
+    public static class HeatRow {
+        public final String chr;
+        public final long start, end;
+        public double[] vals;
+        public HeatRow(String chr, long start, long end, double[] vals) {
+            this.chr = chr; this.start = start; this.end = end; this.vals = vals;
+        }
+    }
+
+    /** A rows x samples matrix for the circular heatmap band. */
+    public static class GenomicHeatmap {
+        public final int samples;
+        public final double min, max;
+        public final List<HeatRow> rows;
+        public GenomicHeatmap(int samples, double min, double max, List<HeatRow> rows) {
+            this.samples = samples; this.min = min; this.max = max; this.rows = rows;
+        }
+    }
+
+    /**
+     * Parse a multi-value BED / TSV into a {@link GenomicHeatmap}. Each line is
+     * {@code chr start end v1 v2 ... vN}. Lines starting with '#' or lacking numeric
+     * coordinate columns are skipped. The diverging colour scale spans the global min..max.
+     */
+    public static GenomicHeatmap parseHeatmap(org.broad.igv.util.ResourceLocator locator) throws java.io.IOException {
+        List<HeatRow> rows = new ArrayList<>();
+        int samples = 0;
+        double mn = Double.POSITIVE_INFINITY, mx = Double.NEGATIVE_INFINITY;
+        java.io.File f = new java.io.File(locator.getPath());
+        try (java.io.BufferedReader br = new java.io.BufferedReader(
+                new java.io.InputStreamReader(new java.io.FileInputStream(f), java.nio.charset.StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                String[] tok = line.split("\t");
+                if (tok.length < 4) tok = line.trim().split("\\s+");
+                if (tok.length < 4) continue;
+                long start, end;
+                try { start = Long.parseLong(tok[1]); end = Long.parseLong(tok[2]); }
+                catch (NumberFormatException e) { continue; }   // header / non-data line
+                int nval = tok.length - 3;
+                double[] vals = new double[nval];
+                boolean ok = true;
+                for (int i = 0; i < nval; i++) {
+                    try { vals[i] = Double.parseDouble(tok[3 + i]); }
+                    catch (NumberFormatException e) { ok = false; break; }
+                }
+                if (!ok || nval == 0) continue;
+                if (nval > samples) samples = nval;
+                for (double v : vals) { if (v < mn) mn = v; if (v > mx) mx = v; }
+                rows.add(new HeatRow(tok[0], start, end, vals));
+            }
+        }
+        if (rows.isEmpty()) return null;
+        // pad short rows to `samples` with NaN so every row has the same width
+        for (HeatRow r : rows) {
+            if (r.vals.length < samples) {
+                double[] p = new double[samples];
+                java.util.Arrays.fill(p, Double.NaN);
+                System.arraycopy(r.vals, 0, p, 0, r.vals.length);
+                r.vals = p;
+            }
+        }
+        if (mn == Double.POSITIVE_INFINITY) { mn = 0; mx = 1; }
+        return new GenomicHeatmap(samples, mn, mx, rows);
+    }
+
+    /** Diverging colour: min -> blue, mid -> white, max -> red (correlation / log-ratio style). */
+    static Color divergingColor(double v, double mn, double mx) {
+        double denom = (mx - mn) > 1e-9 ? (mx - mn) : 1.0;
+        double t = (v - mn) / denom;
+        if (t < 0) t = 0; else if (t > 1) t = 1;
+        int r, g, b;
+        if (t <= 0.5) {                       // white -> blue
+            double f = (0.5 - t) / 0.5;
+            r = (int) (255 + (40 - 255) * f);
+            g = (int) (255 + (90 - 255) * f);
+            b = (int) (255 + (200 - 255) * f);
+        } else {                               // white -> red
+            double f = (t - 0.5) / 0.5;
+            r = (int) (255 + (200 - 255) * f);
+            g = (int) (255 + (40 - 255) * f);
+            b = (int) (255 + (40 - 255) * f);
+        }
+        return new Color(clamp8(r), clamp8(g), clamp8(b));
+    }
+
+    /** Draw the genomic-heatmap ring band: angular = genomic position, radial = stacked samples. */
+    private void drawHeatmapRing(Graphics2D g2, int cx, int cy, double bandInner, double bandOuter,
+                                List<ChrInfo> chrs, List<double[]> sec, GenomicHeatmap hm) {
+        double bandH = bandOuter - bandInner;
+        if (bandH < 2 || hm == null || hm.rows.isEmpty()) return;
+        java.util.Map<String, Integer> idx = new java.util.HashMap<>();
+        for (int i = 0; i < chrs.size(); i++) idx.put(chrs.get(i).name, i);
+        double denom = (hm.max - hm.min) > 1e-9 ? (hm.max - hm.min) : 1.0;
+        int samples = hm.samples;
+        for (HeatRow r : hm.rows) {
+            Integer ii = idx.get(r.chr);
+            if (ii == null) continue;
+            ChrInfo c = chrs.get(ii);
+            double f0 = sec.get(ii)[0], span = sec.get(ii)[1] - f0;
+            double vStart = c.viewStart, vSpan = c.viewSpan();
+            if (vSpan <= 0) vSpan = Math.max(1, c.length);
+            double a0 = f0 + span * clamp01(((double) r.start - vStart) / vSpan);
+            double a1 = f0 + span * clamp01(((double) r.end - vStart) / vSpan);
+            if (a1 <= a0) a1 = a0 + 1e-4;
+            for (int j = 0; j < samples; j++) {
+                double v = r.vals[j];
+                if (Double.isNaN(v)) continue;
+                double rIn = bandInner + bandH * j / samples;
+                double rOut = bandInner + bandH * (j + 1) / samples;
+                g2.setColor(divergingColor(v, hm.min, hm.max));
+                g2.fill(annularPath(cx, cy, rIn, rOut, a0, a1));
+            }
+        }
     }
 
     public CircularViewPanel() {
@@ -1275,7 +1416,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     private void drawTrackRings(Graphics2D g2, int w, int h, List<ChrInfo> chrs, CircularSettings s) {
-        if (ringTracks.isEmpty() || chrs == null || chrs.isEmpty()) return;
+        if ((ringTracks.isEmpty() && heatmap == null) || chrs == null || chrs.isEmpty()) return;
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
@@ -1293,10 +1434,18 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     sharedRangeFor(cfg, globalShared, groups, perGeneGroups));
             cursor = bandInner - 5;
         }
+        if (heatmap != null) {                              // genomic-heatmap band, innermost
+            double bandOuter = cursor;
+            double bandInner = bandOuter - (s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50);
+            if (bandInner >= 24) {
+                drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, heatmap);
+                cursor = bandInner - 5;
+            }
+        }
     }
 
     private void drawTrackRingsSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {
-        if (ringTracks.isEmpty()) return;
+        if (ringTracks.isEmpty() && heatmap == null) return;
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
@@ -1314,6 +1463,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg,
                     sharedRangeFor(cfg, globalShared, groups, perGeneGroups));
             cursor = bandInner - 5;
+        }
+        if (heatmap != null) {                              // genomic-heatmap band, innermost
+            double bandOuter = cursor;
+            double bandInner = bandOuter - (s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50);
+            if (bandInner >= 24) {
+                drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, heatmap);
+                cursor = bandInner - 5;
+            }
         }
     }
 

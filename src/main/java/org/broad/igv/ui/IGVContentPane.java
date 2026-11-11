@@ -450,6 +450,32 @@ public class IGVContentPane extends JPanel {
         }
     }
 
+    /** Load a genomic heatmap (rows x samples, e.g. hg38_heatmap.bed) into the circular view. */
+    private static void loadHeatmapFromFile(CircularViewPanel panel) {
+        java.awt.FileDialog fd = new java.awt.FileDialog(
+                (java.awt.Frame) null, "Load genomic heatmap (BED/TSV rows x samples)", java.awt.FileDialog.LOAD);
+        fd.setVisible(true);
+        String dir = fd.getDirectory();
+        String file = fd.getFile();
+        if (dir == null || file == null) return;
+        String path = dir + file;
+        try {
+            org.broad.igv.util.ResourceLocator locator = new org.broad.igv.util.ResourceLocator(path);
+            CircularViewPanel.GenomicHeatmap hm = CircularViewPanel.parseHeatmap(locator);
+            if (hm == null) {
+                javax.swing.JOptionPane.showMessageDialog(panel, "No numeric heatmap rows found in:\n" + file,
+                        "Load heatmap", javax.swing.JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            panel.setHeatmap(hm);
+            log.info("Loaded heatmap from " + path + " (" + hm.rows.size() + " rows, " + hm.samples + " samples)");
+        } catch (Throwable ex) {
+            log.error("Failed to load heatmap from " + path, ex);
+            javax.swing.JOptionPane.showMessageDialog(panel, "Could not load heatmap:\n" + ex.getMessage(),
+                    "Load heatmap", javax.swing.JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
     public static void addLinkItems(JPopupMenu popup, CircularViewPanel panel) {
         CircularViewPanel.CircularSettings s = panel.getSettings();
 
@@ -464,6 +490,10 @@ public class IGVContentPane extends JPanel {
         JMenuItem loadLinks = new JMenuItem("Load links…");
         loadLinks.addActionListener(e -> loadLinksFromFile(panel));
         popup.add(loadLinks);
+
+        JMenuItem loadHeatmap = new JMenuItem("Load heatmap…");
+        loadHeatmap.addActionListener(e -> loadHeatmapFromFile(panel));
+        popup.add(loadHeatmap);
         popup.addSeparator();
 
         popup.add(linkCheck("Ribbon (filled bands)", s.linkRibbon,
