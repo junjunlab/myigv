@@ -139,7 +139,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** Filled band (Circos {@code ribbon=yes}) instead of a stroked curve. */
         public boolean linkRibbon = true;
         /** Swap which end of the second interval the ribbon's edges connect to (Circos {@code twist}). */
-        public boolean linkTwist = false;
+        public boolean linkTwist = true;
         /** Radial position of the link ends, as a fraction of the ideogram inner radius. */
         public double  linkRadius = 0.95;
         /** Radial position of the bezier control point, as a fraction of the link end radius.
@@ -982,8 +982,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         for (Track t : ringTracks) if (t instanceof HiCTrack) visibleHics.add((HiCTrack) t);
         if (!visibleHics.isEmpty()) {
             drawHiCLegends(g2, w, h, visibleHics, hicLimitsByTrack, settings);
-            drawHeatmapLegend(g2, w, h, heatmap, settings, visibleHics);
         }
+        // The heatmap legend is independent of any Hi-C track being loaded.
+        drawHeatmapLegend(g2, w, h, heatmap, settings, visibleHics);
     }
 
     // ------------------------------------------------------------------
@@ -3172,6 +3173,18 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         Point2D B1 = polar(cx, cy, rEnd, edgeBTo);
         Point2D cA = linkControl(cx, cy, rEnd, rBez, edgeAFrom, edgeATo, purity);
         Point2D cB = linkControl(cx, cy, rEnd, rBez, edgeBFrom, edgeBTo, purity);
+        if (twist) {
+            // "Twist" pulls both edges toward the centreline, so the ribbon narrows to a waist at
+            // mid-span and reopens. Swapping the edge pairing instead (a real 2D cross) would
+            // close the band to a POINT there, which is exactly the hairline look we just fixed.
+            final double k = 0.45;
+            double mx = (cA.getX() + cB.getX()) / 2.0;
+            double my = (cA.getY() + cB.getY()) / 2.0;
+            cA = new Point2D.Double(cA.getX() + (mx - cA.getX()) * k,
+                    cA.getY() + (my - cA.getY()) * k);
+            cB = new Point2D.Double(cB.getX() + (mx - cB.getX()) * k,
+                    cB.getY() + (my - cB.getY()) * k);
+        }
 
         Path2D.Double path = new Path2D.Double();
         path.moveTo(A0.getX(), A0.getY());
