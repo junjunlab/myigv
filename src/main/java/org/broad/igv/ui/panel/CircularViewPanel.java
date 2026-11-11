@@ -908,9 +908,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             }
         }
 
-        Genome genome = GenomeManager.getInstance().getCurrentGenome();
-        String id = genome != null ? genome.getDisplayName() : "";
-        drawCenteredText(g2, id, cx, cy, new Font("SansSerif", Font.PLAIN, 15), Color.DARK_GRAY);
+        // Centre of the ring is intentionally left empty (no genome display-name label), so
+        // links and data rings are not obscured by text.
     }
 
     private static void drawSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {
@@ -924,8 +923,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         drawIdeogramBand(g2, cx, cy, rIn, rOut, 0.0, 1.0, chr);
         drawBandTicks(g2, cx, cy, rIn, rOut, 0.0, 1.0, chr, 360.0, s);
 
-        drawCenteredText(g2, shortName(chr.name), cx, cy,
-                new Font("SansSerif", Font.BOLD, Math.max(10, s.chromosomeLabelSize + 6)), Color.DARK_GRAY);
+        // Centre text removed: keep the ring interior clear for links/tracks.
     }
 
     // ------------------------------------------------------------------

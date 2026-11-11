@@ -29,8 +29,24 @@ public class ChromosomeComboBox extends JComboBox {
     private void chromosomeComboBoxActionPerformed(java.awt.event.ActionEvent evt) {
         JComboBox combobox = (JComboBox) evt.getSource();
         final String chrDisplayName = (String) combobox.getSelectedItem();
+        if (chrDisplayName == null || chrDisplayName.equals(MAX_EXCEEDED)) return;
         final String chrName = GenomeManager.getInstance().getCurrentGenome().getCanonicalChrName(chrDisplayName);
-        if (chrName != null & !chrName.equals(FrameManager.getDefaultFrame().getChrName()) && !chrName.equals(MAX_EXCEEDED)) {
+        if (chrName == null) return;
+
+        if (FrameManager.isGeneListMode()) {
+            // In multi-gene (gene-list) mode the panels each have their own chromosome, so a
+            // single "current chromosome" is meaningless. Selecting one leaves the split view
+            // and shows that chromosome full length -- the same path as searching a locus.
+            // Guard against the re-entrant event fired while the combo box is being reset.
+            if (FrameManager.getDefaultFrame().getChrName().equals(chrName)
+                    && org.broad.igv.ui.IGV.getInstance().getSession().getCurrentGeneList() == null) {
+                return;
+            }
+            org.broad.igv.ui.IGV.getInstance().getSession().setCurrentGeneList(null);
+            org.broad.igv.ui.IGV.getInstance().setDefaultFrame(chrName);
+            return;
+        }
+        if (!chrName.equals(FrameManager.getDefaultFrame().getChrName())) {
             FrameManager.getDefaultFrame().changeChromosome(chrName, true);
         }
     }

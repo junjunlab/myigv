@@ -152,7 +152,11 @@ public class IGVCommandBar extends javax.swing.JPanel implements IGVEventObserve
 
     public void setGeneListMode(boolean geneListMode) {
 
-        chromosomeComboBox.setEnabled(!geneListMode);
+        // Keep the chromosome selector usable in gene-list mode. Stock IGV disables it here,
+        // but selecting a chromosome is a convenient way to leave the multi-panel view: the
+        // combo box action clears the gene list and jumps to that chromosome (see
+        // ChromosomeComboBox.chromosomeComboBoxActionPerformed).
+        chromosomeComboBox.setEnabled(true);
         if (geneListMode && !searchTextField.isShowingResolvedGenes()) {
             searchTextField.clearResolvedGeneState();
             searchTextField.setText("");
