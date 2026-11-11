@@ -148,6 +148,8 @@ dependencies {
             [group: 'org.apache.xmlgraphics', name: 'batik-dom', version: xmlGraphicsVersion],
             [group: 'org.apache.xmlgraphics', name: 'batik-svggen', version: xmlGraphicsVersion],
             [group: 'org.apache.xmlgraphics', name: 'batik-codec', version: xmlGraphicsVersion],
+            // Vector PDF export of the circular view (PdfGraphics2D = a Graphics2D backed by PDF)
+            [group: 'com.github.librepdf', name: 'openpdf', version: '1.3.30'],
             [group: 'org.netbeans.external', name: 'AbsoluteLayout', version: 'RELEASE110'],
 
             // Amazon deps

@@ -29,6 +29,7 @@ import org.broad.igv.logging.*;
 import org.broad.igv.bedpe.BedPEFeature;
 import org.broad.igv.bedpe.InteractionTrack;
 import org.broad.igv.ui.commandbar.IGVCommandBar;
+import org.broad.igv.ui.panel.CircularExporter;
 import org.broad.igv.ui.panel.CircularViewPanel;
 import org.broad.igv.ui.panel.MainPanel;
 import org.broad.igv.ui.panel.TrackPanel;
@@ -51,6 +52,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import javax.swing.plaf.basic.BasicBorders;
 import java.awt.*;
+import java.io.File;
 
 
 /**
@@ -456,7 +458,32 @@ public class IGVContentPane extends JPanel {
 
         options.addActionListener(e -> menu.show(options, 0, options.getHeight()));
         bar.add(options);
+
+        // ---- Export the current circular view as a publication-ready figure ----
+        JButton export = new JButton("Export ▾");
+        JPopupMenu exportMenu = new JPopupMenu();
+        for (CircularExporter.Format f : CircularExporter.Format.values()) {
+            JMenuItem item = new JMenuItem("Export " + f.name() + "…");
+            item.addActionListener(e -> exportCircularView(panel, f));
+            exportMenu.add(item);
+        }
+        exportMenu.addSeparator();
+        JMenuItem hint = new JMenuItem("Size, resolution and file are chosen in the dialog");
+        hint.setEnabled(false);
+        exportMenu.add(hint);
+        export.addActionListener(e -> exportMenu.show(export, 0, export.getHeight()));
+        bar.add(export);
         return bar;
+    }
+
+    /** Export menu action: run the export dialog, then confirm where the figure was written. */
+    private void exportCircularView(CircularViewPanel panel, CircularExporter.Format fmt) {
+        File out = CircularExporter.showDialog(this, panel, fmt);
+        if (out != null) {
+            JOptionPane.showMessageDialog(this,
+                    "Exported " + fmt.name() + ":\n" + out.getAbsolutePath(),
+                    "Export circular view", JOptionPane.INFORMATION_MESSAGE);
+        }
     }
 
     /** Small helper: a checkbox menu item wired to a setter callback. */

@@ -716,6 +716,75 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     // ------------------------------------------------------------------
+    //  Off-screen rendering (PNG / SVG / PDF export)
+    // ------------------------------------------------------------------
+
+    /**
+     * Render the complete circular view into an arbitrary {@link Graphics2D} at {@code w x h}
+     * logical units. This is the seam the exporters use: it runs exactly the same drawing code
+     * as {@link #paintComponent} but never touches the on-screen {@code ringImage} cache, so
+     * exporting at a size different from the window cannot disturb — or be disturbed by — the
+     * display. Call on the EDT; data is whatever is already loaded.
+     */
+    public void renderTo(Graphics2D g2, int w, int h) {
+        if (g2 == null || w <= 0 || h <= 0) return;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+
+        Genome genome = GenomeManager.getInstance().getCurrentGenome();
+        if (genome == null) {
+            drawMessage(g2, w, h, "No genome loaded");
+            return;
+        }
+        String chr = FrameManager.getDefaultFrame().getChrName();
+        if (chr == null || chr.isEmpty()) chr = genome.getHomeChromosome();
+
+        // Load whatever is still missing so a first-time export is not blank. These are
+        // idempotent (guarded by pendingLoads / trackLoaded) and asynchronous, so an export
+        // started right after opening the panel renders the already-available data.
+        ensureFeaturesLoaded(genome);
+        ensureDataLoaded(genome);
+
+        // Legends are collected during drawing; start clean so only the tracks drawn now report.
+        hicLimitsByTrack.clear();
+
+        boolean geneMode = FrameManager.isGeneListMode();
+        if (geneMode) {
+            geneFeatures.clear();
+            List<ChrInfo> geneChrs = buildGenes(genome, zoom, rangeZoom, settings, geneFeatures);
+            if (geneChrs.isEmpty()) {
+                drawMessage(g2, w, h, "Gene list empty or no genes recognised");
+                return;
+            }
+            drawAll(g2, w, h, geneChrs, settings);
+            drawTrackRings(g2, w, h, geneChrs, settings);
+            drawLinks(g2, w, h, geneChrs, allLinks(), settings, linkAnchorRadius(w, h, settings));
+        } else if (Globals.CHR_ALL.equals(chr)) {
+            List<ChrInfo> chrs = buildAll(genome, zoom, rangeZoom, settings);
+            drawAll(g2, w, h, chrs, settings);
+            drawTrackRings(g2, w, h, chrs, settings);
+            drawLinks(g2, w, h, chrs, allLinks(), settings, linkAnchorRadius(w, h, settings));
+        } else {
+            ChrInfo one = buildOne(genome, chr, rangeZoom, settings);
+            if (one == null) {
+                drawMessage(g2, w, h, "Chromosome not found: " + chr);
+                return;
+            }
+            drawSingle(g2, w, h, one, settings);
+            drawTrackRingsSingle(g2, w, h, one, settings);
+            drawLinks(g2, w, h, Collections.singletonList(one), allLinks(), settings,
+                    linkAnchorRadius(w, h, settings));
+        }
+
+        List<HiCTrack> visibleHics = new ArrayList<>();
+        for (Track t : ringTracks) if (t instanceof HiCTrack) visibleHics.add((HiCTrack) t);
+        if (!visibleHics.isEmpty()) drawHiCLegends(g2, w, h, visibleHics, hicLimitsByTrack, settings);
+    }
+
+    // ------------------------------------------------------------------
     //  Wheel zoom ("All" mode)
     //    Ctrl  -> widen / narrow the chromosome's arc (sector span)
     //    Shift -> widen / narrow the visible bp window under the cursor, arc unchanged
@@ -1630,8 +1699,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             // the angular resolution, so cells looked coarse/blurry when zoomed in.
             double dsx = g2.getTransform().getScaleX(); if (!(dsx > 0)) dsx = 1.0;
             double dsy = g2.getTransform().getScaleY(); if (!(dsy > 0)) dsy = 1.0;
-            int tileW = clampInt((int) Math.round(arcLength(midR, spanDeg) * dsx), 32, 4000);
-            int tileH = clampInt((int) Math.round((bandOuter - bandInner) * dsy), 8, 1600);
+            // Never under-sample compared to the logical pixel geometry: vector export to a
+            // smaller page has dsx < 1, but the matrix should still be rendered at full detail.
+            double qx = Math.max(dsx, 1.0), qy = Math.max(dsy, 1.0);
+            int tileW = clampInt((int) Math.round(arcLength(midR, spanDeg) * qx), 32, 4000);
+            int tileH = clampInt((int) Math.round((bandOuter - bandInner) * qy), 8, 1600);
             if (tileW < 2 || tileH < 2) continue;
 
             // Key covers everything that changes the matrix, so a parameter edit rebuilds the
@@ -1707,7 +1779,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         AffineTransform tr = g2.getTransform();
         double sxx = tr.getScaleX() > 0 ? tr.getScaleX() : 1.0;
         double syy = tr.getScaleY() > 0 ? tr.getScaleY() : 1.0;
-        int w = (int) Math.round(2 * cx * sxx), h = (int) Math.round(2 * cy * syy);
+        // Sample at least at the logical (pixel-geometry) resolution. On screen sxx is the HiDPI
+        // factor (>= 1); for vector export to a smaller physical page sxx < 1, and using it
+        // directly would under-sample the matrix and print a soft Hi-C heatmap.
+        double qx = Math.max(sxx, 1.0), qy = Math.max(syy, 1.0);
+        int w = (int) Math.round(2 * cx * qx), h = (int) Math.round(2 * cy * qy);
         if (w < 1 || h < 1) return;
         int tileW = tile.getWidth(), tileH = tile.getHeight();
         double rSpan = bandOuter - bandInner, fSpan = f1 - f0;
@@ -1716,16 +1792,16 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // Bulk read: one getRGB for the whole tile instead of a call per pixel.
         int[] src = tile.getRGB(0, 0, tileW, tileH, null, 0, tileW);
         int[] dst = new int[w * h];               // TYPE_INT_ARGB: 0 == transparent outside band
-        double cxD = cx * sxx, cyD = cy * syy;
-        int x0 = Math.max(0, (int) Math.floor(cxD - bandOuter * sxx));
-        int x1 = Math.min(w - 1, (int) Math.ceil(cxD + bandOuter * sxx));
-        int y0 = Math.max(0, (int) Math.floor(cyD - bandOuter * syy));
-        int y1 = Math.min(h - 1, (int) Math.ceil(cyD + bandOuter * syy));
+        double cxD = cx * qx, cyD = cy * qy;
+        int x0 = Math.max(0, (int) Math.floor(cxD - bandOuter * qx));
+        int x1 = Math.min(w - 1, (int) Math.ceil(cxD + bandOuter * qx));
+        int y0 = Math.max(0, (int) Math.floor(cyD - bandOuter * qy));
+        int y1 = Math.min(h - 1, (int) Math.ceil(cyD + bandOuter * qy));
         final double TWO_PI = 2.0 * Math.PI;
         for (int py = y0; py <= y1; py++) {
-            double dy = (py - cyD) / syy;         // device pixel -> logical offset
+            double dy = (py - cyD) / qy;          // sample pixel -> logical offset
             for (int px = x0; px <= x1; px++) {
-                double dx = (px - cxD) / sxx;
+                double dx = (px - cxD) / qx;
                 double r = Math.sqrt(dx * dx + dy * dy);
                 if (r < bandInner || r > bandOuter) continue;
                 double theta = Math.atan2(dx, -dy);
@@ -1744,7 +1820,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         Shape oldClip = g2.getClip();
         g2.clip(annularPath(cx, cy, bandInner, bandOuter, f0, f1));  // logical -> device clip
         AffineTransform saved = g2.getTransform();
-        g2.setTransform(new AffineTransform());   // blit the device-sized overlay 1:1
+        g2.setTransform(new AffineTransform());   // sample space -> device space
+        g2.scale(sxx / qx, syy / qy);             // identity when sxx,syy >= 1 (screen)
         g2.drawImage(out, 0, 0, null);
         g2.setTransform(saved);
         g2.setClip(oldClip);

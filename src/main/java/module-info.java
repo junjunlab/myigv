@@ -124,6 +124,8 @@ module org.igv {
     requires batik.codec;
     requires batik.svggen;
     requires batik.dom;
+    // Vector PDF export of the circular view (PdfGraphics2D)
+    requires com.github.librepdf.openpdf;
     requires AbsoluteLayout.RELEASE110;
 
     // AWS
