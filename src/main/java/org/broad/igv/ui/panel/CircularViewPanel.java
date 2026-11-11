@@ -462,6 +462,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double R = Math.min(w, h) / 2.0 - MARGIN;
             return Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
         }
+        // No automatic clearance: the label ring starts right after the connector, so
+        // "Connector height" is the single manual knob for clearing the axis tick text.
         return rOut;
     }
 
@@ -1626,7 +1628,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
         double chrLabelR;
-        if (s.heatmapOutside) {
+        if (reserveLabels && !s.labelInside) {
+            // labels ring outside: keep the chromosome numbers beyond it
+            chrLabelR = labelBaseRadius(w, h, s) + labelRingReserve(s) + 12;
+        } else if (s.heatmapOutside) {
             // The heatmap ring lives outside the ideogram, so push the chromosome numbers past it
             // instead of letting them sit under the cells.
             chrLabelR = outsideHeatmapInner(rOut, s) + connectionTrackHeight(s)
@@ -2500,8 +2505,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 double a0 = f0 + span * clamp01(((double) row.start - c.viewStart) / vSpan);
                 double a1 = f0 + span * clamp01(((double) row.end - c.viewStart) / vSpan);
                 if (a1 < a0) { double t = a0; a0 = a1; a1 = t; }
-                // radial text: its arc footprint is the line height; horizontal: the width
-                double fp = s.labelInside ? fm.getHeight() + 3 : fm.stringWidth(row.text) + 6;
+                // radial text on both sides: the arc footprint is the line height
+                double fp = fm.getHeight() + 3;
                 anchors.add(new double[]{a0, a1, fp, fm.stringWidth(row.text)});
                 texts.add(row.text);
             }
@@ -2621,13 +2626,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 double r = labelLayout.get(i)[2], fText = labelLayout.get(i)[3];
                 double len = labelLayout.get(i).length > 4 ? labelLayout.get(i)[4] : 0;
                 double rCenter = r + dir * len / 2.0;      // text centre, away from the ring
-                if (s.labelInside) {
-                    // radial: reads outward along the radius, niceFacing flips the left half
-                    drawRadialText(g2, cx, cy, rCenter, fText, labelTexts.get(i), font, s.labelColor,
-                            s.labelInward);
-                } else {
-                    drawHorizontalLabel(g2, cx, cy, rCenter, fText, labelTexts.get(i), font, s.labelColor);
-                }
+                // Radial on both sides: the name always points at the centre. labelInward only
+                // decides whether it is read away from the centre or towards it.
+                drawRadialText(g2, cx, cy, rCenter, fText, labelTexts.get(i), font, s.labelColor,
+                        s.labelInward);
             }
         } finally {
             g2.setStroke(oldStroke);
