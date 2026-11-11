@@ -64,7 +64,8 @@ public class HiCTrack extends AbstractTrack {
 
     /** Where the colour scale legend is drawn inside the track. */
     public enum LegendPosition {
-        TOP_LEFT("Top left"), TOP_RIGHT("Top right"), NONE("None");
+        TOP_LEFT("Top left"), TOP_RIGHT("Top right"),
+        BOTTOM_LEFT("Bottom left"), BOTTOM_RIGHT("Bottom right"), NONE("None");
 
         private final String label;
 
@@ -553,9 +554,12 @@ public class HiCTrack extends AbstractTrack {
             return null;
         }
         final int barH = Math.max(28, Math.min(90, bottom - top - 36));
-        final int x = position == LegendPosition.TOP_LEFT
-                ? rect.x + 8 : rect.x + rect.width - boxW - 8;
-        final Rectangle box = new Rectangle(x, top, boxW, barH + 30);
+        final boolean left = position == LegendPosition.TOP_LEFT || position == LegendPosition.BOTTOM_LEFT;
+        final boolean topSide = position == LegendPosition.TOP_LEFT || position == LegendPosition.TOP_RIGHT;
+        final int x = left ? rect.x + 8 : rect.x + rect.width - boxW - 8;
+        final int boxH = barH + 30;
+        final int boxY = topSide ? top : (bottom - boxH);
+        final Rectangle box = new Rectangle(x, boxY, boxW, boxH);
         if (clip != null && !clip.contains(box)) {
             // Partially damaged track: skip this pass. The legend comes back with the next
             // full repaint instead of being drawn a second time somewhere else.

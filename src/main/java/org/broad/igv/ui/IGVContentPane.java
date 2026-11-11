@@ -297,6 +297,34 @@ public class IGVContentPane extends JPanel {
         chrSel.addActionListener(e -> showChromosomeSelectionDialog(panel));
         menu.add(chrSel);
 
+        // ---- Single-chromosome arc span: 1 = 360° (default), 0.5 = 180°, etc. ----
+        JMenu arcMenu = new JMenu("Single-chromosome arc");
+        ButtonGroup arcGroup = new ButtonGroup();
+        double[] arcPresets = {1.0, 0.75, 0.5, 1.0 / 3.0, 0.25};
+        for (double frac : arcPresets) {
+            String fresh = String.format(java.util.Locale.ROOT, "%.2f", frac);
+            JRadioButtonMenuItem arcItem =
+                    new JRadioButtonMenuItem(Math.round(frac * 360) + "°  (" + fresh + ")");
+            arcItem.setSelected(Math.abs(s.singleArcFraction - frac) < 1e-6);
+            arcItem.addActionListener(e -> { s.singleArcFraction = frac; panel.refresh(); });
+            arcGroup.add(arcItem);
+            arcMenu.add(arcItem);
+        }
+        arcMenu.addSeparator();
+        JMenuItem arcCustom = new JMenuItem("Custom (0–1)…");
+        arcCustom.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Ring arc fraction for single-chromosome mode (0–1, 1 = 360°):",
+                    String.format(java.util.Locale.ROOT, "%.2f", s.singleArcFraction));
+            if (v == null) return;
+            try {
+                double f = Double.parseDouble(v.trim());
+                if (f > 0 && f <= 1.0) { s.singleArcFraction = f; panel.refresh(); }
+            } catch (NumberFormatException ignore) { /* keep current */ }
+        });
+        arcMenu.add(arcCustom);
+        menu.add(arcMenu);
+
         JMenuItem showAllRing = new JMenuItem("Show all ring tracks");
         showAllRing.addActionListener(e -> { panel.clearHiddenRingTracks(); refreshDataColumn(); });
         menu.add(showAllRing);

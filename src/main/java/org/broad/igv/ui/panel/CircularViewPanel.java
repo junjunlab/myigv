@@ -169,6 +169,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public int     heatmapHeightPx = 50;
         /** Draw thin connectors tying each heatmap cell to its chromosome position (circlize comb). */
         public boolean heatmapConnectors = true;
+        /** Single-chromosome mode: fraction of the full circle the arc spans.
+         *  1.0 = 360° (full ring, default), 0.5 = 180° (half circle), etc. */
+        public double singleArcFraction = 1.0;
 
         public CircularSettings copy() {
             CircularSettings s = new CircularSettings();
@@ -195,6 +198,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.linkEndsInsideTracks = linkEndsInsideTracks;
             s.geneFlankBp = geneFlankBp;
             s.heatmapHeightPx = heatmapHeightPx;
+            s.singleArcFraction = singleArcFraction;
             return s;
         }
 
@@ -1112,9 +1116,23 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return out;
     }
 
-    // ------------------------------------------------------------------
-    //  "All" — cytoband ideogram arc per chromosome
-    // ------------------------------------------------------------------
+    /**
+     * Sector list for one drawing pass. In single-chromosome mode ({@code chrs.size()==1}) the arc
+     * can be shrunk with {@link CircularSettings#singleArcFraction} (1 = 360°, 0.5 = 180°); the arc
+     * starts at the top (12 o'clock) and sweeps clockwise. All other modes use the normal
+     * per-chromosome layout, so this stays a no-op before the option is touched (default 1.0).
+     */
+    static List<double[]> sectorsFor(List<ChrInfo> chrs, CircularSettings s) {
+        if (chrs != null && chrs.size() == 1) {
+            double f = s.singleArcFraction;
+            if (!(f > 0)) f = 1.0;
+            if (f > 1.0) f = 1.0;
+            List<double[]> out = new ArrayList<>();
+            out.add(new double[]{0.0, f, f * 360.0});
+            return out;
+        }
+        return computeSectors(chrs, s.gapDeg);
+    }
 
     private static void drawAll(Graphics2D g2, int w, int h, List<ChrInfo> chrs, CircularSettings s) {
         if (chrs == null || chrs.isEmpty()) { drawMessage(g2, w, h, "Circular view — no chromosomes"); return; }
@@ -1152,8 +1170,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double rOut = R * s.bandOuter;
         double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
 
-        drawIdeogramBand(g2, cx, cy, rIn, rOut, 0.0, 1.0, chr);
-        drawBandTicks(g2, cx, cy, rIn, rOut, 0.0, 1.0, chr, 360.0, s);
+        drawIdeogramBand(g2, cx, cy, rIn, rOut, 0.0, s.singleArcFraction, chr);
+        drawBandTicks(g2, cx, cy, rIn, rOut, 0.0, s.singleArcFraction, chr,
+                s.singleArcFraction * 360.0, s);
 
         // Centre text removed: keep the ring interior clear for links/tracks.
     }
@@ -1490,8 +1509,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (R <= 20) return;
         double cursor = Math.max(R * 0.2, R * s.bandOuter - s.chromosomeHeightPx) - 5;
         List<ChrInfo> chrs = Collections.singletonList(chr);
-        List<double[]> sec = new ArrayList<>();
-        sec.add(new double[]{0.0, 1.0, 360.0});
+        List<double[]> sec = sectorsFor(chrs, s);
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
         java.util.Map<String, java.util.Map<String, float[]>> perGeneGroups = needPerGeneGroups(chrs);
@@ -1591,8 +1609,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             if (!(f1 > f0) || c.viewEnd <= c.viewStart) continue;
 
             double midR = (bandInner + bandOuter) / 2.0;
-            int tileW = clampInt((int) Math.round(arcLength(midR, spanDeg)), 32, 1200);
-            int tileH = clampInt((int) Math.round(bandOuter - bandInner), 8, 400);
+            // Match the tile to DEVICE pixels (the ring image is device-sized) and let it grow with
+            // the ring: a full-chromosome ring is ~1600-2500 px of arc, and the old 1200 cap halved
+            // the angular resolution, so cells looked coarse/blurry when zoomed in.
+            double dsx = g2.getTransform().getScaleX(); if (!(dsx > 0)) dsx = 1.0;
+            double dsy = g2.getTransform().getScaleY(); if (!(dsy > 0)) dsy = 1.0;
+            int tileW = clampInt((int) Math.round(arcLength(midR, spanDeg) * dsx), 32, 4000);
+            int tileH = clampInt((int) Math.round((bandOuter - bandInner) * dsy), 8, 1600);
             if (tileW < 2 || tileH < 2) continue;
 
             // Key covers everything that changes the matrix, so a parameter edit rebuilds the
@@ -1649,7 +1672,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     static void warpHiCTile(Graphics2D g2, double cx, double cy, double bandInner, double bandOuter,
                             double f0, double f1, BufferedImage tile) {
         if (tile == null) return;
-        int w = (int) Math.round(2 * cx), h = (int) Math.round(2 * cy);
+        // Draw at DEVICE resolution. The ring image is device-sized and the graphics carries the
+        // HiDPI scale; building this overlay at logical size and letting the transform blow it up
+        // made every Hi-C cell soft on 125/150/200% displays. Here the overlay is sized in device
+        // pixels and blitted 1:1 with an identity transform, so cells stay crisp.
+        AffineTransform tr = g2.getTransform();
+        double sxx = tr.getScaleX() > 0 ? tr.getScaleX() : 1.0;
+        double syy = tr.getScaleY() > 0 ? tr.getScaleY() : 1.0;
+        int w = (int) Math.round(2 * cx * sxx), h = (int) Math.round(2 * cy * syy);
         if (w < 1 || h < 1) return;
         int tileW = tile.getWidth(), tileH = tile.getHeight();
         double rSpan = bandOuter - bandInner, fSpan = f1 - f0;
@@ -1658,15 +1688,16 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // Bulk read: one getRGB for the whole tile instead of a call per pixel.
         int[] src = tile.getRGB(0, 0, tileW, tileH, null, 0, tileW);
         int[] dst = new int[w * h];               // TYPE_INT_ARGB: 0 == transparent outside band
-        int x0 = Math.max(0, (int) Math.floor(cx - bandOuter));
-        int x1 = Math.min(w - 1, (int) Math.ceil(cx + bandOuter));
-        int y0 = Math.max(0, (int) Math.floor(cy - bandOuter));
-        int y1 = Math.min(h - 1, (int) Math.ceil(cy + bandOuter));
+        double cxD = cx * sxx, cyD = cy * syy;
+        int x0 = Math.max(0, (int) Math.floor(cxD - bandOuter * sxx));
+        int x1 = Math.min(w - 1, (int) Math.ceil(cxD + bandOuter * sxx));
+        int y0 = Math.max(0, (int) Math.floor(cyD - bandOuter * syy));
+        int y1 = Math.min(h - 1, (int) Math.ceil(cyD + bandOuter * syy));
         final double TWO_PI = 2.0 * Math.PI;
         for (int py = y0; py <= y1; py++) {
-            double dy = py - cy;
+            double dy = (py - cyD) / syy;         // device pixel -> logical offset
             for (int px = x0; px <= x1; px++) {
-                double dx = px - cx;
+                double dx = (px - cxD) / sxx;
                 double r = Math.sqrt(dx * dx + dy * dy);
                 if (r < bandInner || r > bandOuter) continue;
                 double theta = Math.atan2(dx, -dy);
@@ -1681,53 +1712,43 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         out.setRGB(0, 0, w, h, dst, 0, w);
         Shape oldClip = g2.getClip();
-        g2.clip(annularPath(cx, cy, bandInner, bandOuter, f0, f1));
+        g2.clip(annularPath(cx, cy, bandInner, bandOuter, f0, f1));  // logical -> device clip
+        AffineTransform saved = g2.getTransform();
+        g2.setTransform(new AffineTransform());   // blit the device-sized overlay 1:1
         g2.drawImage(out, 0, 0, null);
+        g2.setTransform(saved);
         g2.setClip(oldClip);
     }
 
-    /** Rectangle of the i-th Hi-C legend. Legends stack vertically in a corner column,
-     *  preferring bottom-right, then bottom-left, top-left, top-right. A column is only used
-     *  when the panel's nearest point clears the ring outer radius, so legends never sit in a
-     *  ring band. When the panel is too small for any corner to clear the ring, the candidate
-     *  with the largest clearance is returned (best effort). */
-    static Rectangle legendRect(int w, int h, int index) {
+    /** Rectangle of the i-th Hi-C legend for the chosen corner. Legends stack vertically in
+     *  that corner's column (downwards for the top corners, upwards for the bottom corners) so
+     *  multiple Hi-C tracks never overlap. Honouring the requested corner is what makes the
+     *  "Color legend" menu (Top left / Top right / Bottom left / Bottom right / None) actually
+     *  move the legend. */
+    static Rectangle legendRect(int w, int h, HiCTrack.LegendPosition pos, int index) {
         final int panelW = 110, panelH = 150, gap = 4;
-        final double R = Math.max(20, Math.min(w, h) / 2.0 - MARGIN);
-        int[] xs = {w - panelW - 4, 4, 4, w - panelW - 4};
-        int[] y0 = {h - 6 - panelH, h - 6 - panelH, 6, 6};
-        int[] dir = {-1, -1, 1, 1};
-        Rectangle best = null;
-        double bestClearance = -1;
-        for (int c = 0; c < xs.length; c++) {
-            int x = xs[c];
-            int y = y0[c] + dir[c] * index * (panelH + gap);
-            double d = cornerClearance(x, y, panelW, panelH, w, h);
-            if (d >= R) return new Rectangle(x, y, panelW, panelH);
-            if (d > bestClearance) {
-                bestClearance = d;
-                best = new Rectangle(x, y, panelW, panelH);
-            }
-        }
-        return best;
-    }
-
-    /** Distance from the panel centre to the nearest point of the rectangle. */
-    private static double cornerClearance(int x, int y, int pw, int ph, int w, int h) {
-        double cx = w / 2.0, cy = h / 2.0;
-        double nx = Math.max(x, Math.min(cx, x + pw));
-        double ny = Math.max(y, Math.min(cy, y + ph));
-        return Math.hypot(nx - cx, ny - cy);
+        final boolean left = pos == HiCTrack.LegendPosition.TOP_LEFT
+                || pos == HiCTrack.LegendPosition.BOTTOM_LEFT;
+        final boolean topSide = pos == HiCTrack.LegendPosition.TOP_LEFT
+                || pos == HiCTrack.LegendPosition.TOP_RIGHT;
+        final int x = left ? 4 : w - panelW - 4;
+        final int y = topSide
+                ? 6 + index * (panelH + gap)
+                : h - 6 - panelH - index * (panelH + gap);
+        return new Rectangle(x, y, panelW, panelH);
     }
 
     /** Draw one legend per visible Hi-C track, stacked, BESIDE the plot (never in a ring band). */
     void drawHiCLegends(Graphics2D g2, int w, int h, List<HiCTrack> visibleHics,
                         Map<String, double[]> limitsByTrack, CircularSettings s) {
         if (visibleHics == null || visibleHics.isEmpty()) return;
-        int index = 0;
+        java.util.Map<HiCTrack.LegendPosition, Integer> perCorner =
+                new java.util.EnumMap<>(HiCTrack.LegendPosition.class);
         for (HiCTrack hic : visibleHics) {
-            if (hic.getLegendPosition() == HiCTrack.LegendPosition.NONE) continue;
-            Rectangle box = legendRect(w, h, index++);
+            HiCTrack.LegendPosition pos = hic.getLegendPosition();
+            if (pos == HiCTrack.LegendPosition.NONE) continue;
+            int idx = perCorner.merge(pos, 1, Integer::sum) - 1;
+            Rectangle box = legendRect(w, h, pos, idx);
             drawOneHiCLegend(g2, box.x, box.y, box.width, box.height,
                     hic.getName(), limitsByTrack.get(String.valueOf(hic.getName())),
                     hic.getTransform(), hic.getPalette());
@@ -2343,9 +2364,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double rEnd = Math.max(8.0, baseR * s.linkRadius);
         double rBez = rEnd * s.linkBezierRadius;
 
-        List<double[]> sec = computeSectors(chrs, s.gapDeg);
-
-        // Chromosome name -> sector index, tolerant of "chr" prefixes and genome aliases.
+        List<double[]> sec = sectorsFor(chrs, s);
         Map<String, Integer> index = new HashMap<>();
         Genome genome = GenomeManager.getInstance().getCurrentGenome();
         for (int i = 0; i < chrs.size(); i++) {
