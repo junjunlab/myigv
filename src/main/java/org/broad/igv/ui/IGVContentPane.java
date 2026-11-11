@@ -362,11 +362,8 @@ public class IGVContentPane extends JPanel {
         menu.add(arcStartMenu);
         menu.addSeparator();
 
-        // ---- Circos links (bezier chords / ribbons between two genomic intervals) ----
-        JMenu linksMenu = new JMenu("Links");
-        addLinkItems(linksMenu.getPopupMenu(), panel);
-        menu.add(linksMenu);
-        menu.addSeparator();
+        // Links / heatmap import + their parameters moved to the Import menu and to the
+        // per-layer context menus in the Data Tracks column.
 
         JMenu ticksPos = new JMenu("Tick labels position");
         JRadioButtonMenuItem outside = new JRadioButtonMenuItem("Outside (above band)", s.tickLabelsOutside);
@@ -470,6 +467,22 @@ public class IGVContentPane extends JPanel {
         all.addActionListener(e -> panel.showSettingsDialog(SwingUtilities.getWindowAncestor(panel)));
         menu.add(all);
 
+        // ---- Import (circular-view-only data files) : FIRST button in the toolbar ----
+        JButton importBtn = new JButton("Import ▾");
+        JPopupMenu importMenu = new JPopupMenu();
+        JMenuItem impLinks = new JMenuItem("Links  (BEDPE / Circos links)…");
+        impLinks.addActionListener(e -> loadLinksFromFile(panel));
+        importMenu.add(impLinks);
+        JMenuItem impHeat = new JMenuItem("Heatmap  (BED with value columns)…");
+        impHeat.addActionListener(e -> loadHeatmapFromFile(panel));
+        importMenu.add(impHeat);
+        importMenu.addSeparator();
+        JMenuItem impHint = new JMenuItem("Imported data is drawn in the circular view only");
+        impHint.setEnabled(false);
+        importMenu.add(impHint);
+        importBtn.addActionListener(e -> importMenu.show(importBtn, 0, importBtn.getHeight()));
+        bar.add(importBtn);
+
         options.addActionListener(e -> menu.show(options, 0, options.getHeight()));
         bar.add(options);
 
@@ -515,7 +528,7 @@ public class IGVContentPane extends JPanel {
     /** Load a Circos / BEDPE link file directly into the circular links layer, bypassing the
      *  track-format router (so a .bed / .links file works too). Reuses BedPEParser, which already
      *  auto-detects UTF-8 / UTF-16LE / UTF-16BE with BOM. */
-    private static void loadLinksFromFile(CircularViewPanel panel) {
+    private void loadLinksFromFile(CircularViewPanel panel) {
         java.awt.FileDialog fd = new java.awt.FileDialog(
                 (java.awt.Frame) null, "Load Circos / BEDPE links", java.awt.FileDialog.LOAD);
         fd.setVisible(true);
@@ -540,7 +553,10 @@ public class IGVContentPane extends JPanel {
                 l.label = f.getValueString();
                 rings.add(l);
             }
-            panel.setRingLinks(rings);
+            // Circular-only layer: no IGV track, so the horizontal view stays untouched.
+            circularDrawingArea.addLinksLayer(file, path, rings);
+            refreshDataColumn();
+            circularDrawingArea.refresh();
             log.info("Loaded " + rings.size() + " circular links from " + path);
         } catch (Throwable ex) {
             log.error("Failed to load links from " + path, ex);
@@ -550,7 +566,7 @@ public class IGVContentPane extends JPanel {
     }
 
     /** Load a genomic heatmap (rows x samples, e.g. hg38_heatmap.bed) into the circular view. */
-    private static void loadHeatmapFromFile(CircularViewPanel panel) {
+    private void loadHeatmapFromFile(CircularViewPanel panel) {
         java.awt.FileDialog fd = new java.awt.FileDialog(
                 (java.awt.Frame) null, "Load genomic heatmap (BED/TSV rows x samples)", java.awt.FileDialog.LOAD);
         fd.setVisible(true);
@@ -566,7 +582,9 @@ public class IGVContentPane extends JPanel {
                         "Load heatmap", javax.swing.JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            panel.setHeatmap(hm);
+            circularDrawingArea.setHeatmapLayer(file, path, hm);
+            refreshDataColumn();
+            circularDrawingArea.refresh();
             log.info("Loaded heatmap from " + path + " (" + hm.rows.size() + " rows, " + hm.samples + " samples)");
         } catch (Throwable ex) {
             log.error("Failed to load heatmap from " + path, ex);
@@ -586,46 +604,9 @@ public class IGVContentPane extends JPanel {
         popup.add(linkCheck("Draw inside data tracks", s.linkEndsInsideTracks,
                 v -> { s.linkEndsInsideTracks = v; panel.refresh(); }));
 
-        JMenuItem loadLinks = new JMenuItem("Load links…");
-        loadLinks.addActionListener(e -> loadLinksFromFile(panel));
-        popup.add(loadLinks);
-
-        JMenuItem loadHeatmap = new JMenuItem("Load heatmap…");
-        loadHeatmap.addActionListener(e -> loadHeatmapFromFile(panel));
-        popup.add(loadHeatmap);
-        popup.add(linkCheck("Show heatmap connectors", s.heatmapConnectors,
-                v -> { s.heatmapConnectors = v; panel.refresh(); }));
-        popup.add(linkCheck("Heatmap outside the ideogram", s.heatmapOutside,
-                v -> { s.heatmapOutside = v; panel.refresh(); }));
-
-        JMenuItem hmHeight = new JMenuItem("Heatmap height… (" + s.heatmapHeightPx + " px)");
-        hmHeight.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(panel, "Heatmap band height (pixels):",
-                    s.heatmapHeightPx);
-            if (v != null) {
-                try {
-                    s.heatmapHeightPx = Math.max(8, Integer.parseInt(v.trim()));
-                    panel.refresh();
-                } catch (NumberFormatException ignore) { }
-            }
-        });
-        popup.add(hmHeight);
-
-        JMenuItem hmConn = new JMenuItem("Heatmap connection height… ("
-                + s.heatmapConnectionPx + " px)");
-        hmConn.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(panel,
-                    "Height of the connection track between the ideogram and the heatmap\n"
-                            + "(this is where the circlize comb lines are drawn):",
-                    s.heatmapConnectionPx);
-            if (v != null) {
-                try {
-                    s.heatmapConnectionPx = Math.max(0, Integer.parseInt(v.trim()));
-                    panel.refresh();
-                } catch (NumberFormatException ignore) { }
-            }
-        });
-        popup.add(hmConn);
+        // Import + the heatmap parameters live in the Import menu and on the layer rows of the
+        // Data Tracks column, not here (this submenu is the ribbon styling of an interaction
+        // track that was loaded through File > Load from File).
         popup.addSeparator();
 
         popup.add(linkCheck("Ribbon (filled bands)", s.linkRibbon,
@@ -756,6 +737,9 @@ public class IGVContentPane extends JPanel {
      */
     private class TrackReorderHandler extends TransferHandler {
 
+        /** Row offset of the first TRACK row (layer rows are pinned at the top). */
+        private int layerOffset() { return dataColumnLayers.size(); }
+
         private final DataFlavor flavor = new DataFlavor(Integer.class, "data-track-index");
         private int draggedIndex = -1;
 
@@ -766,7 +750,8 @@ public class IGVContentPane extends JPanel {
 
         @Override
         protected Transferable createTransferable(JComponent c) {
-            draggedIndex = dataColumnList.getSelectedIndex();
+            draggedIndex = dataColumnList.getSelectedIndex() - layerOffset();
+            if (draggedIndex < 0) return null;      // a layer row is not draggable
             return new Transferable() {
                 @Override
                 public DataFlavor[] getTransferDataFlavors() {
@@ -796,7 +781,8 @@ public class IGVContentPane extends JPanel {
             try {
                 int from = (Integer) support.getTransferable().getTransferData(flavor);
                 JList.DropLocation drop = (JList.DropLocation) support.getDropLocation();
-                int to = drop.getIndex();
+                int to = drop.getIndex() - layerOffset();
+                if (to < 0) return false;           // dropping onto the layer block is a no-op
                 if (from < 0) return false;
                 if (to > from) to--;      // the row is removed before the insert position applies
                 if (to == from) return true;
@@ -827,10 +813,54 @@ public class IGVContentPane extends JPanel {
         circularDrawingArea.setRingTracks(new ArrayList<>(dataColumnTracks));
     }
 
+    /** Row label for a circular-only layer: name + what it contains. */
+    private String layerLabel(CircularViewPanel.CircularLayer l) {
+        String tag = l.summary();
+        return l.name + "   (" + tag + ")" + (l.visible ? "" : "   (hidden)");
+    }
+
     /** Row label for the data column; hidden ring tracks are marked so removal is visible. */
     private String rowLabel(Track t) {
         String label = t.getDisplayName();
         return circularDrawingArea.isRingTrackHidden(t) ? label + "   (hidden)" : label;
+    }
+
+    /** Heatmap-ring parameters: shown on a heatmap layer row's context menu. */
+    static void addHeatmapItems(JPopupMenu popup, CircularViewPanel panel) {
+        CircularViewPanel.CircularSettings s = panel.getSettings();
+        popup.add(linkCheck("Show heatmap connectors", s.heatmapConnectors,
+                v -> { s.heatmapConnectors = v; panel.refresh(); }));
+        popup.add(linkCheck("Heatmap outside the ideogram", s.heatmapOutside,
+                v -> { s.heatmapOutside = v; panel.refresh(); }));
+
+        JMenuItem hmHeight = new JMenuItem("Heatmap height… (" + s.heatmapHeightPx + " px)");
+        hmHeight.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel, "Heatmap band height (pixels):",
+                    s.heatmapHeightPx);
+            if (v != null) {
+                try {
+                    s.heatmapHeightPx = Math.max(8, Integer.parseInt(v.trim()));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(hmHeight);
+
+        JMenuItem hmConn = new JMenuItem("Heatmap connection height… ("
+                + s.heatmapConnectionPx + " px)");
+        hmConn.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel,
+                    "Height of the connection track between the ideogram and the heatmap\n"
+                            + "(this is where the circlize comb lines are drawn):",
+                    s.heatmapConnectionPx);
+            if (v != null) {
+                try {
+                    s.heatmapConnectionPx = Math.max(0, Integer.parseInt(v.trim()));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(hmConn);
     }
 
     /**
@@ -901,11 +931,20 @@ public class IGVContentPane extends JPanel {
         return out;
     }
 
+    /** Circular-only layers (links / heatmap imported through the Import menu). They are listed
+     *  ABOVE the tracks and carry their own context menu; they never enter IGV's track list. */
+    private final java.util.List<CircularViewPanel.CircularLayer> dataColumnLayers = new ArrayList<>();
+
     public void refreshDataColumn() {
         if (igv == null || igv.getContentPane() == null) return;   // during construction contentPane is null
         List<Track> tracks = circularColumnTracks();
         DefaultListModel<String> model = new DefaultListModel<>();
         dataColumnTracks.clear();
+        dataColumnLayers.clear();
+        dataColumnLayers.addAll(circularDrawingArea.getLayers());
+        for (CircularViewPanel.CircularLayer l : dataColumnLayers) {
+            model.addElement(layerLabel(l));
+        }
         for (Track t : tracks) {
             model.addElement(rowLabel(t));
             dataColumnTracks.add(t);
@@ -958,11 +997,50 @@ public class IGVContentPane extends JPanel {
         }
     }
 
+    /**
+     * Context menu for a circular-only layer row: the parameters that belong to THAT layer
+     * (ribbon styling for a links file, ring geometry for a heatmap) plus removal. This is why
+     * they are no longer buried in View options.
+     */
+    private void showLayerPopup(MouseEvent e, CircularViewPanel.CircularLayer layer) {
+        JPopupMenu menu = new JPopupMenu();
+        final boolean heat = layer.kind == CircularViewPanel.CircularLayer.Kind.HEATMAP;
+
+        menu.add(linkCheck(heat ? "Show heatmap" : "Show this links layer", layer.visible, v -> {
+            circularDrawingArea.setLayerVisible(layer, v);
+            refreshDataColumn();
+        }));
+        menu.addSeparator();
+
+        if (heat) addHeatmapItems(menu, circularDrawingArea);
+        else addLinkItems(menu, circularDrawingArea);
+
+        menu.addSeparator();
+        JMenuItem remove = new JMenuItem(heat
+                ? "Remove heatmap from circular view…" : "Remove links from circular view…");
+        remove.addActionListener(a -> {
+            circularDrawingArea.removeLayer(layer);
+            refreshDataColumn();
+            circularDrawingArea.refresh();
+            if (igv != null) igv.repaint();
+            log.info("Removed circular layer " + layer.name);
+        });
+        menu.add(remove);
+        menu.show(dataColumnList, e.getX(), e.getY());
+    }
+
     /** Right-click popup on the data column: per-track ring band height + collapse/expand. */
     private void maybeShowTrackPopup(MouseEvent e) {
         if (!e.isPopupTrigger()) return;
+        final int layerCount = dataColumnLayers.size();
         int idx = dataColumnList.locationToIndex(e.getPoint());
-        if (idx < 0 || idx >= dataColumnTracks.size()) return;
+        if (idx < 0 || idx >= layerCount + dataColumnTracks.size()) return;
+        // A circular-only layer row has its own menu (ribbon / heatmap parameters + Remove).
+        if (idx < layerCount) {
+            dataColumnList.setSelectedIndex(idx);
+            showLayerPopup(e, dataColumnLayers.get(idx));
+            return;
+        }
         // Keep an existing multi-selection if the click landed inside it; else select just this row.
         boolean inSel = false;
         for (int si : dataColumnList.getSelectedIndices()) if (si == idx) { inSel = true; break; }
@@ -979,8 +1057,10 @@ public class IGVContentPane extends JPanel {
         final java.util.List<HiCTrack> hicTracks = new ArrayList<>();
         final java.util.List<CircularViewPanel.TrackRingConfig> hicCfgs = new ArrayList<>();
         for (int si : sel) {
-            if (si < 0 || si >= dataColumnTracks.size()) continue;
-            Track t = dataColumnTracks.get(si);
+            if (si < layerCount) continue;                       // layer rows have no track menu
+            int ti = si - layerCount;
+            if (ti < 0 || ti >= dataColumnTracks.size()) continue;
+            Track t = dataColumnTracks.get(ti);
             // An interaction track *is* the links layer, so the only ring option it needs is
             // removal; there is no band to size or recolour.
             if (t instanceof InteractionTrack) {

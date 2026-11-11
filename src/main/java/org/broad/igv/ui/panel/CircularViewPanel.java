@@ -323,15 +323,92 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     // Two sources so that refreshing the track list never discards user-loaded links.
-    private final List<RingLink> fileLinks = new ArrayList<>();    // from "Load links…"
     private final List<RingLink> trackLinks = new ArrayList<>();   // auto-collected from InteractionTracks
 
-    /** Replace the user-loaded links (from a Circos / BEDPE file). */
-    public void setRingLinks(List<RingLink> links) {
-        fileLinks.clear();
-        if (links != null) fileLinks.addAll(links);
+    /**
+     * A data layer that lives ONLY in the circular view: it is loaded straight from a file into
+     * the ring and never becomes an IGV track, so it appears neither in the horizontal view nor
+     * in a saved session. The Data Tracks column lists one row per layer, and that row carries
+     * the layer's own context menu (ribbon / heatmap parameters + Remove).
+     */
+    public static class CircularLayer {
+        public enum Kind { LINKS, HEATMAP }
+
+        public final Kind kind;
+        public final String name;      // file name, shown in the Data Tracks column
+        public final String path;      // full path, for tooltips / reload
+        /** LINKS: the chords parsed from this file. Empty for HEATMAP layers. */
+        public final List<RingLink> links = new ArrayList<>();
+        /** HEATMAP: the matrix (only one heatmap ring exists at a time). */
+        public GenomicHeatmap heatmap;
+        public boolean visible = true;
+
+        public CircularLayer(Kind kind, String name, String path) {
+            this.kind = kind;
+            this.name = name;
+            this.path = path;
+        }
+
+        /** Short "what is inside" tag for the column row. */
+        public String summary() {
+            if (kind == Kind.HEATMAP) {
+                return heatmap == null ? "heatmap"
+                        : "heatmap " + heatmap.rows.size() + " x " + heatmap.samples;
+            }
+            return "links " + links.size();
+        }
+    }
+
+    private final List<CircularLayer> layers = new ArrayList<>();
+
+    /** Snapshot of the circular-only layers, in load order. */
+    public List<CircularLayer> getLayers() { return new ArrayList<>(layers); }
+
+    /** Add a links file as its own layer — several link files stack up. */
+    public CircularLayer addLinksLayer(String name, String path, List<RingLink> links) {
+        CircularLayer l = new CircularLayer(CircularLayer.Kind.LINKS, name, path);
+        if (links != null) l.links.addAll(links);
+        layers.add(l);
         invalidateRing();
-        log.info("Circular links: " + fileLinks.size() + " user link(s)");
+        log.info("Circular links layer '" + name + "': " + l.links.size() + " link(s)");
+        return l;
+    }
+
+    /** Set (or replace) the heatmap layer; only one heatmap ring exists at a time. */
+    public CircularLayer setHeatmapLayer(String name, String path, GenomicHeatmap hm) {
+        layers.removeIf(l -> l.kind == CircularLayer.Kind.HEATMAP);
+        CircularLayer l = new CircularLayer(CircularLayer.Kind.HEATMAP, name, path);
+        l.heatmap = hm;
+        layers.add(l);
+        setHeatmap(hm);
+        log.info("Circular heatmap layer '" + name + "': " + l.summary());
+        return l;
+    }
+
+    /** Show / hide one layer without unloading it. */
+    public void setLayerVisible(CircularLayer l, boolean v) {
+        if (l == null) return;
+        l.visible = v;
+        if (l.kind == CircularLayer.Kind.HEATMAP) {
+            heatmap = v ? l.heatmap : null;
+        }
+        invalidateRing();
+    }
+
+    /** Unload a layer (and, for a heatmap, its ring). */
+    public void removeLayer(CircularLayer l) {
+        if (l == null) return;
+        layers.remove(l);
+        if (l.kind == CircularLayer.Kind.HEATMAP && heatmap == l.heatmap) heatmap = null;
+        invalidateRing();
+        log.info("Circular layer removed: " + l.name);
+    }
+
+    /** Replace the user-loaded links with a single unnamed layer (kept for compatibility). */
+    public void setRingLinks(List<RingLink> links) {
+        layers.removeIf(l -> l.kind == CircularLayer.Kind.LINKS);
+        if (links != null && !links.isEmpty()) addLinksLayer("links", null, links);
+        invalidateRing();
     }
 
     /** Replace the links auto-collected from loaded interaction tracks. */
@@ -342,19 +419,27 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     public void clearRingLinks() {
-        fileLinks.clear();
+        layers.removeIf(l -> l.kind == CircularLayer.Kind.LINKS);
         trackLinks.clear();
         invalidateRing();
     }
 
+    /** Links contributed by the visible LINKS layers. */
+    private List<RingLink> layerLinks() {
+        List<RingLink> out = new ArrayList<>();
+        for (CircularLayer l : layers) {
+            if (l.kind != CircularLayer.Kind.LINKS || !l.visible) continue;
+            out.addAll(l.links);
+        }
+        return out;
+    }
+
     public int getRingLinkCount() {
-        return fileLinks.size() + trackLinks.size();
+        return layerLinks().size() + trackLinks.size();
     }
 
     private List<RingLink> allLinks() {
-        if (trackLinks.isEmpty()) return new ArrayList<>(fileLinks);
-        List<RingLink> all = new ArrayList<>(fileLinks.size() + trackLinks.size());
-        all.addAll(fileLinks);
+        List<RingLink> all = layerLinks();
         all.addAll(trackLinks);
         return all;
     }
