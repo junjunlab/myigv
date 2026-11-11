@@ -139,7 +139,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** Filled band (Circos {@code ribbon=yes}) instead of a stroked curve. */
         public boolean linkRibbon = true;
         /** Swap which end of the second interval the ribbon's edges connect to (Circos {@code twist}). */
-        public boolean linkTwist = true;
+        public boolean linkTwist = false;
         /** Radial position of the link ends, as a fraction of the ideogram inner radius. */
         public double  linkRadius = 0.95;
         /** Radial position of the bezier control point, as a fraction of the link end radius.
@@ -151,7 +151,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public double  linkCrest = 0.5;
         /** Minimum angular width (degrees) of a ribbon end. Real BEDPE anchors are only a few kb,
          *  which is sub-pixel on a whole-genome ring, so ribbons would be invisible without this. */
-        public double  linkRibbonMinDeg = 0.15;
+        public double  linkRibbonMinDeg = 1.2;
         /** Ribbons are filled areas, so they need more opacity than stroked links to read well.
          *  255 = fully opaque, which is the default (transparency 0). */
         public int     linkRibbonAlpha = 255;
@@ -177,6 +177,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** true = heatmap ring sits OUTSIDE the ideogram (band + comb grow outward),
          *  false = inside, between the ideogram and the data tracks (circlize side=). */
         public boolean heatmapOutside = false;
+        /** Heatmap ramp colours: low / mid (used only when the data straddles 0) / high. */
+        public Color   heatmapLowColor = new Color(0, 150, 0);
+        public Color   heatmapMidColor = new Color(0, 0, 0);
+        public Color   heatmapHighColor = new Color(215, 40, 40);
+        /** Heatmap colour-bar legend, drawn OUTSIDE the ring (same corner set as the Hi-C legend). */
+        public boolean heatmapLegend = true;
+        public org.broad.igv.hic.HiCTrack.LegendPosition heatmapLegendPosition =
+                org.broad.igv.hic.HiCTrack.LegendPosition.TOP_RIGHT;
         /** Draw thin connectors tying each heatmap cell to its chromosome position (circlize comb). */
         public boolean heatmapConnectors = true;
         /** Single-chromosome mode: fraction of the full circle the arc spans.
@@ -214,6 +222,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.heatmapHeightPx = heatmapHeightPx;
             s.heatmapConnectionPx = heatmapConnectionPx;
             s.heatmapOutside = heatmapOutside;
+            s.heatmapLowColor = heatmapLowColor;
+            s.heatmapMidColor = heatmapMidColor;
+            s.heatmapHighColor = heatmapHighColor;
+            s.heatmapLegend = heatmapLegend;
+            s.heatmapLegendPosition = heatmapLegendPosition;
             s.singleArcFraction = singleArcFraction;
             s.singleArcStartDeg = singleArcStartDeg;
             return s;
@@ -360,6 +373,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     private final List<CircularLayer> layers = new ArrayList<>();
+
+    /** Where the heatmap band sits in the band stack: 0 = outermost (first row). */
+    private int heatmapBandIndex = 0;
+
+    /** Row order of the Data Tracks column decides the radial order, so the heatmap band is
+     *  inserted at the position of its row among the track bands. */
+    public void setHeatmapBandIndex(int i) { heatmapBandIndex = Math.max(0, i); invalidateRing(); }
+
+    public int getHeatmapBandIndex() { return heatmapBandIndex; }
 
     /** Snapshot of the circular-only layers, in load order. */
     public List<CircularLayer> getLayers() { return new ArrayList<>(layers); }
@@ -561,33 +583,47 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     /**
-     * Diverging colour ramp: green -> black -> red, anchored at 0 (circlize's
-     * {@code colorRamp2(c(-1, 0, 1), c("green", "black", "red"))}, which is what the reference
-     * genomic-heatmap figure uses). 0 is always black; when the data is one-sided the ramp is
-     * still spread over min..max so nothing collapses to a flat colour.
+     * Heatmap colour ramp with configurable anchors.
+     *
+     * <p>Three colours (low / mid / high) are used when the value range straddles 0 — the mid
+     * colour is then pinned at 0 and the scale is symmetric, so "no change" reads as the mid
+     * colour. A one-sided range (all values > 0 or all < 0) has no meaningful midpoint, so it
+     * gets a plain two-colour ramp from low to high. Colours come from
+     * {@link CircularSettings#heatmapLowColor} and friends (Heatmap layer context menu).
      */
-    static Color divergingColor(double v, double mn, double mx) {
+    static Color divergingColor(double v, double mn, double mx, CircularSettings s) {
+        return divergingColor(v, mn, mx,
+                s == null ? new Color(0, 150, 0) : s.heatmapLowColor,
+                s == null ? new Color(0, 0, 0) : s.heatmapMidColor,
+                s == null ? new Color(215, 40, 40) : s.heatmapHighColor);
+    }
+
+    /** Same ramp with explicit colours (kept for callers that have no settings at hand). */
+    static Color divergingColor(double v, double mn, double mx,
+                                Color low, Color mid, Color high) {
         if (Double.isNaN(v)) return new Color(200, 200, 200);
-        double lo = mn, hi = mx;
-        // Anchor black at 0 when the values straddle it: symmetric scale, so 0 -> black.
-        if (mn < 0 && mx > 0) {
-            double a = Math.max(-mn, mx);
-            lo = -a; hi = a;
+        if (low == null) low = new Color(0, 150, 0);
+        if (mid == null) mid = new Color(0, 0, 0);
+        if (high == null) high = new Color(215, 40, 40);
+
+        boolean straddles = mn < 0 && mx > 0;
+        if (!straddles) {
+            // one-sided data: no midpoint -> two colours, min -> max
+            double denom = (mx - mn) > 1e-9 ? (mx - mn) : 1.0;
+            return mix(low, high, clamp01((v - mn) / denom));
         }
-        double denom = (hi - lo) > 1e-9 ? (hi - lo) : 1.0;
-        double t = (v - lo) / denom;               // 0..1 over the ramp
+        double a = Math.max(-mn, mx);                  // symmetric about 0
+        double t = clamp01((v + a) / (2 * a));         // 0 = low, 0.5 = 0, 1 = high
+        return t <= 0.5 ? mix(low, mid, t / 0.5) : mix(mid, high, (t - 0.5) / 0.5);
+    }
+
+    /** Linear blend of two colours (c2 weight = t). */
+    static Color mix(Color c1, Color c2, double t) {
         if (t < 0) t = 0; else if (t > 1) t = 1;
-        final int[] GREEN = {0, 150, 0};
-        final int[] BLACK = {0, 0, 0};
-        final int[] RED = {215, 40, 40};
-        int[] a, b;
-        double f;
-        if (t <= 0.5) { a = GREEN; b = BLACK; f = t / 0.5; }
-        else { a = BLACK; b = RED; f = (t - 0.5) / 0.5; }
         return new Color(
-                clamp8((int) Math.round(a[0] + (b[0] - a[0]) * f)),
-                clamp8((int) Math.round(a[1] + (b[1] - a[1]) * f)),
-                clamp8((int) Math.round(a[2] + (b[2] - a[2]) * f)));
+                clamp8((int) Math.round(c1.getRed() + (c2.getRed() - c1.getRed()) * t)),
+                clamp8((int) Math.round(c1.getGreen() + (c2.getGreen() - c1.getGreen()) * t)),
+                clamp8((int) Math.round(c1.getBlue() + (c2.getBlue() - c1.getBlue()) * t)));
     }
 
     /**
@@ -629,7 +665,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     double rIn = bandInner + bandH * j / samples;
                     double rOut = bandInner + bandH * (j + 1) / samples;
                     Shape cell = annularPath(cx, cy, rIn, rOut, a0, a1);
-                    g2.setColor(divergingColor(v, hm.min, hm.max));
+                    g2.setColor(divergingColor(v, hm.min, hm.max, settings));
                     g2.fill(cell);
                     g2.setColor(Color.WHITE);
                     g2.draw(cell);
@@ -685,29 +721,33 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * does. When outside, the whole ring is pulled in (see {@link #ideogramOuterRadius}) so the
      * connection track and the cells still fit inside the panel.
      */
-    private void drawHeatmapBand(Graphics2D g2, int cx, int cy, int w, int h, double R, double rOut,
-                                 double cursor, List<ChrInfo> chrs, List<double[]> sec,
-                                 CircularSettings s, GenomicHeatmap hm, boolean stackInside) {
+    private double drawHeatmapBand(Graphics2D g2, int cx, int cy, int w, int h, double R, double rOut,
+                                   double cursor, List<ChrInfo> chrs, List<double[]> sec,
+                                   CircularSettings s, GenomicHeatmap hm, boolean stackInside) {
         double connH = connectionTrackHeight(s);
         double heatH = Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50);
         if (s.heatmapOutside) {
             double bandInner = outsideHeatmapInner(rOut, s) + connH;
             double bandOuter = Math.min(bandInner + heatH, Math.min(w, h) / 2.0 - 6);
-            if (bandOuter - bandInner < 6) return;
+            if (bandOuter - bandInner < 6) return cursor;
             if (connH > 0) {
                 drawHeatmapConnectors(g2, cx, cy, rOut, bandInner, true, chrs, sec, hm);
             }
             drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, hm);
-        } else {
-            double bandOuter = cursor - connH;
-            double bandInner = bandOuter - heatH;
-            if (bandInner < 24) return;
-            if (connH > 0) {
-                double rIdeoInner = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
-                drawHeatmapConnectors(g2, cx, cy, rIdeoInner, bandOuter, false, chrs, sec, hm);
-            }
-            drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, hm);
+            return cursor;                              // outside: the inner stack is untouched
         }
+        // INSIDE: the comb lives in its OWN track, exactly like circlize's connection track
+        // (connection_height of its own, then the heatmap track). It used to stretch from the
+        // ideogram inner edge all the way down to the band, so it ran straight through every
+        // track band in between -- and shorting the height did nothing visible.
+        double bandOuter = cursor - connH;
+        double bandInner = bandOuter - heatH;
+        if (bandInner < 24) return cursor;
+        if (connH > 0) {
+            drawHeatmapConnectors(g2, cx, cy, cursor, bandOuter, false, chrs, sec, hm);
+        }
+        drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, hm);
+        return bandInner - 5;
     }
 
     /**
@@ -942,6 +982,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         for (Track t : ringTracks) if (t instanceof HiCTrack) visibleHics.add((HiCTrack) t);
         if (!visibleHics.isEmpty()) {
             drawHiCLegends(g2, w, h, visibleHics, hicLimitsByTrack, settings);
+            drawHeatmapLegend(g2, w, h, heatmap, settings, visibleHics);
         }
     }
 
@@ -1012,6 +1053,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         List<HiCTrack> visibleHics = new ArrayList<>();
         for (Track t : ringTracks) if (t instanceof HiCTrack) visibleHics.add((HiCTrack) t);
         if (!visibleHics.isEmpty()) drawHiCLegends(g2, w, h, visibleHics, hicLimitsByTrack, settings);
+        drawHeatmapLegend(g2, w, h, heatmap, settings, visibleHics);
     }
 
     // ------------------------------------------------------------------
@@ -1925,7 +1967,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
         java.util.Map<String, java.util.Map<String, float[]>> perGeneGroups = needPerGeneGroups(chrs);
-        for (Track t : ringTracks) {                       // order == top->bottom == outer->inner
+        // Row order == radial order (top row = outermost). The heatmap layer is just another row,
+        // so it is drawn at its own position in the stack instead of being pinned to one end.
+        int heatSlot = Math.max(0, Math.min(heatmapBandIndex, ringTracks.size()));
+        int bandNo = 0;
+        for (Track t : ringTracks) {
+            if (heatmap != null && bandNo == heatSlot) {
+                cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
+                        chrs, sec, s, heatmap, true);
+            }
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor;
             double bandInner = bandOuter - ringHeightPx(t, cfg);
@@ -1933,9 +1983,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg,
                     sharedRangeFor(cfg, globalShared, groups, perGeneGroups));
             cursor = bandInner - 5;
+            bandNo++;
         }
-        if (heatmap != null) drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
-                chrs, sec, s, heatmap, true);
+        if (heatmap != null && bandNo == heatSlot) {
+            cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
+                    chrs, sec, s, heatmap, true);
+        }
     }
 
     private void drawTrackRingsSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {
@@ -1950,16 +2003,25 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
         java.util.Map<String, java.util.Map<String, float[]>> perGeneGroups = needPerGeneGroups(chrs);
+        int heatSlot = Math.max(0, Math.min(heatmapBandIndex, ringTracks.size()));
+        int bandNo = 0;
         for (Track t : ringTracks) {
+            if (heatmap != null && bandNo == heatSlot) {
+                cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
+                        chrs, sec, s, heatmap, true);
+            }
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor, bandInner = bandOuter - ringHeightPx(t, cfg);
             if (bandInner < 24) break;
             drawOneRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, t, cfg,
                     sharedRangeFor(cfg, globalShared, groups, perGeneGroups));
             cursor = bandInner - 5;
+            bandNo++;
         }
-        if (heatmap != null) drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
-                chrs, sec, s, heatmap, true);
+        if (heatmap != null && bandNo == heatSlot) {
+            cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
+                    chrs, sec, s, heatmap, true);
+        }
     }
 
     /** Per-gene group ranges, computed only when some track has {@code yGroupPerGene} on. */
@@ -2255,6 +2317,74 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     hic.getName(), limitsByTrack.get(String.valueOf(hic.getName())),
                     hic.getTransform(), hic.getPalette());
         }
+    }
+
+    /**
+     * Colour-bar legend for the genomic heatmap, drawn OUTSIDE the ring in one of the four
+     * corners (or hidden). Uses the same corner rectangles as the Hi-C legends and stacks below
+     * them when both want the same corner, so the two never overlap.
+     */
+    void drawHeatmapLegend(Graphics2D g2, int w, int h, GenomicHeatmap hm, CircularSettings s,
+                           List<HiCTrack> visibleHics) {
+        if (!s.heatmapLegend || hm == null || s.heatmapLegendPosition == null) return;
+        if (s.heatmapLegendPosition == org.broad.igv.hic.HiCTrack.LegendPosition.NONE) return;
+        int idx = 0;
+        if (visibleHics != null) {
+            for (HiCTrack hic : visibleHics) {
+                if (hic.getLegendPosition() == s.heatmapLegendPosition) idx++;
+            }
+        }
+        Rectangle box = legendRect(w, h, s.heatmapLegendPosition, idx);
+        Font oldFont = g2.getFont();
+        Color oldColor = g2.getColor();
+        Stroke oldStroke = g2.getStroke();
+        try {
+            g2.setColor(new Color(255, 255, 255, 235));
+            g2.fillRoundRect(box.x, box.y, box.width, box.height, 8, 8);
+            g2.setColor(new Color(120, 120, 120));
+            g2.setStroke(new BasicStroke(0.8f));
+            g2.drawRoundRect(box.x, box.y, box.width, box.height, 8, 8);
+
+            g2.setColor(Color.BLACK);
+            g2.setFont(new Font("SansSerif", Font.PLAIN, 10));
+            String title = "heatmap";
+            g2.drawString(title, box.x + 8, box.y + 14);
+
+            int barX = box.x + 10, barY = box.y + 22;
+            int barW = 16, barH = box.height - 44;
+            int steps = Math.max(2, barH);
+            for (int i = 0; i < steps; i++) {
+                double t = i / (double) (steps - 1);            // 0 = top (max)
+                double v = hm.max - (hm.max - hm.min) * t;
+                g2.setColor(divergingColor(v, hm.min, hm.max, s));
+                g2.fillRect(barX, barY + i, barW, 2);
+            }
+            g2.setColor(new Color(90, 90, 90));
+            g2.setStroke(new BasicStroke(0.8f));
+            g2.drawRect(barX, barY, barW, barH);
+
+            g2.setColor(new Color(60, 60, 60));
+            g2.setFont(new Font("SansSerif", Font.PLAIN, 9));
+            g2.drawString(fmtNum(hm.max), barX + barW + 4, barY + 8);
+            g2.drawString(fmtNum(hm.min), barX + barW + 4, barY + barH);
+            if (hm.min < 0 && hm.max > 0) {
+                double a = Math.max(-hm.min, hm.max);
+                int zeroY = barY + (int) Math.round((a / (2 * a)) * barH);   // 0 sits at half
+                g2.setColor(new Color(60, 60, 60));
+                g2.drawString("0", barX + barW + 4, zeroY + 3);
+            }
+        } finally {
+            g2.setFont(oldFont);
+            g2.setColor(oldColor);
+            g2.setStroke(oldStroke);
+        }
+    }
+
+    /** Compact number for legend ticks: 1.4 / -0.25 / 12. */
+    static String fmtNum(double v) {
+        if (Math.abs(v) >= 10) return String.format(java.util.Locale.ROOT, "%.0f", v);
+        if (Math.abs(v) >= 1) return String.format(java.util.Locale.ROOT, "%.2f", v);
+        return String.format(java.util.Locale.ROOT, "%.3f", v);
     }
 
     /** One legend panel: white rounded box, horizontal colour ramp, min/max ticks, transform
@@ -2928,13 +3058,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     ? link.color
                     : (s.linkColorByChromosome ? pickColor(chrs.get(i1).name, null) : s.linkColor);
 
-            // A ribbon's width at each end is that interval's OWN width: a single-point end
-            // collapses to a point (the band tapers to a line there), an interval end keeps its
-            // arc width. Both ends being points means a band would have no area at all, so we
-            // fall back to a stroked chord.
-            boolean point1 = link.end1 - link.start1 <= 1;
-            boolean point2 = link.end2 - link.start2 <= 1;
-            boolean ribbon = s.linkRibbon && !(point1 && point2);
+            // A ribbon's width at each end is that interval's own width, floored at the
+            // "Min ribbon width": a 1 bp end still gets a visible band, so links read as
+            // ribbons (circlize look) rather than hairlines that pinch in the middle.
+            boolean ribbon = s.linkRibbon;
 
             // Filled areas read much lighter than thin strokes, so ribbons get their own opacity.
             int alpha = Math.min(link.color != null ? link.color.getAlpha() : 255,
@@ -2942,16 +3069,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             g2.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), alpha));
 
             if (ribbon) {
-                double[] e1 = ribbonEnd(a1s, a1e, point1, s.linkRibbonMinDeg);
-                double[] e2 = ribbonEnd(a2s, a2e, point2, s.linkRibbonMinDeg);
-
-                // Building the band from two beziers that share one control point makes both
-                // edges converge on that point, so the ribbon pinches to a needle at its apex.
-                // Instead sample the centreline and offset it by a linearly interpolated
-                // half-width: the silhouette stays a smooth wedge (an arc), and a point end
-                // tapers to a small rounded tip rather than a spike.
-                Path2D.Double path = ribbonBand(cx, cy, rEnd, e1[0], e1[1], e2[0], e2[1],
-                        qx, qy, s.linkTwist);
+                double[] e1 = ribbonEnd(a1s, a1e, s.linkRibbonMinDeg);
+                double[] e2 = ribbonEnd(a2s, a2e, s.linkRibbonMinDeg);
+                Path2D.Double path = ribbonBand(cx, cy, rEnd, rBez,
+                        clamp01(s.linkBezierPurity), e1, e2, s.linkTwist);
                 g2.fill(path);
                 if (s.linkRibbonStroke && s.linkRibbonStrokeThickness > 0) {
                     // A tapered band is only a few pixels wide mid-span; the outline keeps that
@@ -3015,74 +3136,68 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      *       does not vanish.</li>
      * </ul>
      */
-    private static double[] ribbonEnd(double a0, double a1, boolean point, double minDeg) {
+    /**
+     * Angular extent of one ribbon end: the interval's own width, but never narrower than
+     * {@code minDeg}. A 1 bp end used to collapse to zero width, which (combined with the
+     * mid-span pinch below) is what made every link look like a needle instead of a band.
+     */
+    static double[] ribbonEnd(double a0, double a1, double minDeg) {
         double mid = (a0 + a1) / 2.0;
-        if (point) {
-            return new double[]{mid, mid};
-        }
-        double widthDeg = (a1 - a0) * 360.0;
-        if (minDeg > 0 && widthDeg < minDeg) {
-            double half = minDeg / 720.0;
-            return new double[]{mid - half, mid + half};
-        }
-        return new double[]{a0, a1};
+        double widthDeg = Math.abs(a1 - a0) * 360.0;
+        double w = Math.max(widthDeg, Math.max(0.02, minDeg));
+        double half = w / 720.0;
+        return new double[]{mid - half, mid + half};
     }
 
     /**
-     * Filled ribbon with a linearly tapering width: sample the quadratic centreline from the
-     * first interval's midpoint to the second's and offset each sample by an interpolated
-     * half-width. Unlike two beziers sharing one control point, this never pinches to a needle.
+     * Filled ribbon built the way circlize's {@code circos.link} builds it: TWO quadratic edges,
+     * each with its own control point on the bisector of its own pair of ends, closed by straight
+     * caps. The band therefore keeps a real width the whole way across — its width at each end is
+     * that end's arc — instead of pinching to a needle at mid-span.
      *
-     * @param a1s,a1e angular extent of the first interval
-     * @param a2s,a2e angular extent of the second interval
-     * @param qx,qy   bezier control point (already purity-adjusted)
+     * @param e1       {start,end} angular extent of the first interval (already min-width adjusted)
+     * @param e2       same for the second interval
+     * @param twist    cross the edges (circlize {@code inverse = TRUE}): edge A runs
+     *                 start1 -> end2 and edge B end1 -> start2
      */
-    private static Path2D.Double ribbonBand(double cx, double cy, double rEnd,
-                                            double a1s, double a1e,
-                                            double a2s, double a2e,
-                                            double qx, double qy,
-                                            boolean twist) {
-        Point2D p0 = polar(cx, cy, rEnd, (a1s + a1e) / 2.0);
-        Point2D p2 = polar(cx, cy, rEnd, (a2s + a2e) / 2.0);
+    private static Path2D.Double ribbonBand(double cx, double cy, double rEnd, double rBez,
+                                            double purity, double[] e1, double[] e2, boolean twist) {
+        double a1s = e1[0], a1e = e1[1], a2s = e2[0], a2e = e2[1];
+        double edgeAFrom = a1s, edgeATo = twist ? a2e : a2s;
+        double edgeBFrom = a1e, edgeBTo = twist ? a2s : a2e;
 
-        // Half-width in pixels = half the arc length the interval covers at the end radius.
-        // A floor of 0.5 px keeps a single-point end a rounded tip instead of a spike.
-        double h1 = Math.max(0.5, Math.abs(a1e - a1s) * Math.PI * rEnd);
-        double h2 = Math.max(0.5, Math.abs(a2e - a2s) * Math.PI * rEnd);
-
-        final int steps = 64;
-        double[] lx = new double[steps + 1], ly = new double[steps + 1];
-        double[] rx = new double[steps + 1], ry = new double[steps + 1];
-
-        for (int i = 0; i <= steps; i++) {
-            double t = i / (double) steps;
-            double mt = 1 - t;
-            double px = mt * mt * p0.getX() + 2 * mt * t * qx + t * t * p2.getX();
-            double py = mt * mt * p0.getY() + 2 * mt * t * qy + t * t * p2.getY();
-            double dx = 2 * mt * (qx - p0.getX()) + 2 * t * (p2.getX() - qx);
-            double dy = 2 * mt * (qy - p0.getY()) + 2 * t * (p2.getY() - qy);
-            double len = Math.hypot(dx, dy);
-            if (len < 1e-9) {
-                dx = p2.getX() - p0.getX();
-                dy = p2.getY() - p0.getY();
-                len = Math.max(1e-9, Math.hypot(dx, dy));
-            }
-            double nx = -dy / len, ny = dx / len;
-            double h = h1 + (h2 - h1) * t;
-            // A twist rotates the cross-section through 180 degrees along the length: the band
-            // narrows to a waist at mid-span and reopens on the other side. That is a smooth
-            // twist, unlike swapping the four corners, which leaves a spike.
-            double off = twist ? h * Math.cos(Math.PI * t) : h;
-            lx[i] = px + nx * off; ly[i] = py + ny * off;
-            rx[i] = px - nx * off; ry[i] = py - ny * off;
-        }
+        Point2D A0 = polar(cx, cy, rEnd, edgeAFrom);
+        Point2D A1 = polar(cx, cy, rEnd, edgeATo);
+        Point2D B0 = polar(cx, cy, rEnd, edgeBFrom);
+        Point2D B1 = polar(cx, cy, rEnd, edgeBTo);
+        Point2D cA = linkControl(cx, cy, rEnd, rBez, edgeAFrom, edgeATo, purity);
+        Point2D cB = linkControl(cx, cy, rEnd, rBez, edgeBFrom, edgeBTo, purity);
 
         Path2D.Double path = new Path2D.Double();
-        path.moveTo(lx[0], ly[0]);
-        for (int i = 1; i <= steps; i++) path.lineTo(lx[i], ly[i]);
-        for (int i = steps; i >= 0; i--) path.lineTo(rx[i], ry[i]);
-        path.closePath();
+        path.moveTo(A0.getX(), A0.getY());
+        path.quadTo(cA.getX(), cA.getY(), A1.getX(), A1.getY());
+        path.lineTo(B1.getX(), B1.getY());          // flat cap at the second ring
+        path.quadTo(cB.getX(), cB.getY(), B0.getX(), B0.getY());
+        path.closePath();                            // flat cap at the first ring
         return path;
+    }
+
+    /**
+     * Quadratic control point for a link edge, following circlize's {@code getQuadraticPoints}:
+     * radial position {@code rBez} at the midpoint of the shorter arc between the two ends, then
+     * blended toward the chord midpoint by {@code bezier_radius_purity}.
+     */
+    static Point2D linkControl(double cx, double cy, double rEnd, double rBez,
+                               double f1, double f2, double purity) {
+        double d = f2 - f1;
+        d -= Math.rint(d);                            // shortest way round: never cross the seam
+        Point2D q = polar(cx, cy, rBez, f1 + d / 2.0);
+        Point2D pa = polar(cx, cy, rEnd, f1);
+        Point2D pb = polar(cx, cy, rEnd, f2);
+        double mx = (pa.getX() + pb.getX()) / 2.0;
+        double my = (pa.getY() + pb.getY()) / 2.0;
+        return new Point2D.Double(q.getX() * purity + mx * (1 - purity),
+                q.getY() * purity + my * (1 - purity));
     }
 
     private static Integer resolveSector(Map<String, Integer> index, String name) {

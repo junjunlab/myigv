@@ -737,8 +737,6 @@ public class IGVContentPane extends JPanel {
      */
     private class TrackReorderHandler extends TransferHandler {
 
-        /** Row offset of the first TRACK row (layer rows are pinned at the top). */
-        private int layerOffset() { return dataColumnLayers.size(); }
 
         private final DataFlavor flavor = new DataFlavor(Integer.class, "data-track-index");
         private int draggedIndex = -1;
@@ -750,8 +748,8 @@ public class IGVContentPane extends JPanel {
 
         @Override
         protected Transferable createTransferable(JComponent c) {
-            draggedIndex = dataColumnList.getSelectedIndex() - layerOffset();
-            if (draggedIndex < 0) return null;      // a layer row is not draggable
+            draggedIndex = dataColumnList.getSelectedIndex();
+            if (draggedIndex < 0) return null;
             return new Transferable() {
                 @Override
                 public DataFlavor[] getTransferDataFlavors() {
@@ -781,12 +779,11 @@ public class IGVContentPane extends JPanel {
             try {
                 int from = (Integer) support.getTransferable().getTransferData(flavor);
                 JList.DropLocation drop = (JList.DropLocation) support.getDropLocation();
-                int to = drop.getIndex() - layerOffset();
-                if (to < 0) return false;           // dropping onto the layer block is a no-op
+                int to = drop.getIndex();
                 if (from < 0) return false;
                 if (to > from) to--;      // the row is removed before the insert position applies
                 if (to == from) return true;
-                moveDataTrack(from, to);
+                moveDataRow(from, to);
                 return true;
             } catch (Exception e) {
                 log.error("Could not reorder data tracks", e);
@@ -795,22 +792,22 @@ public class IGVContentPane extends JPanel {
         }
     }
 
-    /** Move a track within the data column, keeping the ring band order in sync. */
-    private void moveDataTrack(int from, int to) {
-        if (from < 0 || from >= dataColumnTracks.size()) return;
-        to = Math.max(0, Math.min(dataColumnTracks.size() - 1, to));
-        Track moved = dataColumnTracks.remove(from);
-        dataColumnTracks.add(to, moved);
-
-        DefaultListModel<String> model = new DefaultListModel<>();
-        for (Track t : dataColumnTracks) {
-            model.addElement(rowLabel(t));
-        }
-        dataColumnList.setModel(model);
+    /** Move a row (layer or track) in the data column; the ring band order follows it. */
+    private void moveDataRow(int from, int to) {
+        if (from < 0 || from >= dataColumnRows.size()) return;
+        to = Math.max(0, Math.min(dataColumnRows.size() - 1, to));
+        Object moved = dataColumnRows.remove(from);
+        dataColumnRows.add(to, moved);
         dataColumnList.setSelectedIndex(to);
+        // refreshDataColumn() preserves this order, re-derives the heatmap band slot and pushes
+        // both to the panel, so dragging a row moves that band in or out on the ring.
+        refreshDataColumn();
+        circularDrawingArea.refresh();
+    }
 
-        // Ring bands follow the list order, outer -> inner.
-        circularDrawingArea.setRingTracks(new ArrayList<>(dataColumnTracks));
+    /** Tracks that get a band on the ring (and therefore take part in the row order). */
+    private static boolean isBandTrack(Track t) {
+        return t instanceof FeatureTrack || t instanceof DataTrack || t instanceof HiCTrack;
     }
 
     /** Row label for a circular-only layer: name + what it contains. */
@@ -861,6 +858,60 @@ public class IGVContentPane extends JPanel {
             }
         });
         popup.add(hmConn);
+
+        // ---- legend (outside the ring), same corner semantics as the Hi-C legend ----
+        popup.addSeparator();
+        popup.add(linkCheck("Show heatmap legend", s.heatmapLegend,
+                v -> { s.heatmapLegend = v; panel.refresh(); }));
+        JMenu legendPos = new JMenu("Legend position");
+        ButtonGroup lg = new ButtonGroup();
+        for (org.broad.igv.hic.HiCTrack.LegendPosition p
+                : org.broad.igv.hic.HiCTrack.LegendPosition.values()) {
+            JRadioButtonMenuItem it = new JRadioButtonMenuItem(p.toString());
+            it.setSelected(s.heatmapLegendPosition == p);
+            it.addActionListener(e -> { s.heatmapLegendPosition = p; panel.refresh(); });
+            lg.add(it);
+            legendPos.add(it);
+        }
+        popup.add(legendPos);
+
+        // ---- colours: 3 stops when the range straddles 0, otherwise 2 stops ----
+        popup.addSeparator();
+        CircularViewPanel.GenomicHeatmap hm = panel.getHeatmap();
+        boolean straddles = hm != null && hm.min < 0 && hm.max > 0;
+        JMenu colours = new JMenu(straddles ? "Heatmap colours (low / 0 / high)"
+                : "Heatmap colours (low / high)");
+        JMenuItem low = new JMenuItem("Low (min)…");
+        low.addActionListener(e -> {
+            Color c = JColorChooser.showDialog(panel, "Heatmap low colour", s.heatmapLowColor);
+            if (c != null) { s.heatmapLowColor = c; panel.refresh(); }
+        });
+        colours.add(low);
+        JMenuItem mid = new JMenuItem("Mid (0)…");
+        mid.setEnabled(straddles);
+        if (!straddles) mid.setToolTipText(
+                "Only used when the data range contains 0 (negative and positive values).");
+        mid.addActionListener(e -> {
+            Color c = JColorChooser.showDialog(panel, "Heatmap mid colour", s.heatmapMidColor);
+            if (c != null) { s.heatmapMidColor = c; panel.refresh(); }
+        });
+        colours.add(mid);
+        JMenuItem high = new JMenuItem("High (max)…");
+        high.addActionListener(e -> {
+            Color c = JColorChooser.showDialog(panel, "Heatmap high colour", s.heatmapHighColor);
+            if (c != null) { s.heatmapHighColor = c; panel.refresh(); }
+        });
+        colours.add(high);
+        colours.addSeparator();
+        JMenuItem resetCols = new JMenuItem("Reset (green / black / red)");
+        resetCols.addActionListener(e -> {
+            s.heatmapLowColor = new Color(0, 150, 0);
+            s.heatmapMidColor = new Color(0, 0, 0);
+            s.heatmapHighColor = new Color(215, 40, 40);
+            panel.refresh();
+        });
+        colours.add(resetCols);
+        popup.add(colours);
     }
 
     /**
@@ -931,26 +982,52 @@ public class IGVContentPane extends JPanel {
         return out;
     }
 
-    /** Circular-only layers (links / heatmap imported through the Import menu). They are listed
-     *  ABOVE the tracks and carry their own context menu; they never enter IGV's track list. */
-    private final java.util.List<CircularViewPanel.CircularLayer> dataColumnLayers = new ArrayList<>();
+    /** Data Tracks column rows in DRAW ORDER (top = outermost ring band). An entry is either a
+     *  {@link CircularViewPanel.CircularLayer} (circular-only imported file) or a {@link Track}.
+     *  Dragging a row therefore reorders the ring bands, whichever kind it is. */
+    private final java.util.List<Object> dataColumnRows = new ArrayList<>();
 
     public void refreshDataColumn() {
         if (igv == null || igv.getContentPane() == null) return;   // during construction contentPane is null
+        List<CircularViewPanel.CircularLayer> layers = circularDrawingArea.getLayers();
         List<Track> tracks = circularColumnTracks();
-        DefaultListModel<String> model = new DefaultListModel<>();
-        dataColumnTracks.clear();
-        dataColumnLayers.clear();
-        dataColumnLayers.addAll(circularDrawingArea.getLayers());
-        for (CircularViewPanel.CircularLayer l : dataColumnLayers) {
-            model.addElement(layerLabel(l));
+
+        // Keep the order the user dragged things into; new layers go on top (outermost), new
+        // tracks go to the bottom (innermost) — the historical default for both kinds.
+        List<Object> rows = new ArrayList<>();
+        for (Object oldRow : dataColumnRows) {
+            if (layers.contains(oldRow) || tracks.contains(oldRow)) rows.add(oldRow);
+        }
+        for (CircularViewPanel.CircularLayer l : layers) {
+            if (!rows.contains(l)) rows.add(0, l);
         }
         for (Track t : tracks) {
+            if (!rows.contains(t)) rows.add(t);
+        }
+
+        DefaultListModel<String> model = new DefaultListModel<>();
+        dataColumnTracks.clear();
+        int bandBefore = 0;          // band-capable rows above the heatmap row
+        int heatSlot = -1;
+        for (Object row : rows) {
+            if (row instanceof CircularViewPanel.CircularLayer) {
+                CircularViewPanel.CircularLayer l = (CircularViewPanel.CircularLayer) row;
+                model.addElement(layerLabel(l));
+                if (l.kind == CircularViewPanel.CircularLayer.Kind.HEATMAP && l.visible) {
+                    heatSlot = bandBefore;
+                }
+                continue;
+            }
+            Track t = (Track) row;
             model.addElement(rowLabel(t));
             dataColumnTracks.add(t);
+            if (isBandTrack(t) && t.isVisible()) bandBefore++;
         }
+        dataColumnRows.clear();
+        dataColumnRows.addAll(rows);
         if (model.isEmpty()) model.addElement("(no tracks loaded)");
         dataColumnList.setModel(model);
+        circularDrawingArea.setHeatmapBandIndex(heatSlot < 0 ? 0 : heatSlot);
         circularDrawingArea.setRingTracks(new ArrayList<>(dataColumnTracks));   // ordered top->bottom
 
         // Any interaction track that is already loaded also feeds the circular links, so a
@@ -1032,13 +1109,13 @@ public class IGVContentPane extends JPanel {
     /** Right-click popup on the data column: per-track ring band height + collapse/expand. */
     private void maybeShowTrackPopup(MouseEvent e) {
         if (!e.isPopupTrigger()) return;
-        final int layerCount = dataColumnLayers.size();
         int idx = dataColumnList.locationToIndex(e.getPoint());
-        if (idx < 0 || idx >= layerCount + dataColumnTracks.size()) return;
+        if (idx < 0 || idx >= dataColumnRows.size()) return;
         // A circular-only layer row has its own menu (ribbon / heatmap parameters + Remove).
-        if (idx < layerCount) {
+        final Object hitRow = dataColumnRows.get(idx);
+        if (hitRow instanceof CircularViewPanel.CircularLayer) {
             dataColumnList.setSelectedIndex(idx);
-            showLayerPopup(e, dataColumnLayers.get(idx));
+            showLayerPopup(e, (CircularViewPanel.CircularLayer) hitRow);
             return;
         }
         // Keep an existing multi-selection if the click landed inside it; else select just this row.
@@ -1057,10 +1134,9 @@ public class IGVContentPane extends JPanel {
         final java.util.List<HiCTrack> hicTracks = new ArrayList<>();
         final java.util.List<CircularViewPanel.TrackRingConfig> hicCfgs = new ArrayList<>();
         for (int si : sel) {
-            if (si < layerCount) continue;                       // layer rows have no track menu
-            int ti = si - layerCount;
-            if (ti < 0 || ti >= dataColumnTracks.size()) continue;
-            Track t = dataColumnTracks.get(ti);
+            if (si < 0 || si >= dataColumnRows.size()) continue;
+            if (!(dataColumnRows.get(si) instanceof Track)) continue;   // layer rows: own menu
+            Track t = (Track) dataColumnRows.get(si);
             // An interaction track *is* the links layer, so the only ring option it needs is
             // removal; there is no band to size or recolour.
             if (t instanceof InteractionTrack) {
