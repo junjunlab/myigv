@@ -702,6 +702,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     public CircularLayer setHeatmapLayer(String name, String path, GenomicHeatmap hm) {
         CircularLayer l = new CircularLayer(CircularLayer.Kind.HEATMAP, name, path);
         l.heatmap = hm;
+        l.heatOutside = false;   // a freshly imported heatmap is a normal INSIDE track at its row
         layers.add(l);
         setHeatmap(hm);   // legacy single-heatmap field points at the newest (legend/compat)
         log.info("Circular heatmap layer '" + name + "': " + l.summary());

@@ -1213,14 +1213,15 @@ public class IGVContentPane extends JPanel {
         List<CircularViewPanel.CircularLayer> layers = circularDrawingArea.getLayers();
         List<Track> tracks = circularColumnTracks();
 
-        // Keep the order the user dragged things into; new layers go on top (outermost), new
-        // tracks go to the bottom (innermost) — the historical default for both kinds.
+        // Keep the order the user dragged things into. New layers/tracks are APPENDED, so the
+        // first thing imported stays on the top row (outermost band) and later imports go inner —
+        // matching "lower row = more inner track".
         List<Object> rows = new ArrayList<>();
         for (Object oldRow : dataColumnRows) {
             if (layers.contains(oldRow) || tracks.contains(oldRow)) rows.add(oldRow);
         }
         for (CircularViewPanel.CircularLayer l : layers) {
-            if (!rows.contains(l)) rows.add(0, l);
+            if (!rows.contains(l)) rows.add(l);
         }
         for (Track t : tracks) {
             if (!rows.contains(t)) rows.add(t);
