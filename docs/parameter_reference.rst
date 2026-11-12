@@ -293,10 +293,9 @@ Links layer — right-click a Links row
    * - ``Twist ribbons``
      - off
      - on / off
-     - Narrow the ribbon at its waist to ``0.4×`` width at the midpoint
-       (``sin`` profile) rather than keeping a constant width.  Default is
-       **off**; with it off the ribbon keeps a constant pixel width along its
-       whole length.
+     - Join the two ribbon edges the other way round (circlize ``inverse``):
+       interval 1's start meets interval 2's start instead of its end.  The band
+       stays smooth; only which edges connect changes.  Default is **off**.
    * - ``Colour by chromosome``
      - off
      - on / off
@@ -336,8 +335,9 @@ Links layer — right-click a Links row
    * - ``Bezier radius (0-1)… (0.8)``
      - ``0.8``
      - ``0.0``–``1.0``
-     - Radial position of the bezier control point; ``0`` gives a straight
-       chord (Circos ``bezier_radius``).
+     - Radial position of the bezier control point of a **stroked** link; ``0``
+       gives a straight chord (Circos ``bezier_radius``).  Filled ribbons use
+       circlize's automatic bow height.
    * - ``Crest (0-1)… (0.5)``
      - ``0.5``
      - ``0.0``–``1.0``
@@ -346,8 +346,9 @@ Links layer — right-click a Links row
    * - ``Min ribbon width (deg)… (1.2)``
      - ``1.2``
      - minimum ``0``
-     - Minimum angular width of a ribbon end in degrees.  Real BEDPE anchors
-       are often only a few kb and would be sub-pixel on a whole-genome ring.
+     - Smallest angular width used to size a ribbon's arrow head.  The ribbon
+       body tapers to the true interval width, so real BEDPE anchors (often a
+       few kb, sub-pixel on a whole-genome ring) taper to a tip, not a stub.
    * - ``Ribbon transparency (0 = solid)… (0)``
      - ``0``
      - ``0``–``255``
@@ -368,9 +369,10 @@ Links layer — right-click a Links row
 
 .. tip::
 
-   ``linkBezierPurity`` (default ``1.0``), ``geneFlankBp`` (``2000``) and
-   ``linkRibbonStrokeThickness`` (``0.6``) are internal constants with no
-   dedicated menu item; they are listed here for completeness only.
+   ``linkBezierPurity`` (default ``1.0``; stroked chords only), ``geneFlankBp``
+   (``2000``) and ``linkRibbonStrokeThickness`` (``0.6``) are internal
+   constants with no dedicated menu item; they are listed here for completeness
+   only.
 
 Heatmap layer — right-click a Heatmap row
 -----------------------------------------

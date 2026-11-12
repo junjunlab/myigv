@@ -147,10 +147,11 @@ v1.0.2 tag.
        layer kind.
      - :doc:`circular_data_tracks`
    * - circlize-style ribbon links
-     - Filled constant-pixel-width ribbons swept along a quadratic centreline
-       (so they never pinch to a point), with a guaranteed minimum end width,
-       optional twist, crest, transparency, and optional directional arrow
-       heads.
+     - Filled ribbons built exactly like circlize ``circos.link``: a polygon
+       bounded by two quadratic Bezier edges that bow toward the centre and are
+       closed by the two end arcs, so wide intervals give wide bands and 1 bp
+       anchors taper to a tip.  Optional twist (``inverse``), crest,
+       transparency and directional arrow heads.
      - :doc:`circular_links`
    * - Genomic heatmap ring
      - Equal-width cells (``posTransform.default``), 4-segment comb connectors

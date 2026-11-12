@@ -194,7 +194,8 @@ Links, ribbons and arrows
      - The same links as straight chords (``Bezier radius`` at ``0``).
      - :doc:`circular_links`
    * - ``ribbon_single.png``
-     - A single ribbon showing a uniform pixel-width band along its length.
+     - A single Circos ribbon (two Bézier edges) bowing toward the centre and
+       tapering at the ends.
      - :doc:`circular_links`
    * - ``circular_links_ribbon_mixed.png``
      - Mixed point and interval endpoints in one links layer.

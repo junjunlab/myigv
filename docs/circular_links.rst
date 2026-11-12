@@ -38,12 +38,10 @@ Visibility and geometry
        govern the chord geometry.
    * - ``Twist ribbons``
      - off
-     - Swap which end of the second interval the two ribbon edges connect to
-       (Circos ``twist``).  In myIGV twist is implemented as a **mild waist
-       narrowing** that brings the band to ``0.4×`` of its full width at the
-       midpoint (``sin`` profile), not a full pinch.  It is **off by default**
-       so the ribbon keeps a constant pixel width along its whole length; turn
-       it on only for the classic twisted-ribbon look.
+     - Join the two ribbon edges the other way round — interval 1's start to
+       interval 2's start instead of to its end (circlize ``inverse``).  The
+       ribbon is still a smooth band; only which edges meet changes.  **Off by
+       default**.
    * - ``Colour by chromosome``
      - off
      - Colour each link by its source chromosome instead of using one link
@@ -59,9 +57,8 @@ Visibility and geometry
    :alt: Dense blue filled ribbon links inside a whole-genome circular ring
    :width: 65%
 
-   ``Ribbon (filled bands)`` on: each link is a filled band with a constant
-   pixel width along its length.  ``Twist ribbons`` (default off) optionally
-   narrows the waist to ``0.4×`` at the midpoint without ever closing it.
+   ``Ribbon (filled bands)`` on: every link is a curved band that bows toward
+   the centre and tapers at its ends, exactly like Circos ``ribbon=yes``.
 
 .. figure:: images/circular_links_straight.png
    :alt: Straight chord links across a circular ring
@@ -73,16 +70,15 @@ Visibility and geometry
 Ribbon body
 -----------
 
-The ribbon is drawn as a **constant-pixel-width band** swept along a quadratic
-Bezier centreline spine.  The spine runs from the midpoint of the first
-interval, through a single control point on the angle bisector at
-``linkBezierRadius``, to the midpoint of the second interval; at every sample
-the band is offset by ``±`` half its width perpendicular to the spine.  This is
-what stops the band pinching to a point in the middle — a fixed *angular* width
-would do exactly that whenever the spine dives toward the centre.  A
-whole-genome BEDPE anchor is often only a few kilobases (sub-pixel on the
-ring), so a minimum angular width is still applied at each end to keep the
-anchor visible.
+The ribbon is built the way circlize's ``circos.link`` builds it (see the
+circlize R source, ``R/link.R``): the body is a polygon bounded by **two
+independent quadratic Bézier edges** that bow toward the centre, closed by the
+two **end arcs**.  Each end's width is the interval's own arc on the ring, so a
+whole-genome BEDPE anchor (often only a few kilobases, hence sub-pixel on the
+ring) tapers to a fine tip instead of a blunt stub, while a wide interval gives
+a wide band.  The bow height follows circlize's automatic ``h``
+(``h.ratio = 0.5``, ``w = 1``); two anchors on opposite sides of the ring draw a
+near-straight chord through the centre.
 
 .. list-table::
    :header-rows: 1
@@ -98,17 +94,19 @@ anchor visible.
        rings.
    * - ``Bezier radius (0-1)…``
      - ``0.8``
-     - Radial position of the Bezier control point (Circos
-       ``bezier_radius``).  ``0`` draws a straight chord; ``1`` pushes the
-       control point to the centre.  Range ``0 – 1``.
+     - Radial position of the Bezier control point of a **stroked** link
+       (Circos ``bezier_radius``).  ``0`` draws a straight chord; ``1`` pushes
+       the control point to the centre.  Range ``0 – 1``.  Filled ribbons use
+       circlize's automatic bow height instead.
    * - ``Crest (0-1)…``
      - ``0.5``
      - Adds control points that make links meet the ideogram perpendicularly
        (Circos ``crest``).  ``0`` disables.  Range ``0 – 1``.
    * - ``Min ribbon width (deg)…``
      - ``1.2°``
-     - Minimum angular width of a ribbon end.  Without it, links with tiny
-       anchors would be invisible.  Minimum ``0``.
+     - Smallest angular width used when sizing a ribbon's **arrow head**.  The
+       ribbon body now tapers to the true interval width, so this only keeps a
+       tiny anchor's arrow from vanishing.  Minimum ``0``.
    * - ``Ribbon transparency (0 = solid)…``
      - ``0``
      - ``0`` is fully opaque; ``255`` is invisible.  Internally stored as an
@@ -122,18 +120,17 @@ anchor visible.
      - ``5000``
      - Cap on links drawn per frame (Circos ``record_limit``).  Minimum ``1``.
 
-An internal ``linkBezierPurity`` of ``1.0`` holds the control point at the
-purely radial (angle-bisector) position, which keeps the band at full width;
-lower values tilt it toward the Cartesian midpoint.  It has no menu item.  The
-control point's radial position is set by the ``Bezier radius (0-1)…`` menu
-(default ``0.8``).
+An internal ``linkBezierPurity`` of ``1.0`` holds a **stroked** chord's control
+point at the purely radial (angle-bisector) position; lower values tilt it
+toward the Cartesian midpoint.  It has no menu item and does not affect filled
+ribbons (those follow circlize's ``getQuadraticPoints`` geometry).
 
 .. figure:: images/ribbon_single.png
-   :alt: One ribbon link showing a uniform pixel-width band along its length
+   :alt: One Circos ribbon link between two intervals, bowing toward the centre
    :width: 55%
 
-   A single ribbon.  The band keeps a constant pixel width along its length —
-   it never pinches to a needle at the midpoint.
+   A single interval-to-interval ribbon: two Bézier edges bowing toward the
+   centre, closed by the two end arcs and tapering where the anchors are narrow.
 
 .. figure:: images/circular_links_ribbon_mixed.png
    :alt: Mixed point-anchor and interval-anchor ribbons in one ring
