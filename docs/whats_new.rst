@@ -176,7 +176,8 @@ v1.0.2 tag.
    * - Genomic heatmap ring
      - Equal-width cells (``posTransform.default``), 4-segment comb connectors
        (``circos.genomicPosTransformLines``), inside/outside placement, a
-       diverging low/mid/high colour ramp and an out-of-ring colour legend.
+       diverging low/mid/high colour ramp and an out-of-ring colour legend —
+       **one legend per heatmap layer**, each with its own range and ramp.
      - :doc:`circular_heatmap`
    * - Genomic labels ring
      - Radial gene labels with comb connectors, circlize ``smartAlign`` for

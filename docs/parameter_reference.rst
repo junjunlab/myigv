@@ -356,12 +356,14 @@ Links layer — right-click a Links row
      - ``0.0``–``1.0``
      - Extra control points that make links meet the ideogram perpendicularly;
        ``0`` disables (Circos ``crest``).
-   * - ``Min ribbon width (deg)… (1.2)``
-     - ``1.2``
-     - minimum ``0``
-     - Smallest angular width used to size a ribbon's arrow head.  The ribbon
-       body tapers to the true interval width, so real BEDPE anchors (often a
-       few kb, sub-pixel on a whole-genome ring) taper to a tip, not a stub.
+   * - ``Min ribbon width (deg)… (auto ≈1 px)``
+     - ``0`` = auto
+     - ``0`` or any degree value
+     - Smallest angular width used to size a ribbon's band / arrow head.  ``0``
+       floors it at about one device pixel of arc, which keeps a small anchor
+       visible without widening it: a fixed multi-degree floor used to inflate
+       5–40 kb anchors into wide bands, so 600 such links merged into a solid
+       block.  Enter degrees to override.
    * - ``Ribbon transparency (0 = solid)… (0)``
      - ``0``
      - ``0``–``255``

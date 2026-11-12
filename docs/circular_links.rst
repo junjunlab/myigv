@@ -103,10 +103,13 @@ near-straight chord through the centre.
      - Adds control points that make links meet the ideogram perpendicularly
        (Circos ``crest``).  ``0`` disables.  Range ``0 – 1``.
    * - ``Min ribbon width (deg)…``
-     - ``1.2°``
-     - Smallest angular width used when sizing a ribbon's **arrow head**.  The
-       ribbon body now tapers to the true interval width, so this only keeps a
-       tiny anchor's arrow from vanishing.  Minimum ``0``.
+     - ``auto ≈1 px``
+     - Smallest angular width used when sizing a ribbon's band and arrow head.
+       The default ``0`` means **auto: about one device pixel** of arc at the ring
+       radius, so a 5 kb anchor on a whole-genome ring stays a hairline instead of
+       being inflated into a wide band (a fixed floor of a few degrees made 600
+       small-anchor links merge into one solid block).  Enter a value in degrees to
+       override it; minimum ``0``.
    * - ``Ribbon transparency (0 = solid)…``
      - ``0``
      - ``0`` is fully opaque; ``255`` is invisible.  Internally stored as an
@@ -137,7 +140,17 @@ ribbons (those follow circlize's ``getQuadraticPoints`` geometry).
    :width: 65%
 
    Mixed links where some ends are single points and others are intervals.
-   ``Min ribbon width (deg)…`` keeps the point ends visible.
+   ``Min ribbon width (deg)…`` at its default (``auto ≈1 px``) keeps the point
+   ends visible without widening the interval ends.
+
+.. figure:: images/links_thin.png
+   :alt: 600 whole-genome links drawn as thin chords instead of wide bands
+   :width: 70%
+
+   The same 600 links at ``auto ≈1 px``: each anchor spans 5–40 kb (a few
+   thousandths of a degree), so the links read as distinguishable chords.  With
+   the old fixed 1.2° floor every one of them became a wide band and the ring
+   filled with a solid block of colour.
 
 Arrows
 ------

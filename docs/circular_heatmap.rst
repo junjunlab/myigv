@@ -177,7 +177,7 @@ Colour legend
    * - ``Show heatmap legend``
      - on
      - Draws a vertical colour bar **outside the ring** with the numeric
-       ``min`` / ``max`` labels.
+       ``min`` / ``max`` labels — one bar per heatmap layer (see below).
    * - ``Legend position``
      - ``TOP_RIGHT``
      - Submenu with the five literals ``TOP_LEFT``, ``TOP_RIGHT``,
@@ -196,6 +196,19 @@ The legend is drawn unconditionally on both the on-screen painting path and
 the export path — it does **not** require a Hi-C track to be loaded.  This was a
 bug in an earlier build where the call sat inside an ``if
 (!visibleHics.isEmpty())`` block.
+
+**One legend per heatmap layer.**  Each imported heatmap gets its **own** colour
+bar: its own title (the file name), its own ``min`` / ``max`` and its own
+low / mid / high ramp.  They stack downward in the chosen corner, below any Hi-C
+legends in the same corner.  Two heatmaps with different ranges or different
+colours therefore stays readable instead of sharing one bar.
+
+.. figure:: images/two_heat_legends.png
+   :alt: Two heatmap rings with two separate colour legends in the top-right corner
+   :width: 90%
+
+   Two heatmaps imported together: one legend per layer, each with its own file
+   name, value range and colour ramp.
 
 .. figure:: images/polish_legend_TOP_RIGHT.png
    :alt: Heatmap colour-bar legend in the top-right corner outside the ring
