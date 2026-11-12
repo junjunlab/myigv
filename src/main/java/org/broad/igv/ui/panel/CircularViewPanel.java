@@ -199,6 +199,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
          *  so {@link #ideogramOuterRadius(int, int, CircularSettings)} reserves room for all of them.
          *  0 = no heatmap outside. */
         public int     heatmapOutsideCount = 0;
+        /** Total radial room the whole OUTSIDE column needs (name zone + every outside layer).
+         *  Recomputed every render, used by {@link #ideogramOuterRadius(int, int, CircularSettings)}. */
+        public double  outsideNeedPx = 0;
         /** Heatmap ramp colours: low / mid (used only when the data straddles 0) / high. */
         public Color   heatmapLowColor = new Color(0, 150, 0);
         public Color   heatmapMidColor = new Color(0, 0, 0);
@@ -268,6 +271,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.heatmapConnectionPx = heatmapConnectionPx;
             s.heatmapOutside = heatmapOutside;
             s.heatmapOutsideCount = heatmapOutsideCount;
+            s.outsideNeedPx = outsideNeedPx;
             s.heatmapLowColor = heatmapLowColor;
             s.heatmapMidColor = heatmapMidColor;
             s.heatmapHighColor = heatmapHighColor;
@@ -415,6 +419,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** Absolute row position in the Data Tracks column (0 = top). Newly imported layers are
          *  inserted at the top, so this is NOT the add order; the ring stacks by THIS. */
         public int rowIndex = 0;
+        /** Position in the OUTSIDE column (0 = closest to the chromosome). */
+        public int outsideIndex = 0;
         /** Outer radius of this layer's ring band (inside labels), computed each render. */
         public double slotOuterR = -1;
 
@@ -422,6 +428,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public Boolean lblInside, lblInward, lblShowLines, lblBold;
         public Integer lblFontSize, lblGapPx, lblHeightPx, lblLevelGapPx;
         public java.awt.Color lblColor, lblLineColor;
+        /** Measured widest label text (px), refreshed each render; sizes the outside slot. */
+        public double lblTextWidth = 0;
         /** HEATMAP: per-layer inside/outside override (null = inherit global heatmapOutside). */
         public Boolean heatOutside;
         // ---- Per-layer HEATMAP overrides (null = inherit the global CircularSettings) ----
@@ -539,6 +547,59 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return out;
     }
 
+    /** True when this layer is drawn OUTSIDE the ideogram (moved to the Outside column). */
+    public static boolean isOutsideLayer(CircularLayer l, CircularSettings s) {
+        if (l == null) return false;
+        if (l.kind == CircularLayer.Kind.HEATMAP) return l.heatmapOutside(s);
+        if (l.kind == CircularLayer.Kind.LABELS) return !l.labelInside(s);
+        return false;
+    }
+
+    /** Visible OUTSIDE layers, ordered by their Outside-column position (0 = nearest the chromosome). */
+    private List<CircularLayer> visibleOutsideLayers(CircularSettings s) {
+        List<CircularLayer> out = new ArrayList<>();
+        for (CircularLayer l : layers) {
+            if (!l.visible || !isOutsideLayer(l, s)) continue;
+            if (l.kind == CircularLayer.Kind.HEATMAP && l.heatmap == null) continue;
+            if (l.kind == CircularLayer.Kind.LABELS && l.labels.isEmpty()) continue;
+            out.add(l);
+        }
+        out.sort(java.util.Comparator.comparingInt(l -> l.outsideIndex));
+        return out;
+    }
+
+    /** Radial footprint one OUTSIDE layer occupies (its band + a small gap). */
+    static double outsideFootprint(CircularLayer l, CircularSettings s) {
+        if (l.kind == CircularLayer.Kind.HEATMAP) {
+            double conn = l.heatConnTrack(s);
+            double heat = Math.max(8, l.heatHeight(s) > 0 ? l.heatHeight(s) : 50);
+            return conn + heat + 6;
+        }
+        // Labels: the radial extent is the text itself (drawn along the radius), so size the slot
+        // from the measured widest label, falling back to the ring reserve before the first render.
+        double text = l.lblTextWidth > 0 ? l.lblTextWidth : 0;
+        return Math.max(labelRingReserve(l, s), l.labelGapPx(s) + text) + 6;
+    }
+
+    /** Distance from rOut to the INNER edge of this outside layer's band (sum of the ones above it). */
+    private double outsideLayerOffset(CircularLayer l, CircularSettings s) {
+        double r = chromosomeNameOuter(s);
+        for (CircularLayer o : visibleOutsideLayers(s)) {
+            if (o == l) break;
+            r += outsideFootprint(o, s);
+        }
+        return r;
+    }
+
+    /** Total outer reserve needed by every outside layer, plus the chromosome-name zone. */
+    private double outsideTotalNeed(CircularSettings s) {
+        List<CircularLayer> outs = visibleOutsideLayers(s);
+        if (outs.isEmpty()) return 0;
+        double r = chromosomeNameOuter(s);
+        for (CircularLayer l : outs) r += outsideFootprint(l, s);
+        return r;
+    }
+
     /** Radius the labels hang from: the ideogram's INNER edge when inside, outer when outside. */
     static double labelBaseRadius(int w, int h, CircularSettings s) {
         return labelBaseRadius(w, h, s, s.labelInside);
@@ -587,16 +648,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (inside) {
             return l.slotOuterR > 0 ? l.slotOuterR : labelBaseRadius(w, h, s, true);
         }
-        // OUTSIDE: several outside label layers stack outward (their order in the rows), so an
-        // inner layer moved outside lands on its own ring past the ones already outside.
-        double base = labelBaseRadius(w, h, s, false);
-        int idx = 0;
-        for (CircularLayer o : layers) {
-            if (o == l) continue;
-            if (o.kind == CircularLayer.Kind.LABELS && o.visible && !o.labels.isEmpty()
-                    && !o.labelInside(s) && o.rowIndex < l.rowIndex) idx++;
-        }
-        return base + idx * labelRingReserve(l, s);
+        // OUTSIDE: unified outside stack — this layer's band starts after every outside layer
+        // above it in the Outside column (order 0 = nearest the chromosome).
+        return ideogramOuterRadius(w, h, s) + outsideLayerOffset(l, s);
     }
 
     /** Clear the per-render slot radius of every labels layer (recomputed by the band layout). */
@@ -631,21 +685,19 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * is also how deleting the labels row restores it).
      */
     private void updateOutsideLabelReserve() {
-        // Count how many heatmap rings sit OUTSIDE (per-layer override, else the global flag), so
-        // the ideogram reserves room for all of them.
+        // Count how many heatmap rings sit OUTSIDE (per-layer override, else the global flag).
         int outsideHm = 0;
         for (CircularLayer l : layers) {
             if (l.kind == CircularLayer.Kind.HEATMAP && l.visible && l.heatmap != null
                     && l.heatmapOutside(settings)) outsideHm++;
         }
         settings.heatmapOutsideCount = outsideHm;
-        // Measure only the OUTSIDE label layers (per-layer inside/outside, per-layer font & gap).
+        // Measure the widest label text of every OUTSIDE label layer (sizes its outside slot).
         BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
         Graphics2D pg = probe.createGraphics();
         double reserve = 0;
         for (CircularLayer l : layers) {
             if (l.kind != CircularLayer.Kind.LABELS || !l.visible || l.labels.isEmpty()) continue;
-            if (l.labelInside(settings)) continue;   // this layer hangs INSIDE, not outside
             Font font = new Font("SansSerif", l.labelBold(settings) ? Font.BOLD : Font.PLAIN,
                     l.labelFontSize(settings));
             pg.setFont(font);
@@ -655,11 +707,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 if (row == null || row.text == null) continue;
                 maxW = Math.max(maxW, fm.stringWidth(row.text));
             }
-            // Outside layers STACK (see layerBaseRadius), so each one adds its own radial slot.
-            if (maxW > 0) reserve += l.labelGapPx(settings) + maxW + 8;
+            l.lblTextWidth = maxW;
+            if (!l.labelInside(settings) && maxW > 0) {
+                reserve += l.labelGapPx(settings) + maxW + 8;
+            }
         }
         pg.dispose();
         settings.labelOutsideReservePx = reserve;
+        // Total room the whole OUTSIDE column needs — name zone plus every outside layer, in order.
+        settings.outsideNeedPx = outsideTotalNeed(settings);
     }
 
     public boolean hasLabelsLayer() {
@@ -1086,7 +1142,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             // The heatmap lives OUTSIDE the chromosome names + axis: those keep their normal
             // radius (see drawAll / chromosomeNameClearance) and the band grows beyond them.
             // Several outside heatmaps stack outward, one heatmap footprint each.
-            double slotTop = rOut + chromosomeNameOuter(s) + outsideIndex * slotPitch;
+            double slotTop = rOut + outsideLayerOffset(hl, s);
             double bandInner = slotTop + connH;
             double bandOuter = Math.min(bandInner + heatH, Math.min(w, h) / 2.0 - 6);
             if (bandOuter - bandInner < 6) return cursor;
@@ -2017,15 +2073,22 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double half = Math.min(w, h) / 2.0;
         double R = half - MARGIN;
         double rOut = R * s.bandOuter;
-        int outsideHeatmaps = Math.max(s.heatmapOutsideCount, s.heatmapOutside ? 1 : 0);
-        boolean outsideHeatmap = outsideHeatmaps > 0;
-        boolean outsideLabels = s.labelOutsideReservePx > 0;   // measured from the real label texts
-        if (!outsideHeatmap && !outsideLabels) return rOut;
-        // Everything that lives outside the ring, from inside out: the axis / chromosome names,
-        // then the heatmap ring (when outside too), then the label texts themselves.
-        double need = chromosomeNameOuter(s)
-                + (outsideHeatmap ? outsideHeatmaps * outsideHeatmapFootprint(s) : 0)
-                + (outsideLabels ? s.labelOutsideReservePx + 6 : 0);
+        // The exact outside stack (name zone + every outside layer, in column order) is measured
+        // each render and published on the settings. Fall back to the coarse estimate before the
+        // first render / for callers that never render.
+        double need;
+        if (s.outsideNeedPx > 0) {
+            need = s.outsideNeedPx;
+        } else {
+            int outsideHeatmaps = Math.max(s.heatmapOutsideCount, s.heatmapOutside ? 1 : 0);
+            boolean outsideHeatmap = outsideHeatmaps > 0;
+            boolean outsideLabels = s.labelOutsideReservePx > 0;
+            if (!outsideHeatmap && !outsideLabels) return rOut;
+            need = chromosomeNameOuter(s)
+                    + (outsideHeatmap ? outsideHeatmaps * outsideHeatmapFootprint(s) : 0)
+                    + (outsideLabels ? s.labelOutsideReservePx + 6 : 0);
+        }
+        if (need <= 0) return rOut;
         return Math.min(rOut, Math.max(R * 0.35, half - 8 - need));
     }
 
