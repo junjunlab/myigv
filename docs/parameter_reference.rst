@@ -291,10 +291,12 @@ Links layer — right-click a Links row
      - on / off
      - Draw a filled ribbon (Circos ``ribbon=yes``) instead of a stroked curve.
    * - ``Twist ribbons``
-     - **on**
+     - off
      - on / off
-     - Narrow the ribbon at its waist (factor ``k = 0.22``) rather than
-       collapsing it to zero width.  Default is **on**.
+     - Narrow the ribbon at its waist to ``0.4×`` width at the midpoint
+       (``sin`` profile) rather than keeping a constant width.  Default is
+       **off**; with it off the ribbon keeps a constant pixel width along its
+       whole length.
    * - ``Colour by chromosome``
      - off
      - on / off
@@ -331,8 +333,8 @@ Links layer — right-click a Links row
      - ``0.05``–``1.0``
      - Radial position of link ends as a fraction of the ideogram inner radius.
        Lower it to keep links clear of the data rings.
-   * - ``Bezier radius (0-1)… (0.25)``
-     - ``0.25``
+   * - ``Bezier radius (0-1)… (0.8)``
+     - ``0.8``
      - ``0.0``–``1.0``
      - Radial position of the bezier control point; ``0`` gives a straight
        chord (Circos ``bezier_radius``).
@@ -366,7 +368,7 @@ Links layer — right-click a Links row
 
 .. tip::
 
-   ``linkBezierPurity`` (default ``0.75``), ``geneFlankBp`` (``2000``) and
+   ``linkBezierPurity`` (default ``1.0``), ``geneFlankBp`` (``2000``) and
    ``linkRibbonStrokeThickness`` (``0.6``) are internal constants with no
    dedicated menu item; they are listed here for completeness only.
 

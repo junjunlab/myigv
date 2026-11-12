@@ -138,15 +138,23 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public boolean showLinks = true;
         /** Filled band (Circos {@code ribbon=yes}) instead of a stroked curve. */
         public boolean linkRibbon = true;
-        /** Swap which end of the second interval the ribbon's edges connect to (Circos {@code twist}). */
-        public boolean linkTwist = true;
+        /** Swap which end of the second interval the ribbon's edges connect to (Circos {@code twist}).
+         *  When true the two edges are pulled toward the centreline so the band narrows to a waist
+         *  at mid-span; when false the band keeps a near-constant width (the default). */
+        public boolean linkTwist = false;
         /** Radial position of the link ends, as a fraction of the ideogram inner radius. */
         public double  linkRadius = 0.95;
         /** Radial position of the bezier control point, as a fraction of the link end radius.
-         *  Values &lt;= 0 draw a straight chord (Circos {@code bezier_radius=0}). */
-        public double  linkBezierRadius = 0.25;
-        /** 1 = control point purely radial (curves hug the circle), 0 = pulled to the Cartesian midpoint. */
-        public double  linkBezierPurity = 0.75;
+         *  This is what makes a chord dip inward: 1 = the curve stays right next to the ring,
+         *  0 = a straight chord. Values that are too small (e.g. 0.25) pull the ribbon so deep
+         *  toward the centre that the two edges meet and it collapses to a point with no width,
+         *  so the default is 0.8, which keeps a clear band across the whole span. */
+        public double  linkBezierRadius = 0.8;
+        /** 1 = control point purely radial (curves hug the circle and the band keeps its width),
+         *  0 = control point pulled to the Cartesian chord midpoint (which narrows a long ribbon's
+         *  middle). 1.0 is the default so diametric links stay full width; lower it for a softer,
+         *  more tapered look. */
+        public double  linkBezierPurity = 1.0;
         /** Extra control points that make links meet the ideogram perpendicularly; 0 disables. */
         public double  linkCrest = 0.5;
         /** Minimum angular width (degrees) of a ribbon end. Real BEDPE anchors are only a few kb,
@@ -3473,65 +3481,95 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     /**
-     * Filled ribbon built the way circlize's {@code circos.link} builds it: TWO quadratic edges,
-     * each with its own control point on the bisector of its own pair of ends, closed by straight
-     * caps. The band therefore keeps a real width the whole way across — its width at each end is
-     * that end's arc — instead of pinching to a needle at mid-span.
+     * Filled ribbon built the way circlize's {@code circos.link} builds it, but with a CONSTANT
+     * PIXEL width along its whole length (a true band) instead of a constant *angular* width.
+     *
+     * <p>A constant angular width is what made every long link pinch to a needle at mid-span:
+     * the band dips toward the centre, and a fixed angle there spans fewer pixels, so the middle
+     * collapsed to a point. Here we take the ribbon's centreline — the bisector bezier between the
+     * two interval centres, the same control point the chords use — and offset it by +/– half the
+     * band width perpendicular to the curve. The band therefore keeps its width no matter how deep
+     * the chord dips. When the two ends have different widths the band tapers between them (a
+     * trapezoid) rather than hourglassing.</p>
      *
      * @param e1       {start,end} angular extent of the first interval (already min-width adjusted)
      * @param e2       same for the second interval
-     * @param twist    cross the edges (circlize {@code inverse = TRUE}): edge A runs
-     *                 start1 -> end2 and edge B end1 -> start2
+     * @param twist    gently narrows the band to a waist at mid-span (floored so it never closes)
+     * @param arrowStart/arrowEnd  flare the end into a triangular head that touches the ring
      */
     static Path2D.Double ribbonBand(double cx, double cy, double rEnd, double rBez,
                                     double purity, double[] e1, double[] e2, boolean twist,
                                     boolean arrowStart, boolean arrowEnd, double arrLen) {
         double a1s = e1[0], a1e = e1[1], a2s = e2[0], a2e = e2[1];
-        double edgeAFrom = a1s, edgeATo = a2s;
-        double edgeBFrom = a1e, edgeBTo = a2e;
-        // An arrow end pulls the two EDGES back by arrLen and then runs the closing edge along the
-        // ring arc: the band flares out into a head whose base is the whole arc at rEnd. That is
-        // circos.link's d1x/d2x + arc.points(theta22, theta21, rou2) construction.
-        double rFrom = arrowStart ? Math.max(4, rEnd - arrLen) : rEnd;
-        double rTo = arrowEnd ? Math.max(4, rEnd - arrLen) : rEnd;
+        double m1 = (a1s + a1e) / 2.0, m2 = (a2s + a2e) / 2.0;   // centre of each interval arc
 
-        Point2D A0 = polar(cx, cy, rFrom, edgeAFrom);
-        Point2D A1 = polar(cx, cy, rTo, edgeATo);
-        Point2D B0 = polar(cx, cy, rFrom, edgeBFrom);
-        Point2D B1 = polar(cx, cy, rTo, edgeBTo);
-        Point2D cA = linkControl(cx, cy, rEnd, rBez, edgeAFrom, edgeATo, purity);
-        Point2D cB = linkControl(cx, cy, rEnd, rBez, edgeBFrom, edgeBTo, purity);
-        if (twist) {
-            // "Twist" pulls both edges toward the centreline, so the ribbon narrows to a waist at
-            // mid-span and reopens. Swapping the edge pairing instead (a real 2D cross) would
-            // close the band to a POINT there, which is exactly the hairline look we just fixed.
-            final double k = 0.22;
-            double mx = (cA.getX() + cB.getX()) / 2.0;
-            double my = (cA.getY() + cB.getY()) / 2.0;
-            cA = new Point2D.Double(cA.getX() + (mx - cA.getX()) * k,
-                    cA.getY() + (my - cA.getY()) * k);
-            cB = new Point2D.Double(cB.getX() + (mx - cB.getX()) * k,
-                    cB.getY() + (my - cB.getY()) * k);
+        // An arrow end pulls the whole end of the spine back by arrLen so the head can flare out
+        // to the ring (circos.link's big.arrow: the band narrows into a tip touching rou2).
+        double rFrom = arrowStart ? Math.max(4, rEnd - arrLen) : rEnd;
+        double rTo   = arrowEnd   ? Math.max(4, rEnd - arrLen) : rEnd;
+
+        // Centreline: from the centre of interval 1 to the centre of interval 2, with the same
+        // radial bezier control the chords use.
+        Point2D S0 = polar(cx, cy, rFrom, m1);
+        Point2D S2 = polar(cx, cy, rTo, m2);
+        Point2D Cs = linkControl(cx, cy, rEnd, rBez, m1, m2, purity);
+
+        // Half widths (px) at each end, taken from the real arc length of the interval. The
+        // min-degree floor in ribbonEnd already guarantees a visible width for 1 bp anchors.
+        double hw0 = Math.max(0.75, arcWidthPx(e1, rEnd) / 2.0);
+        double hw2 = Math.max(0.75, arcWidthPx(e2, rEnd) / 2.0);
+
+        final int N = 48;
+        Point2D[] top = new Point2D[N + 1], bot = new Point2D[N + 1];
+        for (int i = 0; i <= N; i++) {
+            double t = i / (double) N;
+            Point2D p = quadAt(S0, Cs, S2, t);
+            Point2D d = quadDeriv(S0, Cs, S2, t);
+            double len = Math.hypot(d.getX(), d.getY());
+            if (len < 1e-9) { d = new Point2D.Double(1, 0); len = 1; }
+            double nx = -d.getY() / len, ny = d.getX() / len;          // unit normal to the spine
+            double hw = hw0 + (hw2 - hw0) * t;                         // trapezoid between ends
+            if (twist) hw *= Math.max(0.4, 1.0 - 0.6 * Math.sin(Math.PI * t));  // gentle waist
+            top[i] = new Point2D.Double(p.getX() + nx * hw, p.getY() + ny * hw);
+            bot[i] = new Point2D.Double(p.getX() - nx * hw, p.getY() - ny * hw);
         }
 
         Path2D.Double path = new Path2D.Double();
-        path.moveTo(A0.getX(), A0.getY());
-        path.quadTo(cA.getX(), cA.getY(), A1.getX(), A1.getY());
+        path.moveTo(top[0].getX(), top[0].getY());
+        for (int i = 1; i <= N; i++) path.lineTo(top[i].getX(), top[i].getY());
         if (arrowEnd) {
-            // circos.link "big.arrow": both edges stop at rEnd - arr.length and the polygon
-            // closes on ONE point at the middle of the arc, so the band narrows into a tip that
-            // touches the ring (a triangular head, base = band width).
-            Point2D tip = polar(cx, cy, rEnd, (edgeATo + edgeBTo) / 2.0);
+            // Flared head: the band narrows into a single tip that touches the ring.
+            Point2D tip = polar(cx, cy, rEnd, m2);
             path.lineTo(tip.getX(), tip.getY());
         }
-        path.lineTo(B1.getX(), B1.getY());
-        path.quadTo(cB.getX(), cB.getY(), B0.getX(), B0.getY());
+        for (int i = N; i >= 0; i--) path.lineTo(bot[i].getX(), bot[i].getY());
         if (arrowStart) {
-            Point2D tip = polar(cx, cy, rEnd, (edgeAFrom + edgeBFrom) / 2.0);
+            Point2D tip = polar(cx, cy, rEnd, m1);
             path.lineTo(tip.getX(), tip.getY());
         }
         path.closePath();
         return path;
+    }
+
+    /** Arc length (px) of an interval end [{@code start,end}] fraction-of-circle at radius r. */
+    static double arcWidthPx(double[] e, double r) {
+        return Math.abs(e[1] - e[0]) * 2.0 * Math.PI * r;
+    }
+
+    /** Point on a quadratic bezier (p0, c, p2) at t. */
+    static Point2D quadAt(Point2D p0, Point2D c, Point2D p2, double t) {
+        double u = 1 - t;
+        return new Point2D.Double(
+                u * u * p0.getX() + 2 * u * t * c.getX() + t * t * p2.getX(),
+                u * u * p0.getY() + 2 * u * t * c.getY() + t * t * p2.getY());
+    }
+
+    /** Tangent (derivative) of a quadratic bezier at t. */
+    static Point2D quadDeriv(Point2D p0, Point2D c, Point2D p2, double t) {
+        double u = 1 - t;
+        return new Point2D.Double(
+                2 * u * (c.getX() - p0.getX()) + 2 * t * (p2.getX() - c.getX()),
+                2 * u * (c.getY() - p0.getY()) + 2 * t * (p2.getY() - c.getY()));
     }
 
     /**
@@ -3637,7 +3675,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     //  Geometry + text
     // ------------------------------------------------------------------
 
-    private static Point2D polar(double cx, double cy, double r, double frac) {
+    static Point2D polar(double cx, double cy, double r, double frac) {
         double theta = frac * 2.0 * Math.PI;
         return new Point2D.Double(cx + r * Math.sin(theta), cy - r * Math.cos(theta));
     }

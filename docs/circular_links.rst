@@ -37,13 +37,13 @@ Visibility and geometry
        stroked curve.  Even when off, the other ribbon parameters below still
        govern the chord geometry.
    * - ``Twist ribbons``
-     - on
+     - off
      - Swap which end of the second interval the two ribbon edges connect to
        (Circos ``twist``).  In myIGV twist is implemented as a **mild waist
-       narrowing** (factor ``k = 0.22`` at the midpoint), not a full pinch: the
-       band keeps a visible width along its entire length.  This is the default
-       and is the main visual difference from a naive centreline ribbon whose
-       width collapses to zero at ``t = 0.5``.
+       narrowing** that brings the band to ``0.4×`` of its full width at the
+       midpoint (``sin`` profile), not a full pinch.  It is **off by default**
+       so the ribbon keeps a constant pixel width along its whole length; turn
+       it on only for the classic twisted-ribbon look.
    * - ``Colour by chromosome``
      - off
      - Colour each link by its source chromosome instead of using one link
@@ -59,9 +59,9 @@ Visibility and geometry
    :alt: Dense blue filled ribbon links inside a whole-genome circular ring
    :width: 65%
 
-   ``Ribbon (filled bands)`` on: each link is a filled two-edge Bezier band.
-   ``Twist ribbons`` (default on) narrows the waist slightly but never closes
-   it.
+   ``Ribbon (filled bands)`` on: each link is a filled band with a constant
+   pixel width along its length.  ``Twist ribbons`` (default off) optionally
+   narrows the waist to ``0.4×`` at the midpoint without ever closing it.
 
 .. figure:: images/circular_links_straight.png
    :alt: Straight chord links across a circular ring
@@ -73,10 +73,16 @@ Visibility and geometry
 Ribbon body
 -----------
 
-The ribbon is a polygon bounded by two quadratic Bezier edges, following
-``circos.link`` in the circlize R package.  A whole-genome BEDPE anchor is often
-only a few kilobases, which is sub-pixel on the ring, so a minimum angular
-width is applied at each end.
+The ribbon is drawn as a **constant-pixel-width band** swept along a quadratic
+Bezier centreline spine.  The spine runs from the midpoint of the first
+interval, through a single control point on the angle bisector at
+``linkBezierRadius``, to the midpoint of the second interval; at every sample
+the band is offset by ``±`` half its width perpendicular to the spine.  This is
+what stops the band pinching to a point in the middle — a fixed *angular* width
+would do exactly that whenever the spine dives toward the centre.  A
+whole-genome BEDPE anchor is often only a few kilobases (sub-pixel on the
+ring), so a minimum angular width is still applied at each end to keep the
+anchor visible.
 
 .. list-table::
    :header-rows: 1
@@ -91,7 +97,7 @@ width is applied at each end.
        radius.  Range ``0.05 – 1.0``.  Lower it to keep links clear of data
        rings.
    * - ``Bezier radius (0-1)…``
-     - ``0.25``
+     - ``0.8``
      - Radial position of the Bezier control point (Circos
        ``bezier_radius``).  ``0`` draws a straight chord; ``1`` pushes the
        control point to the centre.  Range ``0 – 1``.
@@ -116,15 +122,18 @@ width is applied at each end.
      - ``5000``
      - Cap on links drawn per frame (Circos ``record_limit``).  Minimum ``1``.
 
-An internal ``linkBezierPurity`` of ``0.75`` blends the control point between
-the purely radial position and the Cartesian midpoint; it has no menu item.
+An internal ``linkBezierPurity`` of ``1.0`` holds the control point at the
+purely radial (angle-bisector) position, which keeps the band at full width;
+lower values tilt it toward the Cartesian midpoint.  It has no menu item.  The
+control point's radial position is set by the ``Bezier radius (0-1)…`` menu
+(default ``0.8``).
 
 .. figure:: images/ribbon_single.png
-   :alt: One ribbon link showing its two curved edges and constant waist width
+   :alt: One ribbon link showing a uniform pixel-width band along its length
    :width: 55%
 
-   A single ribbon.  Both edges remain separate at the midpoint — the band
-   never degenerates into a needle.
+   A single ribbon.  The band keeps a constant pixel width along its length —
+   it never pinches to a needle at the midpoint.
 
 .. figure:: images/circular_links_ribbon_mixed.png
    :alt: Mixed point-anchor and interval-anchor ribbons in one ring
