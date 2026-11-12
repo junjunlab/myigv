@@ -32,15 +32,17 @@ One list, two kinds of row
      - A concentric band whose radial position is **its row position**.
    * - Labels layer
      - ``<file>   (labels N)``
-     - A dedicated label ring (inside or outside the ideogram).
+     - A dedicated label ring (inside or outside the ideogram), placed at
+       **its row position** when the labels sit inside the ring.
    * - Normal IGV track
      - ``<track display name>``
      - A concentric data band.
 
 A hidden row gets a ``   (hidden)`` suffix.  ``refreshDataColumn()`` preserves
 the existing order, appends newly imported layers at the top and newly loaded
-tracks at the bottom, then recomputes ``heatmapBandIndex`` from the row list and
-calls ``setRingTracks(...)`` with the tracks in that same order.
+tracks at the bottom, then recomputes ``heatmapBandIndex`` **and**
+``labelBandIndex`` from the row list and calls ``setRingTracks(...)`` with the
+tracks in that same order.
 
 .. note::
 
@@ -49,6 +51,19 @@ calls ``setRingTracks(...)`` with the tracks in that same order.
    between two track rows moves its band between those two bands.  This is what
    fixes the historical problem of a heatmap overlapping a RefSeq band that was
    listed after it.
+
+.. note::
+
+   The label ring follows the same rule.  ``labelBandIndex`` is the number of
+   data bands listed **above** the labels row, and ``drawTrackRings`` reserves
+   ``labelRingReserve()`` worth of radial room at exactly that position — so
+   dragging the labels row to the last place moves the labels to the
+   **innermost** ring, below every data band, instead of leaving them pinned
+   just under the ideogram.  With the labels row at the top (the default) they
+   sit directly under the ideogram, which is the historical layout.  The slot
+   applies only when ``Labels inside the ideogram`` is on: outside labels hang
+   from the ideogram's outer edge regardless of row order, and a slot past the
+   last band clamps to the innermost position.
 
 Dragging rows
 -------------

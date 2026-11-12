@@ -1172,12 +1172,18 @@ public class IGVContentPane extends JPanel {
         dataColumnTracks.clear();
         int bandBefore = 0;          // band-capable rows above the heatmap row
         int heatSlot = -1;
+        int labelSlot = -1;          // band position of the (single, shared) inside label ring
         for (Object row : rows) {
             if (row instanceof CircularViewPanel.CircularLayer) {
                 CircularViewPanel.CircularLayer l = (CircularViewPanel.CircularLayer) row;
                 model.addElement(layerLabel(l));
                 if (l.kind == CircularViewPanel.CircularLayer.Kind.HEATMAP && l.visible) {
                     heatSlot = bandBefore;
+                } else if (l.kind == CircularViewPanel.CircularLayer.Kind.LABELS
+                        && l.visible && !l.labels.isEmpty() && labelSlot < 0) {
+                    // All label layers share ONE ring, so its band sits at the first visible
+                    // labels row: dragging that row to the bottom puts the ring innermost.
+                    labelSlot = bandBefore;
                 }
                 continue;
             }
@@ -1191,6 +1197,7 @@ public class IGVContentPane extends JPanel {
         if (model.isEmpty()) model.addElement("(no tracks loaded)");
         dataColumnList.setModel(model);
         circularDrawingArea.setHeatmapBandIndex(heatSlot < 0 ? 0 : heatSlot);
+        circularDrawingArea.setLabelBandIndex(labelSlot < 0 ? 0 : labelSlot);
         circularDrawingArea.setRingTracks(new ArrayList<>(dataColumnTracks));   // ordered top->bottom
 
         // Any interaction track that is already loaded also feeds the circular links, so a

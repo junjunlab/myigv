@@ -35,6 +35,17 @@ the **near end of the text**.  The layout stores each string's rendered length,
 so the text centre is offset by half that length and the comb never runs
 through the letters.
 
+**The label ring is a band in the row stack.**  When the labels sit inside the
+ideogram, the ring is placed like any data band: its radial position comes from
+the labels row's position in the Data Tracks column.  ``labelBandIndex`` counts
+the visible data bands listed above the labels row, ``drawTrackRings()``
+reserves ``labelRingReserve()`` at that slot, and the text pass hangs the names
+from the recorded slot radius.  Dragging the labels row to the last place
+therefore moves the label ring to the **innermost** position, below every data
+band; leaving it at the top (the default) keeps the historical layout just under
+the ideogram.  The outside mode ignores the slot and always hangs the labels
+from the ideogram's outer edge.
+
 **``smartAlign`` for dense regions.**  When several names would overlap,
 circlize groups consecutive overlapping extents into a cluster, then re-tiles
 the cluster end to end around its midpoint so the names fan out in the

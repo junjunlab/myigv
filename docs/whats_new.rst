@@ -162,6 +162,9 @@ v1.0.2 tag.
      - Radial gene labels with comb connectors, circlize ``smartAlign`` for
        dense regions, inward reading, and full typographic control.  Outside
        mode leaves the ideogram radius, chromosome names and axis untouched.
+       Inside mode places the ring like any band, so the labels row's position
+       in the Data Tracks column decides its radius — drag it last and the
+       labels become the innermost ring.
      - :doc:`circular_labels`
    * - Hi-C on the ring
      - Triangle/square Hi-C contact matrices warped into a ring, with TAD

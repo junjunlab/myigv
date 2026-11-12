@@ -475,6 +475,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return rOut;
     }
 
+    /** Base radius for the label text pass: the reserved label-band slot when the labels sit
+     *  INSIDE the ring, otherwise the plain outside radius. */
+    private double effectiveLabelBaseRadius(int w, int h, CircularSettings s) {
+        if (s.labelInside && labelSlotOuterR > 0) return labelSlotOuterR;
+        return labelBaseRadius(w, h, s);
+    }
+
     /** True when at least one visible labels layer exists (drives the inside-label band reservation). */
     public boolean hasVisibleLabels() {
         for (CircularLayer l : layers) {
@@ -498,6 +505,20 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     public void setHeatmapBandIndex(int i) { heatmapBandIndex = Math.max(0, i); invalidateRing(); }
 
     public int getHeatmapBandIndex() { return heatmapBandIndex; }
+
+    /** Where the labels band sits in the band stack: 0 = outermost (first row),
+     *  ringTracks.size() = innermost (last row). This makes the Data Tracks row order place the
+     *  inside label ring exactly like a data band, so dragging the labels row to the end moves the
+     *  label ring to the innermost position (previously it was always pinned just under the ring). */
+    private int labelBandIndex = 0;
+
+    /** Outer radius of the reserved label band, captured during the ring layout so the later text
+     *  pass hangs the labels from exactly that radius. -1 = not placed (outside / no labels). */
+    private double labelSlotOuterR = -1;
+
+    public void setLabelBandIndex(int i) { labelBandIndex = Math.max(0, i); invalidateRing(); }
+
+    public int getLabelBandIndex() { return labelBandIndex; }
 
     /** Snapshot of the circular-only layers, in load order. */
     public List<CircularLayer> getLayers() { return new ArrayList<>(layers); }
@@ -1046,6 +1067,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         String key = gid + "|" + chr + "|" + bw + "x" + bh + geneSig;
         if (!key.equals(ringKey) || ringImage == null) {
             hicLimitsByTrack.clear();   // only legends for tracks drawn in THIS rebuild
+            labelSlotOuterR = -1;       // recomputed by the band layout below
             ringImage = new BufferedImage(bw, bh, BufferedImage.TYPE_INT_ARGB);
             Graphics2D ig = ringImage.createGraphics();
             ig.scale(sx, sy);   // draw in logical coords, mapped to device pixels
@@ -1143,6 +1165,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
         // Legends are collected during drawing; start clean so only the tracks drawn now report.
         hicLimitsByTrack.clear();
+        labelSlotOuterR = -1;   // recomputed by the band layout below when labels sit inside
 
         boolean geneMode = FrameManager.isGeneListMode();
         if (geneMode) {
@@ -2096,19 +2119,25 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (R <= 20) return;
         double rOut = ideogramOuterRadius(w, h, s);
         double cursor = bandStartRadius(R, rOut, s);   // leaves room for inside tick labels
-        if (s.labelInside && hasVisibleLabels()) cursor -= labelRingReserve(s);
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
         java.util.Map<String, java.util.Map<String, float[]>> perGeneGroups = needPerGeneGroups(chrs);
-        // Row order == radial order (top row = outermost). The heatmap layer is just another row,
-        // so it is drawn at its own position in the stack instead of being pinned to one end.
+        // Row order == radial order (top row = outermost). The heatmap and the inside label ring
+        // are just another row each, so they are placed at their own position in the stack
+        // instead of being pinned to one end.
         int heatSlot = Math.max(0, Math.min(heatmapBandIndex, ringTracks.size()));
+        boolean labelBand = s.labelInside && hasVisibleLabels();
+        int labelSlot = Math.max(0, Math.min(labelBandIndex, ringTracks.size()));
         int bandNo = 0;
         for (Track t : ringTracks) {
             if (heatmap != null && bandNo == heatSlot) {
                 cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
                         chrs, sec, s, heatmap, true);
+            }
+            if (labelBand && bandNo == labelSlot) {
+                labelSlotOuterR = cursor;
+                cursor -= labelRingReserve(s);
             }
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor;
@@ -2123,6 +2152,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
                     chrs, sec, s, heatmap, true);
         }
+        // Labels whose row is past the last drawable band fall in at the innermost position.
+        if (labelBand && labelSlotOuterR < 0 && labelSlot >= bandNo) {
+            labelSlotOuterR = cursor;
+            cursor -= labelRingReserve(s);
+        }
     }
 
     private void drawTrackRingsSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {
@@ -2132,18 +2166,23 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (R <= 20) return;
         double rOut = ideogramOuterRadius(w, h, s);
         double cursor = bandStartRadius(R, rOut, s);   // leaves room for inside tick labels
-        if (s.labelInside && hasVisibleLabels()) cursor -= labelRingReserve(s);
         List<ChrInfo> chrs = Collections.singletonList(chr);
         List<double[]> sec = sectorsFor(chrs, s);
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
         java.util.Map<String, java.util.Map<String, float[]>> perGeneGroups = needPerGeneGroups(chrs);
         int heatSlot = Math.max(0, Math.min(heatmapBandIndex, ringTracks.size()));
+        boolean labelBand = s.labelInside && hasVisibleLabels();
+        int labelSlot = Math.max(0, Math.min(labelBandIndex, ringTracks.size()));
         int bandNo = 0;
         for (Track t : ringTracks) {
             if (heatmap != null && bandNo == heatSlot) {
                 cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
                         chrs, sec, s, heatmap, true);
+            }
+            if (labelBand && bandNo == labelSlot) {
+                labelSlotOuterR = cursor;
+                cursor -= labelRingReserve(s);
             }
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor, bandInner = bandOuter - ringHeightPx(t, cfg);
@@ -2156,6 +2195,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (heatmap != null && bandNo == heatSlot) {
             cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
                     chrs, sec, s, heatmap, true);
+        }
+        // Labels whose row is past the last drawable band fall in at the innermost position.
+        if (labelBand && labelSlotOuterR < 0 && labelSlot >= bandNo) {
+            labelSlotOuterR = cursor;
+            cursor -= labelRingReserve(s);
         }
     }
 
@@ -2483,7 +2527,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         FontMetrics fm = pg.getFontMetrics();
         pg.dispose();
 
-        double rBase = labelBaseRadius(w, h, s);
+        double rBase = effectiveLabelBaseRadius(w, h, s);
         double dir = s.labelInside ? -1.0 : 1.0;
         // {a0, a1, widthPx} in anchor order; texts aligned with the same indices
         List<double[]> anchors = new ArrayList<>();
@@ -2585,7 +2629,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     void drawLabelLayers(Graphics2D g2, int w, int h, CircularSettings s) {
         if (labelLayout.isEmpty()) return;
         int cx = w / 2, cy = h / 2;
-        double rBase = labelBaseRadius(w, h, s);
+        double rBase = effectiveLabelBaseRadius(w, h, s);
         double dir = s.labelInside ? -1.0 : 1.0;
         Font font = new Font("SansSerif", s.labelBold ? Font.BOLD : Font.PLAIN, s.labelFontSize);
         Stroke oldStroke = g2.getStroke();
