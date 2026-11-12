@@ -402,7 +402,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * the layer's own context menu (ribbon / heatmap parameters + Remove).
      */
     public static class CircularLayer {
-        public enum Kind { LINKS, HEATMAP, LABELS, POINTS, LINES }
+        public enum Kind { LINKS, HEATMAP, LABELS, POINTS, LINES, HIST, RECT }
 
         public final Kind kind;
         public final String name;      // file name, shown in the Data Tracks column
@@ -420,11 +420,18 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public Integer plPointSize, plLineWidth, plHeightPx;
         /** POINTS / LINES: draw outside the ideogram (moved to the Outside column). */
         public Boolean plOutside;
+        /** RECT: expand overlapping intervals into radial lanes so every one stays visible. */
+        public Boolean plExpand;
+        public boolean plExpand() { return plExpand != null && plExpand; }
         public java.awt.Color plColor() { return plColor != null ? plColor : new java.awt.Color(35, 95, 175); }
         public int plPointSize() { return plPointSize != null ? plPointSize : 4; }
         public int plLineWidth() { return plLineWidth != null ? plLineWidth : 2; }
         public int plHeight()    { return plHeightPx != null ? plHeightPx : 42; }
         public boolean plOutside() { return plOutside != null && plOutside; }
+        /** Kind test shared by the interval+value tracks (points / lines / histogram / rectangles). */
+        public static boolean isIntervalValue(Kind k) {
+            return k == Kind.POINTS || k == Kind.LINES || k == Kind.HIST || k == Kind.RECT;
+        }
         public boolean visible = true;
         /** Row position (band index) among the band-capable rows, so several labels layers each
          *  get their own ring band instead of sharing one. */
@@ -488,9 +495,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 return heatmap == null ? "heatmap"
                         : "heatmap " + heatmap.rows.size() + " x " + heatmap.samples;
             }
-            if (kind == Kind.POINTS || kind == Kind.LINES) {
-                return (kind == Kind.POINTS ? "points " : "lines ")
-                        + (points == null ? 0 : points.rows.size());
+            if (CircularLayer.isIntervalValue(kind)) {
+                String tag = kind == Kind.POINTS ? "points" : kind == Kind.LINES ? "lines"
+                        : kind == Kind.HIST ? "hist" : "rect";
+                return tag + " " + (points == null ? 0 : points.rows.size());
             }
             return "links " + links.size();
         }
@@ -569,7 +577,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (l == null) return false;
         if (l.kind == CircularLayer.Kind.HEATMAP) return l.heatmapOutside(s);
         if (l.kind == CircularLayer.Kind.LABELS) return !l.labelInside(s);
-        if (l.kind == CircularLayer.Kind.POINTS || l.kind == CircularLayer.Kind.LINES) return l.plOutside();
+        if (CircularLayer.isIntervalValue(l.kind)) return l.plOutside();
         return false;
     }
 
@@ -580,8 +588,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             if (!l.visible || !isOutsideLayer(l, s)) continue;
             if (l.kind == CircularLayer.Kind.HEATMAP && l.heatmap == null) continue;
             if (l.kind == CircularLayer.Kind.LABELS && l.labels.isEmpty()) continue;
-            if ((l.kind == CircularLayer.Kind.POINTS || l.kind == CircularLayer.Kind.LINES)
-                    && l.points == null) continue;
+            if (CircularLayer.isIntervalValue(l.kind) && l.points == null) continue;
             out.add(l);
         }
         out.sort(java.util.Comparator.comparingInt(l -> l.outsideIndex));
@@ -595,7 +602,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double heat = Math.max(8, l.heatHeight(s) > 0 ? l.heatHeight(s) : 50);
             return conn + heat + 6;
         }
-        if (l.kind == CircularLayer.Kind.POINTS || l.kind == CircularLayer.Kind.LINES) {
+        if (CircularLayer.isIntervalValue(l.kind)) {
             return l.plHeight() + 6;
         }
         // Labels: the radial extent is the text itself (drawn along the radius), so size the slot
@@ -994,12 +1001,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return l;
     }
 
-    /** Visible POINTS / LINES layers, in ROW order. */
+    /** Visible POINTS / LINES / HIST / RECT layers, in ROW order. */
     private List<CircularLayer> visiblePointLineLayers() {
         List<CircularLayer> out = new ArrayList<>();
         for (CircularLayer l : layers) {
-            if (l.visible && (l.kind == CircularLayer.Kind.POINTS
-                    || l.kind == CircularLayer.Kind.LINES) && l.points != null) out.add(l);
+            if (l.visible && CircularLayer.isIntervalValue(l.kind) && l.points != null) out.add(l);
         }
         out.sort(java.util.Comparator.comparingInt(l -> l.rowIndex));
         return out;
@@ -2544,7 +2550,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (l.kind == CircularLayer.Kind.HEATMAP) {
             return drawHeatmapLayer(g2, cx, cy, w, h, R, rOut, cursor, chrs, sec, s, l, outIdx);
         }
-        if (l.kind == CircularLayer.Kind.POINTS || l.kind == CircularLayer.Kind.LINES) {
+        if (CircularLayer.isIntervalValue(l.kind)) {
             if (isOutsideLayer(l, s)) {
                 // Outside: drawn beyond the ideogram, in the Outside column's order.
                 double bandInner = rOut + outsideLayerOffset(l, s);
@@ -2571,7 +2577,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return bandInner - 5;
     }
 
-    /** Draw the POINTS / LINES markers inside an explicit radial band (inside or outside). */
+    /** Draw POINTS / LINES / HIST / RECT inside an explicit radial band (inside or outside). */
     private void drawPointLineCells(Graphics2D g2, int cx, int cy, double bandInner, double bandOuter,
                                     List<ChrInfo> chrs, List<double[]> sec, CircularLayer l) {
         PointLineData d = l.points;
@@ -2584,6 +2590,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         java.awt.Color color = l.plColor();
         Stroke oldStroke = g2.getStroke();
         Color oldColor = g2.getColor();
+        boolean hist = l.kind == CircularLayer.Kind.HIST;
+        boolean rect = l.kind == CircularLayer.Kind.RECT;
         try {
             g2.setColor(color);
             double ps = Math.max(1, l.plPointSize());
@@ -2597,17 +2605,32 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 if (vSpan <= 0) vSpan = Math.max(1, c.length);
                 List<HeatRow> list = new ArrayList<>(e.getValue());
                 list.sort(java.util.Comparator.comparingLong(r -> r.start));
+
+                if (rect) {
+                    drawRectCells(g2, cx, cy, bandInner, bandOuter, f0, sSpan, vStart, vSpan,
+                            d.min, span, list, l);
+                    continue;
+                }
                 if (l.kind == CircularLayer.Kind.LINES) {
                     g2.setStroke(new BasicStroke(Math.max(0.5f, l.plLineWidth()),
                             BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 }
                 Point2D prev = null;
                 for (HeatRow r : list) {
-                    double mid = (r.start + r.end) / 2.0;
-                    double f = f0 + sSpan * clamp01((mid - vStart) / vSpan);
                     double v = (r.vals != null && r.vals.length > 0) ? r.vals[0] : Double.NaN;
                     if (Double.isNaN(v)) continue;
                     double t = span > 1e-9 ? clamp01((v - d.min) / span) : 0.5;
+                    if (hist) {
+                        // Bars grow from the inner edge (baseline) out to the value's radius.
+                        double a0 = f0 + sSpan * clamp01(((double) r.start - vStart) / vSpan);
+                        double a1 = f0 + sSpan * clamp01(((double) r.end - vStart) / vSpan);
+                        if (a1 <= a0) a1 = a0 + 1e-4;
+                        g2.fill(annularPath(cx, cy, bandInner,
+                                bandInner + (bandOuter - bandInner) * t, a0, a1));
+                        continue;
+                    }
+                    double mid = (r.start + r.end) / 2.0;
+                    double f = f0 + sSpan * clamp01((mid - vStart) / vSpan);
                     Point2D p = polar(cx, cy, bandInner + (bandOuter - bandInner) * t, f);
                     if (l.kind == CircularLayer.Kind.POINTS) {
                         g2.fill(new Ellipse2D.Double(p.getX() - ps / 2, p.getY() - ps / 2, ps, ps));
@@ -2621,6 +2644,55 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             g2.setStroke(oldStroke);
             g2.setColor(oldColor);
         }
+    }
+
+    /**
+     * RECT cells: fill each interval's angular width, coloured by value (low=blue, high=red).
+     * With {@code expand} on, overlapping intervals are pushed into separate radial lanes
+     * (greedy interval scheduling) so each one stays visible instead of covering the others.
+     */
+    private void drawRectCells(Graphics2D g2, int cx, int cy, double bandInner, double bandOuter,
+                               double f0, double sSpan, double vStart, double vSpan,
+                               double minV, double span, List<HeatRow> list, CircularLayer l) {
+        int n = list.size();
+        int[] lanes = l.plExpand() ? computeLanes(list) : null;
+        int nLanes = 1;
+        if (lanes != null) for (int x : lanes) nLanes = Math.max(nLanes, x + 1);
+        double bandH = bandOuter - bandInner;
+        for (int i = 0; i < n; i++) {
+            HeatRow r = list.get(i);
+            double v = (r.vals != null && r.vals.length > 0) ? r.vals[0] : Double.NaN;
+            if (Double.isNaN(v)) continue;
+            double t = span > 1e-9 ? clamp01((v - minV) / span) : 0.5;
+            double a0 = f0 + sSpan * clamp01(((double) r.start - vStart) / vSpan);
+            double a1 = f0 + sSpan * clamp01(((double) r.end - vStart) / vSpan);
+            if (a1 <= a0) a1 = a0 + 1e-4;
+            double subIn = bandInner, subOut = bandOuter;
+            if (lanes != null) {
+                subIn = bandInner + bandH * lanes[i] / nLanes;
+                subOut = bandInner + bandH * (lanes[i] + 1) / nLanes;
+            }
+            g2.setColor(mix(new Color(60, 110, 200), new Color(210, 60, 60), t));
+            g2.fill(annularPath(cx, cy, subIn, subOut, a0, a1));
+        }
+    }
+
+    /** Greedy interval scheduling: give each start-sorted row the lowest free radial lane. */
+    private static int[] computeLanes(List<HeatRow> rows) {
+        int n = rows.size();
+        int[] lane = new int[n];
+        java.util.List<Long> ends = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            long s = rows.get(i).start;
+            int chosen = -1;
+            for (int j = 0; j < ends.size(); j++) {
+                if (ends.get(j) <= s) { chosen = j; break; }
+            }
+            if (chosen < 0) { chosen = ends.size(); ends.add(0L); }
+            lane[i] = chosen;
+            ends.set(chosen, rows.get(i).end);
+        }
+        return lane;
     }
 
     private void drawTrackRingsSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {

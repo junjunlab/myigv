@@ -507,6 +507,14 @@ public class IGVContentPane extends JPanel {
         impLines.addActionListener(e ->
                 loadPointLineFromFile(panel, CircularViewPanel.CircularLayer.Kind.LINES));
         importMenu.add(impLines);
+        JMenuItem impHist = new JMenuItem("Histogram  (BED + value column)…");
+        impHist.addActionListener(e ->
+                loadPointLineFromFile(panel, CircularViewPanel.CircularLayer.Kind.HIST));
+        importMenu.add(impHist);
+        JMenuItem impRect = new JMenuItem("Rectangles  (BED + value column)…");
+        impRect.addActionListener(e ->
+                loadPointLineFromFile(panel, CircularViewPanel.CircularLayer.Kind.RECT));
+        importMenu.add(impRect);
         importMenu.addSeparator();
         JMenuItem impHint = new JMenuItem("Imported data is drawn in the circular view only");
         impHint.setEnabled(false);
@@ -681,9 +689,12 @@ public class IGVContentPane extends JPanel {
     private void loadPointLineFromFile(CircularViewPanel panel,
                                        CircularViewPanel.CircularLayer.Kind kind) {
         boolean pts = kind == CircularViewPanel.CircularLayer.Kind.POINTS;
+        String kn = pts ? "points"
+                : kind == CircularViewPanel.CircularLayer.Kind.LINES ? "lines"
+                : kind == CircularViewPanel.CircularLayer.Kind.HIST ? "histogram" : "rectangles";
         java.awt.FileDialog fd = new java.awt.FileDialog(
                 (java.awt.Frame) null,
-                (pts ? "Import points" : "Import lines") + " (BED: chr start end value)",
+                "Import " + kn + " (BED: chr start end value)",
                 java.awt.FileDialog.LOAD);
         fd.setMultipleMode(true);
         fd.setVisible(true);
@@ -720,13 +731,17 @@ public class IGVContentPane extends JPanel {
         }
     }
 
-    /** Per-layer POINTS / LINES parameters: colour, marker size / stroke width, band height. */
+    /** Per-layer interval+value track parameters (points / lines / histogram / rectangles). */
     private void addPointLineItems(JPopupMenu popup, CircularViewPanel panel,
                                    CircularViewPanel.CircularLayer layer) {
         boolean pts = layer.kind == CircularViewPanel.CircularLayer.Kind.POINTS;
+        boolean lines = layer.kind == CircularViewPanel.CircularLayer.Kind.LINES;
+        boolean hist = layer.kind == CircularViewPanel.CircularLayer.Kind.HIST;
+        boolean rect = layer.kind == CircularViewPanel.CircularLayer.Kind.RECT;
+        String kn = pts ? "Points" : lines ? "Lines" : hist ? "Histogram" : "Rectangles";
         // Inside / outside the ideogram — switching moves the row between the two column sections.
         JCheckBoxMenuItem outside = new JCheckBoxMenuItem(
-                (pts ? "Points" : "Lines") + " outside the ideogram", layer.plOutside());
+                kn + " outside the ideogram", layer.plOutside());
         outside.addActionListener(e -> {
             layer.plOutside = outside.isSelected();
             refreshDataColumn();
@@ -734,12 +749,24 @@ public class IGVContentPane extends JPanel {
         });
         popup.add(outside);
 
-        JMenuItem colour = new JMenuItem("Colour…");
-        colour.addActionListener(e -> {
-            Color c = JColorChooser.showDialog(panel, "Colour", layer.plColor());
-            if (c != null) { layer.plColor = c; panel.refresh(); }
-        });
-        popup.add(colour);
+        // Rectangles colour themselves by value (blue->red ramp), so they get no single colour.
+        if (!rect) {
+            JMenuItem colour = new JMenuItem(hist ? "Bar colour…" : "Colour…");
+            colour.addActionListener(e -> {
+                Color c = JColorChooser.showDialog(panel, "Colour", layer.plColor());
+                if (c != null) { layer.plColor = c; panel.refresh(); }
+            });
+            popup.add(colour);
+        }
+
+        if (rect) {
+            JCheckBoxMenuItem expand = new JCheckBoxMenuItem(
+                    "Expand overlapping rectangles", layer.plExpand());
+            expand.setToolTipText("Overlapping intervals are split into radial lanes so each one "
+                    + "stays visible instead of covering the others.");
+            expand.addActionListener(e -> { layer.plExpand = expand.isSelected(); panel.refresh(); });
+            popup.add(expand);
+        }
 
         if (pts) {
             int ps = layer.plPointSize();
@@ -754,7 +781,7 @@ public class IGVContentPane extends JPanel {
                 }
             });
             popup.add(size);
-        } else {
+        } else if (lines) {
             int lw = layer.plLineWidth();
             JMenuItem width = new JMenuItem("Line width… (" + lw + " px)");
             width.addActionListener(e -> {
@@ -1185,8 +1212,7 @@ public class IGVContentPane extends JPanel {
             where = l.heatmapOutside(s) ? "   · outside" : "   · inside";
         } else if (l.kind == CircularViewPanel.CircularLayer.Kind.LABELS) {
             where = l.labelInside(s) ? "   · inside" : "   · outside";
-        } else if (l.kind == CircularViewPanel.CircularLayer.Kind.POINTS
-                || l.kind == CircularViewPanel.CircularLayer.Kind.LINES) {
+        } else if (CircularViewPanel.CircularLayer.isIntervalValue(l.kind)) {
             where = l.plOutside() ? "   · outside" : "   · inside";
         }
         return l.name + "   (" + tag + ")" + where + (l.visible ? "" : "   (hidden)");
@@ -1523,31 +1549,32 @@ public class IGVContentPane extends JPanel {
     private void showLayerPopup(MouseEvent e, CircularViewPanel.CircularLayer layer, JList<String> list) {
         JPopupMenu menu = new JPopupMenu();
         final boolean heat = layer.kind == CircularViewPanel.CircularLayer.Kind.HEATMAP;
-        final boolean pts = layer.kind == CircularViewPanel.CircularLayer.Kind.POINTS;
-        final boolean lines = layer.kind == CircularViewPanel.CircularLayer.Kind.LINES;
+        final boolean labels = layer.kind == CircularViewPanel.CircularLayer.Kind.LABELS;
+        final boolean iv = CircularViewPanel.CircularLayer.isIntervalValue(layer.kind);
+        final String kn = layer.kind == CircularViewPanel.CircularLayer.Kind.POINTS ? "points"
+                : layer.kind == CircularViewPanel.CircularLayer.Kind.LINES ? "lines"
+                : layer.kind == CircularViewPanel.CircularLayer.Kind.HIST ? "histogram"
+                : layer.kind == CircularViewPanel.CircularLayer.Kind.RECT ? "rectangles" : "";
 
         String showLabel = heat ? "Show heatmap"
-                : (layer.kind == CircularViewPanel.CircularLayer.Kind.LABELS ? "Show labels"
-                : pts ? "Show points"
-                : lines ? "Show lines" : "Show this links layer");
+                : labels ? "Show labels"
+                : iv ? "Show " + kn : "Show this links layer";
         menu.add(linkCheck(showLabel, layer.visible, v -> {
             circularDrawingArea.setLayerVisible(layer, v);
             refreshDataColumn();
         }));
         menu.addSeparator();
 
-        boolean labels = layer.kind == CircularViewPanel.CircularLayer.Kind.LABELS;
         if (heat) addHeatmapItems(menu, circularDrawingArea, layer);
         else if (labels) addLabelItems(menu, circularDrawingArea, layer);
-        else if (pts || lines) addPointLineItems(menu, circularDrawingArea, layer);
+        else if (iv) addPointLineItems(menu, circularDrawingArea, layer);
         else addLinkItems(menu, circularDrawingArea);
 
         menu.addSeparator();
         JMenuItem remove = new JMenuItem(heat ? "Remove heatmap from circular view…"
-                : (labels ? "Remove labels from circular view…"
-                : pts ? "Remove points from circular view…"
-                : lines ? "Remove lines from circular view…"
-                : "Remove links from circular view…"));
+                : labels ? "Remove labels from circular view…"
+                : iv ? "Remove " + kn + " from circular view…"
+                : "Remove links from circular view…");
         remove.addActionListener(a -> {
             circularDrawingArea.removeLayer(layer);
             refreshDataColumn();
