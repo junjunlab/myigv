@@ -160,7 +160,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public double  linkCrest = 0.5;
         /** Minimum angular width (degrees) of a ribbon end. Real BEDPE anchors are only a few kb,
          *  which is sub-pixel on a whole-genome ring, so ribbons would be invisible without this. */
-        public double  linkRibbonMinDeg = 1.2;
+        public double  linkRibbonMinDeg = 0;   // 0 = auto (~1 px); >0 overrides in degrees
         /** Ribbons are filled areas, so they need more opacity than stroked links to read well.
          *  255 = fully opaque, which is the default (transparency 0). */
         public int     linkRibbonAlpha = 255;
@@ -1512,7 +1512,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             drawHiCLegends(g2, w, h, visibleHics, hicLimitsByTrack, settings);
         }
         // The heatmap legend is independent of any Hi-C track being loaded.
-        drawHeatmapLegend(g2, w, h, heatmap, settings, visibleHics);
+        drawHeatmapLegend(g2, w, h, settings, visibleHics);
         drawLabelLayers(g2, w, h, settings);
     }
 
@@ -1588,7 +1588,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         List<HiCTrack> visibleHics = new ArrayList<>();
         for (Track t : ringTracks) if (t instanceof HiCTrack) visibleHics.add((HiCTrack) t);
         if (!visibleHics.isEmpty()) drawHiCLegends(g2, w, h, visibleHics, hicLimitsByTrack, settings);
-        drawHeatmapLegend(g2, w, h, heatmap, settings, visibleHics);
+        drawHeatmapLegend(g2, w, h, settings, visibleHics);
         layoutLabels(w, h, lastChrs, settings);
         drawLabelLayers(g2, w, h, settings);
     }
@@ -3358,21 +3358,33 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     /**
-     * Colour-bar legend for the genomic heatmap, drawn OUTSIDE the ring in one of the four
-     * corners (or hidden). Uses the same corner rectangles as the Hi-C legends and stacks below
-     * them when both want the same corner, so the two never overlap.
+     * Colour-bar legend for the genomic heatmaps — ONE legend per heatmap layer, each with that
+     * layer's own name, value range and colour ramp (never shared). They stack downward in the
+     * chosen corner, below any Hi-C legends in the same corner.
      */
-    void drawHeatmapLegend(Graphics2D g2, int w, int h, GenomicHeatmap hm, CircularSettings s,
+    void drawHeatmapLegend(Graphics2D g2, int w, int h, CircularSettings s,
                            List<HiCTrack> visibleHics) {
-        if (!s.heatmapLegend || hm == null || s.heatmapLegendPosition == null) return;
+        if (!s.heatmapLegend || s.heatmapLegendPosition == null) return;
         if (s.heatmapLegendPosition == org.broad.igv.hic.HiCTrack.LegendPosition.NONE) return;
+        List<CircularLayer> layers = visibleHeatmapLayers();
+        if (layers.isEmpty()) return;
         int idx = 0;
         if (visibleHics != null) {
             for (HiCTrack hic : visibleHics) {
                 if (hic.getLegendPosition() == s.heatmapLegendPosition) idx++;
             }
         }
-        Rectangle box = legendRect(w, h, s.heatmapLegendPosition, idx);
+        for (CircularLayer layer : layers) {
+            GenomicHeatmap hm = layer.heatmap;
+            if (hm == null) continue;
+            drawOneHeatmapLegend(g2, legendRect(w, h, s.heatmapLegendPosition, idx++),
+                    hm, layer, s);
+        }
+    }
+
+    /** One colour bar: this layer's ramp and its own min / max. */
+    private void drawOneHeatmapLegend(Graphics2D g2, Rectangle box, GenomicHeatmap hm,
+                                      CircularLayer layer, CircularSettings s) {
         Font oldFont = g2.getFont();
         Color oldColor = g2.getColor();
         Stroke oldStroke = g2.getStroke();
@@ -3385,16 +3397,23 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
             g2.setColor(Color.BLACK);
             g2.setFont(new Font("SansSerif", Font.PLAIN, 10));
-            String title = "heatmap";
+            String title = layer.name == null ? "heatmap" : layer.name;
+            // Keep the title inside the box (it is ~110 px wide).
+            FontMetrics tfm = g2.getFontMetrics();
+            while (title.length() > 4 && tfm.stringWidth(title) > box.width - 14) {
+                title = title.substring(0, title.length() - 2);
+            }
+            if (!title.equals(layer.name) && title.length() > 3) title = title + "…";
             g2.drawString(title, box.x + 8, box.y + 14);
 
             int barX = box.x + 10, barY = box.y + 22;
             int barW = 16, barH = box.height - 44;
             int steps = Math.max(2, barH);
+            Color low = layer.heatLow(s), mid = layer.heatMid(s), high = layer.heatHigh(s);
             for (int i = 0; i < steps; i++) {
                 double t = i / (double) (steps - 1);            // 0 = top (max)
                 double v = hm.max - (hm.max - hm.min) * t;
-                g2.setColor(divergingColor(v, hm.min, hm.max, s));
+                g2.setColor(divergingColor(v, hm.min, hm.max, low, mid, high));
                 g2.fillRect(barX, barY + i, barW, 2);
             }
             g2.setColor(new Color(90, 90, 90));
@@ -4116,8 +4135,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 boolean arrowStart = s.linkArrow == 1 || s.linkArrow == 3;
                 boolean arrowEnd = s.linkArrow == 2 || s.linkArrow == 3;
                 double headLen = Math.max(3.0, s.linkArrowLength);
-                double[] e1 = ribbonEnd(a1s, a1e, s.linkRibbonMinDeg);
-                double[] e2 = ribbonEnd(a2s, a2e, s.linkRibbonMinDeg);
+                double[] e1 = ribbonEnd(a1s, a1e, s.linkRibbonMinDeg, rEnd);
+                double[] e2 = ribbonEnd(a2s, a2e, s.linkRibbonMinDeg, rEnd);
                 // The head's height follows the band width so a wide band cannot end in a chamfer;
                 // linkArrowLenRatio is the user's knob (1.5x = ~40 deg tip).
                 double len1raw = Math.max(4, Math.abs(e1[1] - e1[0]) * 2 * Math.PI * rEnd
@@ -4210,10 +4229,16 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * {@code minDeg}. A 1 bp end used to collapse to zero width, which (combined with the
      * mid-span pinch below) is what made every link look like a needle instead of a band.
      */
-    static double[] ribbonEnd(double a0, double a1, double minDeg) {
+    static double[] ribbonEnd(double a0, double a1, double minDeg, double radiusPx) {
         double mid = (a0 + a1) / 2.0;
         double widthDeg = Math.abs(a1 - a0) * 360.0;
-        double w = Math.max(widthDeg, Math.max(0.02, minDeg));
+        // Floor the width to ~1 device pixel of arc, not to a fixed number of degrees. The old
+        // default (1.2 deg) inflated every small interval into a wide band: 600 links whose anchors
+        // span 5-40 kb (a few thousandths of a degree) all became 1.2 deg wide and merged into a
+        // solid blue ring. A user-set minDeg > 0 still wins.
+        double pxDeg = radiusPx > 1 ? (1.0 / (2 * Math.PI * radiusPx)) * 360.0 : 0.02;
+        double floorDeg = minDeg > 0 ? minDeg : pxDeg;
+        double w = Math.max(widthDeg, Math.max(0.01, floorDeg));
         double half = w / 720.0;
         return new double[]{mid - half, mid + half};
     }

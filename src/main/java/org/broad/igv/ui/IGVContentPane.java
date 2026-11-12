@@ -1101,7 +1101,8 @@ public class IGVContentPane extends JPanel {
         });
         popup.add(crest);
 
-        JMenuItem minWidth = new JMenuItem("Min ribbon width (deg)… (" + s.linkRibbonMinDeg + ")");
+        JMenuItem minWidth = new JMenuItem("Min ribbon width (deg)… ("
+                + (s.linkRibbonMinDeg > 0 ? String.valueOf(s.linkRibbonMinDeg) : "auto ≈1 px") + ")");
         minWidth.setToolTipText("Widens ribbon ends so links with tiny anchors stay visible.");
         minWidth.addActionListener(e -> {
             String v = JOptionPane.showInputDialog(panel,
