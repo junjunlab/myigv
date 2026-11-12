@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/github/license/junjunlab/myigv)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-21-blue)](https://www.oracle.com/java/technologies/)
 [![Based on](https://img.shields.io/badge/based%20on-IGV%202.19.8-orange)](https://github.com/igvteam/igv)
+[![Documentation](https://readthedocs.org/projects/myigv/badge/?version=latest)](https://myigv.readthedocs.io/en/latest/?badge=latest)
 
 > A customized [IGV](https://github.com/igvteam/igv) genome browser: offline annotations, multi-gene panels, GTF-based gene search, auto-indexing, per-panel autoscale, Hi-C / BEDPE / TAD overlays, and SSH/SFTP remote browsing.
 
@@ -32,7 +33,15 @@
 | 15 | BEDPE arc tracks | loops / arcs as circular, elliptical, or Bézier arcs |
 | 16 | SSH/SFTP remote browse | Connect to an SSH server, browse, and read tracks (incl. Hi-C) directly; credentials stored with OS-level encryption |
 
-> **Full, per-feature documentation** — behaviour, menus, and caveats for every item above — is in [`README-myigv.md`](README-myigv.md). This README is only a summary.
+> **Full, per-feature documentation** — behaviour, menus, and caveats for every item above — is on the [myIGV User Guide](https://myigv.readthedocs.io/en/latest/). This README is only a summary; an in-repo change log is in [`README-myigv.md`](README-myigv.md).
+
+## Documentation
+
+Full, illustrated guides for every feature above — the circular view, Hi-C / TAD overlays, BEDPE arcs, SSH/SFTP remote data, the parameter reference, and export — are published on **Read the Docs**:
+
+**➜ [myIGV User Guide](https://myigv.readthedocs.io/en/latest/)**
+
+The guide documents only what myIGV adds on top of upstream IGV 2.19.8; for stock IGV concepts, see the [official IGV documentation](https://igv.org/doc/).
 
 ## Quick start
 
