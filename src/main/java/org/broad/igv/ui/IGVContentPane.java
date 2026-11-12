@@ -940,9 +940,12 @@ public class IGVContentPane extends JPanel {
                 int from = (Integer) support.getTransferable().getTransferData(flavor);
                 JList.DropLocation drop = (JList.DropLocation) support.getDropLocation();
                 int to = drop.getIndex();
-                if (from < 0) return false;
-                if (to > from) to--;      // the row is removed before the insert position applies
-                if (to == from) return true;
+                if (from < 0 || to < 0) return false;
+                if (to == from) return true;   // dropped onto its own row: genuinely nothing to do
+                if (to > from + 1) to--;       // only shift the target when the drop lands more than
+                                               // one slot below; otherwise a row dragged down by a
+                                               // single slot (or to the very end) would be swallowed
+                                               // as a no-op and never reach the innermost band
                 moveDataRow(from, to);
                 return true;
             } catch (Exception e) {
