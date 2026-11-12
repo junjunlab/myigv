@@ -749,8 +749,54 @@ public class IGVContentPane extends JPanel {
         });
         popup.add(outside);
 
-        // Rectangles colour themselves by value (blue->red ramp), so they get no single colour.
-        if (!rect) {
+        // Rectangles get a full colour submenu: fill (solid or value ramp) + border.
+        if (rect) {
+            JMenu colours = new JMenu("Colours");
+            JCheckBoxMenuItem byValue = new JCheckBoxMenuItem(
+                    "Fill by value (ramp)", layer.rectFill == null);
+            byValue.addActionListener(e -> {
+                layer.rectFill = byValue.isSelected() ? null : layer.rectLow();
+                panel.refresh();
+            });
+            colours.add(byValue);
+
+            JMenuItem fill = new JMenuItem("Fill colour…");
+            fill.addActionListener(e -> {
+                Color cur = layer.rectFill() != null ? layer.rectFill() : layer.rectLow();
+                Color c = JColorChooser.showDialog(panel, "Fill colour", cur);
+                if (c != null) { layer.rectFill = c; panel.refresh(); }
+            });
+            colours.add(fill);
+
+            JMenuItem border = new JMenuItem(layer.rectBorder() == null
+                    ? "Border colour… (none)" : "Border colour…");
+            border.addActionListener(e -> {
+                Color cur = layer.rectBorder() != null ? layer.rectBorder()
+                        : new Color(90, 90, 90);
+                Color c = JColorChooser.showDialog(panel, "Border colour", cur);
+                if (c != null) { layer.rectBorder = c; panel.refresh(); }
+            });
+            colours.add(border);
+            JMenuItem noBorder = new JMenuItem("No border");
+            noBorder.setEnabled(layer.rectBorder() != null);
+            noBorder.addActionListener(e -> { layer.rectBorder = null; panel.refresh(); });
+            colours.add(noBorder);
+
+            colours.addSeparator();
+            JMenuItem lowC = new JMenuItem("Low value colour…");
+            lowC.addActionListener(e -> {
+                Color c = JColorChooser.showDialog(panel, "Low value colour", layer.rectLow());
+                if (c != null) { layer.rectLow = c; panel.refresh(); }
+            });
+            colours.add(lowC);
+            JMenuItem highC = new JMenuItem("High value colour…");
+            highC.addActionListener(e -> {
+                Color c = JColorChooser.showDialog(panel, "High value colour", layer.rectHigh());
+                if (c != null) { layer.rectHigh = c; panel.refresh(); }
+            });
+            colours.add(highC);
+            popup.add(colours);
+        } else {
             JMenuItem colour = new JMenuItem(hist ? "Bar colour…" : "Colour…");
             colour.addActionListener(e -> {
                 Color c = JColorChooser.showDialog(panel, "Colour", layer.plColor());

@@ -422,7 +422,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public Boolean plOutside;
         /** RECT: expand overlapping intervals into radial lanes so every one stays visible. */
         public Boolean plExpand;
+        /** RECT: colour-ramp endpoints for the value (low = min, high = max). */
+        public java.awt.Color rectLow, rectHigh;
+        /** RECT: solid fill override (null = fill by value ramp) and cell border colour. */
+        public java.awt.Color rectFill, rectBorder;
         public boolean plExpand() { return plExpand != null && plExpand; }
+        public java.awt.Color rectLow()  { return rectLow != null ? rectLow : new java.awt.Color(60, 110, 200); }
+        public java.awt.Color rectHigh() { return rectHigh != null ? rectHigh : new java.awt.Color(210, 60, 60); }
+        public java.awt.Color rectFill() { return rectFill; }                    // null => value ramp
+        public java.awt.Color rectBorder() { return rectBorder; }                // null => no outline
         public java.awt.Color plColor() { return plColor != null ? plColor : new java.awt.Color(35, 95, 175); }
         public int plPointSize() { return plPointSize != null ? plPointSize : 4; }
         public int plLineWidth() { return plLineWidth != null ? plLineWidth : 2; }
@@ -2647,9 +2655,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     /**
-     * RECT cells: fill each interval's angular width, coloured by value (low=blue, high=red).
-     * With {@code expand} on, overlapping intervals are pushed into separate radial lanes
-     * (greedy interval scheduling) so each one stays visible instead of covering the others.
+     * RECT cells: fill each interval's angular width, either with a per-layer solid fill or
+     * coloured by value (low -> high ramp). With {@code expand} on, overlapping intervals are
+     * pushed into separate radial lanes (greedy interval scheduling) so each one stays visible.
      */
     private void drawRectCells(Graphics2D g2, int cx, int cy, double bandInner, double bandOuter,
                                double f0, double sSpan, double vStart, double vSpan,
@@ -2659,6 +2667,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         int nLanes = 1;
         if (lanes != null) for (int x : lanes) nLanes = Math.max(nLanes, x + 1);
         double bandH = bandOuter - bandInner;
+        java.awt.Color solid = l.rectFill();
+        java.awt.Color border = l.rectBorder();
+        Stroke oldStroke = g2.getStroke();
+        if (border != null) g2.setStroke(new BasicStroke(0.7f));
         for (int i = 0; i < n; i++) {
             HeatRow r = list.get(i);
             double v = (r.vals != null && r.vals.length > 0) ? r.vals[0] : Double.NaN;
@@ -2672,9 +2684,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 subIn = bandInner + bandH * lanes[i] / nLanes;
                 subOut = bandInner + bandH * (lanes[i] + 1) / nLanes;
             }
-            g2.setColor(mix(new Color(60, 110, 200), new Color(210, 60, 60), t));
-            g2.fill(annularPath(cx, cy, subIn, subOut, a0, a1));
+            Shape cell = annularPath(cx, cy, subIn, subOut, a0, a1);
+            g2.setColor(solid != null ? solid : mix(l.rectLow(), l.rectHigh(), t));
+            g2.fill(cell);
+            if (border != null) {
+                g2.setColor(border);
+                g2.draw(cell);
+            }
         }
+        g2.setStroke(oldStroke);
     }
 
     /** Greedy interval scheduling: give each start-sorted row the lowest free radial lane. */
