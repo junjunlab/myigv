@@ -1,0 +1,4 @@
+# Documentation build dependencies (used by .readthedocs.yaml and local builds).
+# Keep these pinned so Read the Docs and local builds render identically.
+sphinx==7.4.7
+sphinx-rtd-theme==3.0.2

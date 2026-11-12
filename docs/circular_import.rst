@@ -1,0 +1,263 @@
+Import: circular-only data layers
+=================================
+
+``Import ▾`` is the first button in the Circular View toolbar.  It loads three
+kinds of data that exist **only in the Circular View** — links, a genomic
+heatmap, and genomic labels.
+
+.. important::
+
+   Files loaded here are **not IGV tracks**.  They never appear in the
+   horizontal (linear) view, they are not added to the session's resource list,
+   and they are not saved in a session.  They are drawn from in-memory layers
+   held by ``CircularViewPanel`` and are lost when myIGV closes.  This is
+   deliberate: it lets you build a publication figure without polluting the
+   normal IGV workspace.
+
+The Import menu
+---------------
+
+The dropdown contains exactly four entries:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 42 58
+
+   * - Menu item
+     - File dialog title / action
+   * - ``Links  (BEDPE / Circos links)…``
+     - ``Load Circos / BEDPE links``
+   * - ``Heatmap  (BED with value columns)…``
+     - ``Load genomic heatmap (BED/TSV rows x samples)``
+   * - ``Labels  (BED + name column)…``
+     - ``Import labels (BED, 4th column = name)``
+   * - ``Imported data is drawn in the circular view only``
+     - Disabled hint (not clickable)
+
+Each choice opens a native ``java.awt.FileDialog`` for a **local file only**.
+There is no remote/URL input in these dialogs: ``parseHeatmap`` and
+``parseLabels`` read the path directly with ``FileInputStream``.
+
+Links: BEDPE / Circos links
+---------------------------
+
+Links are parsed by ``org.broad.igv.bedpe.BedPEParser`` — the same parser the
+linear interaction-track loader uses.  It auto-detects **UTF-8, UTF-16LE and
+UTF-16BE from the BOM**, so files produced by Windows PowerShell ``Out-File``
+work, and it accepts a minimal 6-column BEDPE::
+
+    chrom1  start1  end1  chrom2  start2  end2
+    chr1    1000000 1000000 chr9   80000000 80000000
+    chr2    5000000 5200000 chr17  41000000 41200000
+
+Optional columns (``name``, ``score``, ``strand1``, ``strand2``, ``color``,
+…) are read when present.  Per-record ``score``, ``color``, ``thickness`` and
+the remaining value string are carried into the ring layer.  Rows with a
+missing chromosome name are skipped.  Both ``1`` and ``chr1`` chromosome
+spellings are accepted.
+
+.. note::
+
+   A line beginning with ``#`` **never becomes a link**, but it is not simply
+   discarded either.  ``BedPEParser`` reads three kinds of metadata from it:
+
+   * ``#columns color=N thickness=M`` (semicolon-separated ``key=value`` after
+     whitespace) sets the **1-based** index of the colour and thickness columns
+     directly — ``colorColumn = N - 1``, ``thicknessColumn = M - 1``.
+   * Any ``#`` line with **six or more tab-separated fields** replaces the
+     entire column-name list with its tokens.  Columns named ``color`` or
+     ``thickness`` at index ≥ 6 are then picked up automatically.
+   * An ordinary ``#`` comment line produces no feature and changes nothing.
+
+   The heatmap and labels parsers, by contrast, just skip ``#`` lines outright.
+
+For example, ``../simulated_loops.full12.bedpe`` declares all 12 columns with a
+single ``#`` header line::
+
+    #chrom1  start1  end1  chrom2  start2  end2  name  score  strand1  strand2  color  thickness
+    X        71124   76124 X       242555  247555 LONG_0001  94.0  +  -  31,119,180  1
+
+A real 10-column example ships inside the repository at
+``test/data/bedpe/interleaved_chrs.bedpe`` (78 rows).  Its first row is::
+
+    chr5  135399049  135399149  chr5  135398825  135398922  VH01587:178:...  255  -  +
+
+.. warning::
+
+   Some demo files (for example ``../links_demo_line_band.bed``) contain
+   comments describing a ``View options → Links`` import path.  **That path no
+   longer exists.**  Links files are imported through
+   ``Import ▾ → Links  (BEDPE / Circos links)…`` and styled from the links
+   layer's right-click menu.  See :doc:`circular_data_tracks`.
+
+Each import creates a **new** links layer; importing several files stacks
+several layers.  Links layers can be hidden, removed, or styled independently
+from the Data Tracks column (see :doc:`circular_data_tracks`).
+
+.. figure:: images/links_demo_ribbons.png
+   :alt: Blue ribbon links radiating inside a circular ideogram ring
+   :width: 65%
+
+   A links layer imported from a small BEDPE demo.  Filled ribbon bands keep a
+   visible width along their whole length.
+
+.. figure:: images/circular_links_ribbon.png
+   :alt: Dense set of blue ribbon links across a whole-genome ring
+   :width: 65%
+
+   A dense whole-genome links layer with ``Ribbon (filled bands)`` enabled.
+
+.. note::
+
+   **Two loading paths coexist.**  ``File → Load from File...`` on a BEDPE
+   creates a normal IGV interaction track (horizontal view, saved in session,
+   with its own arc menus).  ``Import ▾ → Links`` creates a circular-only layer
+   with ribbon/arrow menus.  Neither replaces the other.
+
+Heatmap: BED with value columns
+-------------------------------
+
+The heatmap parser reads a BED-like text file, one genomic interval per row and
+one or more numeric sample columns::
+
+    chr   start    end      v1      v2      v3      v4
+    chr1  1000000  2000000  -0.83   0.42    1.17    -0.05
+    chr1  2000000  3000000  0.31    -1.04   0.68    0.22
+
+Exact parsing rules:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 32 68
+
+   * - Rule
+     - Behaviour
+   * - Encoding
+     - UTF-8, read from a local ``FileInputStream``.
+   * - Delimiter
+     - Tab.  If a tab split yields fewer than 4 fields, the line is re-split
+       on arbitrary whitespace, so space-separated TSV works too.
+   * - Comments / headers
+     - Empty lines and lines starting with ``#`` are skipped.  A header line
+       such as ``chr start end v1 …`` is skipped automatically because
+       ``start`` / ``end`` do not parse as integers.
+   * - Minimum columns
+     - 4 (``chr``, ``start``, ``end``, at least one value).
+   * - Values
+     - Every field from column 4 onward must parse as a ``double``; if any
+       fails, the **whole row** is skipped.
+   * - Ragged rows
+     - Short rows are padded with ``NaN`` to the widest row's sample count.
+       ``NaN`` cells are not drawn.
+   * - Range
+     - Global ``min`` / ``max`` over all numeric cells drives the colour ramp.
+   * - Chromosome names
+     - ``1`` ↔ ``chr1`` aliases and case differences are resolved.
+
+The reference example is ``../hg38_heatmap.bed`` (107 rows, 4 numeric
+columns), whose first row is::
+
+    chr1  12349422  17367982  0.0521477005103746  0.142378383327149  0.27553691609403  -0.339657653591206
+
+.. note::
+
+   The demo data files (``hg38_heatmap.bed``, ``hg38_genes.bed``,
+   ``hg38_links.bed``, ``links_demo_line_band.bed``) live in the workspace
+   directory **one level above** the ``myigv_v1.3`` repository and are not
+   committed to it.  The repository contains only rendered PNGs whose names
+   mention them, plus ``test/data/bedpe/interleaved_chrs.bedpe``.
+
+Importing another heatmap **replaces** the existing heatmap layer rather than
+adding a second one.
+
+.. figure:: images/circlize_heatmap_links.png
+   :alt: Circular ring with green-black-red heatmap cells and an outside colour legend
+   :width: 65%
+
+   The reference heatmap rendered with equal-width cells, comb connectors and
+   the default green / black / red diverging ramp.  The colour-bar legend sits
+   outside the ring at ``TOP_RIGHT``.
+
+Labels: BED + name column
+-------------------------
+
+The labels parser reads a 4-column BED-like file::
+
+    chr   start    end      name
+    chr1  11869    14409    DDX11L1
+    chr1  69091    70008    OR4F5
+    chr9  12709305 12783498 MTHFR
+
+Exact parsing rules:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 32 68
+
+   * - Rule
+     - Behaviour
+   * - Encoding / location
+     - UTF-8, local file only.
+   * - Delimiter
+     - Tab, with the same whitespace fallback as the heatmap parser.
+   * - Comments
+     - Empty lines and ``#`` lines are skipped.
+   * - Minimum columns
+     - 4; ``start`` and ``end`` must parse as ``int``.
+   * - Empty name
+     - Replaced by ``chr:start`` so the label is never blank.
+   * - Extra columns
+     - Ignored; only column 4 is used as the text.
+
+The reference example is ``../hg38_genes.bed`` (100 rows, gene names such as
+``MTHFR``, ``ARID1A``, ``F3``), whose first row is::
+
+    chr1  11785722  11805964  MTHFR
+
+Each import creates a **new** labels layer.  Labels are radial, sit inside the
+ideogram by default, and are connected to their genomic position by a
+four-segment comb.  There is no alternative leader-line style — see
+:doc:`circular_labels`.
+
+.. figure:: images/labels_ring.png
+   :alt: Circular ring with radial gene labels connected by comb lines
+   :width: 65%
+
+   The reference labels layer.  Dense names are fanned out by circlize's
+   ``smartAlign`` so their connectors do not overlap.
+
+.. figure:: images/labels_zoom.png
+   :alt: Zoomed detail of radial gene labels and comb connectors
+   :width: 65%
+
+   Zoomed detail: the comb stops at the near end of each gene name, so the
+   connector never runs through the text.
+
+Troubleshooting
+---------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 45 55
+
+   * - Symptom
+     - Cause / fix
+   * - ``No numeric heatmap rows found in: …``
+     - No row had ≥4 columns with all-numeric values from column 4 onward.
+       Check the delimiter and remove non-numeric annotation columns.
+   * - ``No chr / start / end / name rows found in: …``
+     - The labels file had fewer than 4 columns or non-integer coordinates.
+   * - ``Could not load links: …``
+     - The BEDPE file could not be parsed.  Verify the first 6 columns and the
+       file encoding; UTF-16 with BOM is supported.
+   * - Heatmap appears empty
+     - Chromosome names do not match the genome.  Use ``chr1`` or ``1`` as the
+       genome uses; aliases are resolved but unrelated contig names are not.
+   * - Data appears in the horizontal view
+     - You used ``File → Load from File...``.  Use ``Import ▾`` instead.
+
+.. tip::
+
+   ``Import ▾`` layers are re-created each session.  If you need a reproducible
+   figure, keep the three source files next to your session and re-import them
+   after loading the session; the exported PNG/SVG/PDF is self-contained.
