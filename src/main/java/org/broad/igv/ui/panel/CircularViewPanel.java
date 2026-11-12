@@ -2413,28 +2413,22 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
         java.util.Map<String, java.util.Map<String, float[]>> perGeneGroups = needPerGeneGroups(chrs);
-        // Row order == radial order (top row = outermost). The heatmap and the inside label ring
-        // are just another row each, so they are placed at their own position in the stack
-        // instead of being pinned to one end.
-        List<CircularLayer> heatLayers = visibleHeatmapLayers();
-        // Each labels layer is its own ring band, placed at its row position among the band rows.
-        List<CircularLayer> labelLayers = visibleInsideLabelLayers(s);
-        for (CircularLayer l : labelLayers) l.slotOuterR = -1;
-        int hi = 0, li = 0;
+        // Inside band layers (heatmaps + labels) merged into ONE list ordered by their Data Tracks
+        // ROW. Previously every heatmap was drawn first and every labels layer after it, so a
+        // labels row dragged ABOVE a heatmap row still landed INSIDE it — the row order was
+        // ignored for mixed heatmap/labels stacks.
+        List<CircularLayer> bandLayers = new ArrayList<>();
+        for (CircularLayer l : visibleHeatmapLayers()) bandLayers.add(l);
+        for (CircularLayer l : visibleInsideLabelLayers(s)) bandLayers.add(l);
+        bandLayers.sort(java.util.Comparator.comparingInt(l -> l.rowIndex));
+        for (CircularLayer l : bandLayers) if (l.kind == CircularLayer.Kind.LABELS) l.slotOuterR = -1;
         int[] outIdx = {0};      // index among OUTSIDE heatmaps (for their outward stacking)
+        int bi = 0;
         int bandNo = 0;
         for (Track t : ringTracks) {
-            while (hi < heatLayers.size() && heatLayers.get(hi).bandIndex == bandNo) {
-                CircularLayer hl = heatLayers.get(hi);
-                cursor = drawHeatmapLayer(g2, cx, cy, w, h, R, rOut, cursor,
-                        chrs, sec, s, hl, outIdx);
-                hi++;
-            }
-            while (li < labelLayers.size() && labelLayers.get(li).bandIndex == bandNo) {
-                CircularLayer l = labelLayers.get(li);
-                l.slotOuterR = cursor;
-                cursor -= labelRingReserve(l, s);
-                li++;
+            while (bi < bandLayers.size() && bandLayers.get(bi).bandIndex <= bandNo) {
+                cursor = drawBandLayer(g2, cx, cy, w, h, R, rOut, cursor, chrs, sec, s,
+                        bandLayers.get(bi++), outIdx);
             }
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor;
@@ -2445,19 +2439,22 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             cursor = bandInner - 5;
             bandNo++;
         }
-        // Heatmap / label layers whose row is past the last drawable band fall in innermost.
-        while (hi < heatLayers.size()) {
-            CircularLayer hl = heatLayers.get(hi);
-            cursor = drawHeatmapLayer(g2, cx, cy, w, h, R, rOut, cursor,
-                    chrs, sec, s, hl, outIdx);
-            hi++;
+        // Layers whose row is past the last drawable band fall in at the innermost position.
+        while (bi < bandLayers.size()) {
+            cursor = drawBandLayer(g2, cx, cy, w, h, R, rOut, cursor, chrs, sec, s,
+                    bandLayers.get(bi++), outIdx);
         }
-        while (li < labelLayers.size()) {
-            CircularLayer l = labelLayers.get(li);
-            l.slotOuterR = cursor;
-            cursor -= labelRingReserve(l, s);
-            li++;
+    }
+
+    /** Draw one INSIDE band layer (heatmap ring or labels slot) at the current cursor. */
+    private double drawBandLayer(Graphics2D g2, int cx, int cy, int w, int h, double R, double rOut,
+                                 double cursor, List<ChrInfo> chrs, List<double[]> sec,
+                                 CircularSettings s, CircularLayer l, int[] outIdx) {
+        if (l.kind == CircularLayer.Kind.HEATMAP) {
+            return drawHeatmapLayer(g2, cx, cy, w, h, R, rOut, cursor, chrs, sec, s, l, outIdx);
         }
+        l.slotOuterR = cursor;
+        return cursor - labelRingReserve(l, s);
     }
 
     private void drawTrackRingsSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {
@@ -2472,24 +2469,19 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
         java.util.Map<String, java.util.Map<String, float[]>> perGeneGroups = needPerGeneGroups(chrs);
-        List<CircularLayer> heatLayers = visibleHeatmapLayers();
-        List<CircularLayer> labelLayers = visibleInsideLabelLayers(s);
-        for (CircularLayer l : labelLayers) l.slotOuterR = -1;
-        int hi = 0, li = 0;
+        // Same merged, row-ordered inside stack as drawTrackRings (heatmaps + labels interleaved).
+        List<CircularLayer> bandLayers = new ArrayList<>();
+        for (CircularLayer l : visibleHeatmapLayers()) bandLayers.add(l);
+        for (CircularLayer l : visibleInsideLabelLayers(s)) bandLayers.add(l);
+        bandLayers.sort(java.util.Comparator.comparingInt(l -> l.rowIndex));
+        for (CircularLayer l : bandLayers) if (l.kind == CircularLayer.Kind.LABELS) l.slotOuterR = -1;
         int[] outIdx = {0};      // index among OUTSIDE heatmaps (for their outward stacking)
+        int bi = 0;
         int bandNo = 0;
         for (Track t : ringTracks) {
-            while (hi < heatLayers.size() && heatLayers.get(hi).bandIndex == bandNo) {
-                CircularLayer hl = heatLayers.get(hi);
-                cursor = drawHeatmapLayer(g2, cx, cy, w, h, R, rOut, cursor,
-                        chrs, sec, s, hl, outIdx);
-                hi++;
-            }
-            while (li < labelLayers.size() && labelLayers.get(li).bandIndex == bandNo) {
-                CircularLayer l = labelLayers.get(li);
-                l.slotOuterR = cursor;
-                cursor -= labelRingReserve(l, s);
-                li++;
+            while (bi < bandLayers.size() && bandLayers.get(bi).bandIndex <= bandNo) {
+                cursor = drawBandLayer(g2, cx, cy, w, h, R, rOut, cursor, chrs, sec, s,
+                        bandLayers.get(bi++), outIdx);
             }
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor, bandInner = bandOuter - ringHeightPx(t, cfg);
@@ -2499,17 +2491,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             cursor = bandInner - 5;
             bandNo++;
         }
-        while (hi < heatLayers.size()) {
-            CircularLayer hl = heatLayers.get(hi);
-            cursor = drawHeatmapLayer(g2, cx, cy, w, h, R, rOut, cursor,
-                    chrs, sec, s, hl, outIdx);
-            hi++;
-        }
-        while (li < labelLayers.size()) {
-            CircularLayer l = labelLayers.get(li);
-            l.slotOuterR = cursor;
-            cursor -= labelRingReserve(l, s);
-            li++;
+        while (bi < bandLayers.size()) {
+            cursor = drawBandLayer(g2, cx, cy, w, h, R, rOut, cursor, chrs, sec, s,
+                    bandLayers.get(bi++), outIdx);
         }
     }
 
