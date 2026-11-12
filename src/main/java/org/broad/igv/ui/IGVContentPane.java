@@ -724,6 +724,16 @@ public class IGVContentPane extends JPanel {
     private void addPointLineItems(JPopupMenu popup, CircularViewPanel panel,
                                    CircularViewPanel.CircularLayer layer) {
         boolean pts = layer.kind == CircularViewPanel.CircularLayer.Kind.POINTS;
+        // Inside / outside the ideogram — switching moves the row between the two column sections.
+        JCheckBoxMenuItem outside = new JCheckBoxMenuItem(
+                (pts ? "Points" : "Lines") + " outside the ideogram", layer.plOutside());
+        outside.addActionListener(e -> {
+            layer.plOutside = outside.isSelected();
+            refreshDataColumn();
+            panel.refresh();
+        });
+        popup.add(outside);
+
         JMenuItem colour = new JMenuItem("Colour…");
         colour.addActionListener(e -> {
             Color c = JColorChooser.showDialog(panel, "Colour", layer.plColor());
@@ -1175,6 +1185,9 @@ public class IGVContentPane extends JPanel {
             where = l.heatmapOutside(s) ? "   · outside" : "   · inside";
         } else if (l.kind == CircularViewPanel.CircularLayer.Kind.LABELS) {
             where = l.labelInside(s) ? "   · inside" : "   · outside";
+        } else if (l.kind == CircularViewPanel.CircularLayer.Kind.POINTS
+                || l.kind == CircularViewPanel.CircularLayer.Kind.LINES) {
+            where = l.plOutside() ? "   · outside" : "   · inside";
         }
         return l.name + "   (" + tag + ")" + where + (l.visible ? "" : "   (hidden)");
     }

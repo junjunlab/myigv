@@ -418,10 +418,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // ---- Per-layer POINTS / LINES style (null = defaults) ----
         public java.awt.Color plColor;
         public Integer plPointSize, plLineWidth, plHeightPx;
+        /** POINTS / LINES: draw outside the ideogram (moved to the Outside column). */
+        public Boolean plOutside;
         public java.awt.Color plColor() { return plColor != null ? plColor : new java.awt.Color(35, 95, 175); }
         public int plPointSize() { return plPointSize != null ? plPointSize : 4; }
         public int plLineWidth() { return plLineWidth != null ? plLineWidth : 2; }
         public int plHeight()    { return plHeightPx != null ? plHeightPx : 42; }
+        public boolean plOutside() { return plOutside != null && plOutside; }
         public boolean visible = true;
         /** Row position (band index) among the band-capable rows, so several labels layers each
          *  get their own ring band instead of sharing one. */
@@ -566,6 +569,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (l == null) return false;
         if (l.kind == CircularLayer.Kind.HEATMAP) return l.heatmapOutside(s);
         if (l.kind == CircularLayer.Kind.LABELS) return !l.labelInside(s);
+        if (l.kind == CircularLayer.Kind.POINTS || l.kind == CircularLayer.Kind.LINES) return l.plOutside();
         return false;
     }
 
@@ -576,6 +580,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             if (!l.visible || !isOutsideLayer(l, s)) continue;
             if (l.kind == CircularLayer.Kind.HEATMAP && l.heatmap == null) continue;
             if (l.kind == CircularLayer.Kind.LABELS && l.labels.isEmpty()) continue;
+            if ((l.kind == CircularLayer.Kind.POINTS || l.kind == CircularLayer.Kind.LINES)
+                    && l.points == null) continue;
             out.add(l);
         }
         out.sort(java.util.Comparator.comparingInt(l -> l.outsideIndex));
@@ -588,6 +594,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double conn = l.heatConnTrack(s);
             double heat = Math.max(8, l.heatHeight(s) > 0 ? l.heatHeight(s) : 50);
             return conn + heat + 6;
+        }
+        if (l.kind == CircularLayer.Kind.POINTS || l.kind == CircularLayer.Kind.LINES) {
+            return l.plHeight() + 6;
         }
         // Labels: the radial extent is the text itself (drawn along the radius), so size the slot
         // from the measured widest label, falling back to the ring reserve before the first render.
@@ -2536,6 +2545,12 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             return drawHeatmapLayer(g2, cx, cy, w, h, R, rOut, cursor, chrs, sec, s, l, outIdx);
         }
         if (l.kind == CircularLayer.Kind.POINTS || l.kind == CircularLayer.Kind.LINES) {
+            if (isOutsideLayer(l, s)) {
+                // Outside: drawn beyond the ideogram, in the Outside column's order.
+                double bandInner = rOut + outsideLayerOffset(l, s);
+                drawPointLineCells(g2, cx, cy, bandInner, bandInner + l.plHeight(), chrs, sec, l);
+                return cursor;   // outside: the inner stack is untouched
+            }
             return drawPointLineBand(g2, cx, cy, cursor, chrs, sec, l);
         }
         l.slotOuterR = cursor;
@@ -2549,11 +2564,18 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      */
     private double drawPointLineBand(Graphics2D g2, int cx, int cy, double cursor,
                                      List<ChrInfo> chrs, List<double[]> sec, CircularLayer l) {
-        PointLineData d = l.points;
         double bandOuter = cursor;
         double bandInner = bandOuter - l.plHeight();
         if (bandInner < 24) return cursor;   // not enough room: skip this band
-        if (d == null || d.rows.isEmpty()) return cursor;
+        drawPointLineCells(g2, cx, cy, bandInner, bandOuter, chrs, sec, l);
+        return bandInner - 5;
+    }
+
+    /** Draw the POINTS / LINES markers inside an explicit radial band (inside or outside). */
+    private void drawPointLineCells(Graphics2D g2, int cx, int cy, double bandInner, double bandOuter,
+                                    List<ChrInfo> chrs, List<double[]> sec, CircularLayer l) {
+        PointLineData d = l.points;
+        if (d == null || d.rows.isEmpty() || bandOuter <= bandInner) return;
 
         java.util.Map<String, List<HeatRow>> byChr = new java.util.LinkedHashMap<>();
         for (HeatRow r : d.rows) byChr.computeIfAbsent(r.chr, k -> new ArrayList<>()).add(r);
@@ -2599,7 +2621,6 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             g2.setStroke(oldStroke);
             g2.setColor(oldColor);
         }
-        return bandInner - 5;
     }
 
     private void drawTrackRingsSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {
