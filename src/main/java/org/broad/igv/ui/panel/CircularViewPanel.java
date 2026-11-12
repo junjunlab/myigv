@@ -2763,6 +2763,30 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         FontMetrics fm = pg.getFontMetrics();
         pg.dispose();
 
+        // Shared smartAlign pitch, based on the OUTERMOST label layer's radius. Several layers
+        // showing the SAME data then tile their labels identically and line up radially, instead
+        // of drifting apart because the inner ring has a shorter circumference (its per-label arc
+        // is a larger angle, so the old per-layer pitch pushed the inner labels to different slots).
+        double rRef = 8, fmHRef = fm.getHeight(), gapRef = s.labelLevelGapPx;
+        boolean refSet = false;
+        for (CircularLayer l : layers) {
+            if (l.kind != CircularLayer.Kind.LABELS || !l.visible || l.labels.isEmpty()) continue;
+            double dirL = l.labelInside(s) ? -1.0 : 1.0;
+            double rl = layerBaseRadius(l, w, h, s) + dirL * l.labelGapPx(s);
+            rRef = Math.max(rRef, rl);
+            if (!refSet) {
+                Font rf = new Font("SansSerif", l.labelBold(s) ? Font.BOLD : Font.PLAIN,
+                        l.labelFontSize(s));
+                Graphics2D rg = probe.createGraphics();
+                rg.setFont(rf);
+                fmHRef = rg.getFontMetrics().getHeight();
+                rg.dispose();
+                gapRef = l.labelLevelGapPx(s);
+                refSet = true;
+            }
+        }
+        double wlShared = (fmHRef + 3 + Math.max(0, gapRef)) / (2 * Math.PI * Math.max(8.0, rRef));
+
         for (CircularLayer l : layers) {
             if (l.kind != CircularLayer.Kind.LABELS || !l.visible || l.labels.isEmpty()) continue;
             // Per-layer style: font / gap / inward / inside all resolve against the layer's own
@@ -2802,10 +2826,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             java.util.Arrays.sort(order, (x, y) -> Double.compare(
                     (a.get(x)[0] + a.get(x)[1]) / 2.0, (a.get(y)[0] + a.get(y)[1]) / 2.0));
 
-            // ---- circlize's smartAlign(): tile overlapping labels end to end (per layer) ----
+            // ---- circlize's smartAlign(): tile overlapping labels end to end ----
             int n = anchors.size();
-            double wl = (lfm.getHeight() + 3 + Math.max(0, l.labelLevelGapPx(s)))
-                    / (2 * Math.PI * Math.max(8.0, rLbl));
+            double wl = wlShared;   // shared pitch so same-data layers line up radially
             double[] s1 = new double[n], s2 = new double[n];
             for (int k = 0; k < n; k++) {
                 int oi = order[k];
