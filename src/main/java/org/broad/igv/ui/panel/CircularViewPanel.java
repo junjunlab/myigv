@@ -3493,9 +3493,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             g2.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), alpha));
 
             if (ribbon) {
-                // circlize-style ribbon: two quadratic-Bezier edges + the two end arcs. The raw
-                // interval spans are used (no min-width floor) so a 1 bp anchor tapers to a point,
-                // exactly like circos.link.
+                // circlize-style ribbon: two quadratic-Bezier edges + the two end arcs. The
+                // FLOORED end widths (ribbonEnd) are used for the body too, so a 1 bp anchor keeps
+                // a minimum band width instead of tapering to a hairline (which, combined with the
+                // control point bowing to the centre, made far-apart links cross into an X).
                 boolean arrowStart = s.linkArrow == 1 || s.linkArrow == 3;
                 boolean arrowEnd = s.linkArrow == 2 || s.linkArrow == 3;
                 double headLen = Math.max(3.0, s.linkArrowLength);
@@ -3516,7 +3517,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 double len1 = (arrowStart && !point1) ? len1raw : 0;
                 double len2 = (arrowEnd && !point2) ? len2raw : 0;
                 Path2D.Double path = ribbonBand(cx, cy, rEnd, s.linkTwist,
-                        a1s, a1e, a2s, a2e, len1, len2);
+                        e1[0], e1[1], e2[0], e2[1], len1, len2);
                 g2.fill(path);
                 if (s.linkRibbonStroke && s.linkRibbonStrokeThickness > 0) {
                     int strokeAlpha = Math.min(255, alpha + 85);
@@ -3631,17 +3632,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                                     double arrowLen1, double arrowLen2) {
         double r1 = Math.max(4, rEnd - Math.max(0, arrowLen1));
         double r2 = Math.max(4, rEnd - Math.max(0, arrowLen2));
-        Point2D p1a = polar(cx, cy, r1, a1s);   // interval 1 start
-        Point2D p1b = polar(cx, cy, r1, a1e);   // interval 1 end
-        Point2D p2a = polar(cx, cy, r2, a2s);   // interval 2 start
-        Point2D p2b = polar(cx, cy, r2, a2e);   // interval 2 end
         boolean inverse = twist;
 
-        Point2D e1End = inverse ? p2b : p2a;
-        Point2D e2End = inverse ? p2a : p2b;
-        double rou = Math.min(r1, r2);          // circlize bows the edge by the SMALLER radius
-        List<Point2D> e1 = quadEdge(cx, cy, rou, p1b, e1End);
-        List<Point2D> e2 = quadEdge(cx, cy, rou, p1a, e2End);
+        // circlize pairs the two edges "crossed": interval-1 end <-> interval-2 start (edge 1)
+        // and interval-1 start <-> interval-2 end (edge 2). twist flips that pairing.
+        double e1f1 = inverse ? a1s : a1e, e1f2 = inverse ? a2e : a2s;
+        double e2f1 = inverse ? a1e : a1s, e2f2 = inverse ? a2s : a2e;
+
+        List<Point2D> e1 = quadEdgeCirclize(cx, cy, e1f1, e1f2, r1, r2);
+        List<Point2D> e2 = quadEdgeCirclize(cx, cy, e2f1, e2f2, r1, r2);
 
         Path2D.Double path = new Path2D.Double();
         path.moveTo(e1.get(0).getX(), e1.get(0).getY());
@@ -3666,35 +3665,88 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     /**
-     * One quadratic-Bezier edge from {@code A} to {@code B} (both on the ring at {@code rEnd})
-     * that bows toward the centre. Mirrors circlize's {@code getQuadraticPoints}: control height
-     * {@code h = r*(1 - 0.5*cos(beta/2))}, rational weight {@code w = 1}, bow toward the centre.
+     * One quadratic-Bezier edge of a link ribbon, ported from circlize's
+     * {@code getQuadraticPoints()} (R/link.R). The control point is set up in a LOCAL frame
+     * that has the chord on the x-axis and the control point at {@code (0, (1+w)/w * h2)}, then
+     * rotated by circlize's {@code alpha} and translated to the chord midpoint. This is what keeps
+     * the ribbon's two edges bowing in parallel (no X-crossing): the previous "control point toward
+     * the centre" approximation collapsed both edges onto the circle centre for near-180 links,
+     * which is exactly what made a ribbon's middle cross into an X.
+     *
+     * <p>Angles are given as <b>fractions of the circle</b> (the {@link #polar} convention:
+     * 0 = 12 o'clock, increasing clockwise). They are converted to circlize's degrees
+     * ({@code frac*360 - 90}) before running its algorithm, so the returned pixel points line up
+     * exactly with {@link #polar} / {@link #appendArcFrac}.</p>
+     *
+     * @param frac1 start angle as a fraction of the circle (the interval-1 side for edge 1)
+     * @param frac2 end angle as a fraction of the circle (the interval-2 side for edge 1)
+     * @param rou1  radius (px) at the {@code frac1} end
+     * @param rou2  radius (px) at the {@code frac2} end
+     * @return sampled curve points, from the ({@code rou1},{@code frac1}) end to the
+     *         ({@code rou2},{@code frac2}) end
      */
-    static List<Point2D> quadEdge(double cx, double cy, double rEnd, Point2D A, Point2D B) {
-        double mx = (A.getX() + B.getX()) / 2.0;
-        double my = (A.getY() + B.getY()) / 2.0;
-        double angA = Math.atan2(A.getY() - cy, A.getX() - cx);
-        double angB = Math.atan2(B.getY() - cy, B.getX() - cx);
-        double dAng = Math.abs(angB - angA);
-        if (dAng > Math.PI) dAng = 2 * Math.PI - dAng;
-        double beta = Math.toDegrees(dAng);
-        double h = rEnd * (1 - 0.5 * Math.cos(Math.toRadians(beta / 2.0)));       // h_auto
-        double h2 = h - rEnd * (1 - Math.cos(Math.toRadians(beta / 2.0)));
+    static List<Point2D> quadEdgeCirclize(double cx, double cy, double frac1, double frac2,
+                                          double rou1, double rou2) {
+        double t1 = (frac1 * 360.0 - 90.0) % 360.0;
+        double t2 = (frac2 * 360.0 - 90.0) % 360.0;
+        if (Math.abs(Math.abs(t2 - t1) - 180.0) < 1e-3) t1 += 1e-3;
+
+        double thetaMid;
+        if (Math.abs(t2 - t1) > 180.0) thetaMid = (t2 + t1) / 2.0 - 180.0;
+        else thetaMid = (t2 + t1) / 2.0;
+        thetaMid = thetaMid % 360.0;
+
+        double rouMin = Math.min(rou1, rou2);
+        double x1 = rouMin * Math.cos(Math.toRadians(t1));
+        double y1 = rouMin * Math.sin(Math.toRadians(t1));
+        double x2 = rouMin * Math.cos(Math.toRadians(t2));
+        double y2 = rouMin * Math.sin(Math.toRadians(t2));
+
+        double beta = (t1 - t2) % 360.0;
+        if (beta < 0) beta += 360.0;          // R %% is always non-negative, Java % is not
+        if (beta > 180.0) beta = 360.0 - beta;
+
+        double hAuto = rouMin * (1.0 - 0.5 * Math.cos(Math.toRadians(beta / 2.0)));
+        double h = hAuto;
+        double h2 = h - rouMin * (1.0 - Math.cos(Math.toRadians(beta / 2.0)));
         double w = 1.0;
-        double p1y = (1 + w) / w * h2;
-        // perpendicular pointing toward the ring centre
-        double nx = cx - mx, ny = cy - my;
-        double nlen = Math.hypot(nx, ny);
-        if (nlen < 1e-9) { nx = 0; ny = 0; } else { nx /= nlen; ny /= nlen; }
-        double pcx = mx + nx * p1y, pcy = my + ny * p1y;
+        double dis = 0.5 * Math.hypot(x1 - x2, y1 - y2);
+        double p0x = -dis, p0y = 0.0;
+        double p2x = dis, p2y = 0.0;
+        double p1x = 0.0, p1y = (1.0 + w) / w * h2;   // = 2*h2
+
+        // circlize: alpha = -90 + (360 - (theta1+theta2)/2 %% 360), with the wrap-around fix
+        double alpha = -90.0 + (360.0 - (t1 + t2) / 2.0 % 360.0);
+        if ((thetaMid > 270.0 || thetaMid < 90.0) && (t1 - 180.0) * (t2 - 180.0) < 0.0) {
+            alpha += 180.0;
+        }
+        double a = Math.toRadians(alpha);
+        double cosA = Math.cos(a), sinA = Math.sin(a);
+        double x0 = (x1 + x2) / 2.0, y0 = (y1 + y2) / 2.0;
+
         final int N = 48;
-        List<Point2D> out = new ArrayList<>(N);
+        List<Point2D> out = new ArrayList<>(N + 2);
         for (int i = 0; i < N; i++) {
-            double t = i / (double) (N - 1), u = 1 - t;
-            double denom = u * u + 2 * t * u * w + t * t;
-            double x = (u * u * A.getX() + 2 * t * u * w * pcx + t * t * B.getX()) / denom;
-            double y = (u * u * A.getY() + 2 * t * u * w * pcy + t * t * B.getY()) / denom;
-            out.add(new Point2D.Double(x, y));
+            double t = i / (double) (N - 1), u = 1.0 - t;
+            double denom = u * u + 2.0 * t * u * w + t * t;
+            double lx = (u * u * p0x + 2.0 * t * u * w * p1x + t * t * p2x) / denom;
+            double ly = (u * u * p0y + 2.0 * t * u * w * p1y + t * t * p2y) / denom;
+            // R: d %*% mat with mat = [[cos,-sin],[sin,cos]]  (row-vector multiply)
+            double gx = lx * cosA + ly * sinA + x0 + cx;
+            double gy = -lx * sinA + ly * cosA + y0 + cy;
+            out.add(new Point2D.Double(gx, gy));
+        }
+
+        // circlize reverses the point order when the short way round goes the other way
+        double span = (t1 - t2) % 360.0;
+        if (span < 0) span += 360.0;
+        if (span < 180.0) Collections.reverse(out);
+
+        // attach the actual end radius (a straight radial segment) when the ends differ
+        if (rou1 > rou2) {
+            out.add(0, polar(cx, cy, rou1, frac1));
+        } else if (rou1 < rou2) {
+            out.add(polar(cx, cy, rou2, frac2));
         }
         return out;
     }
