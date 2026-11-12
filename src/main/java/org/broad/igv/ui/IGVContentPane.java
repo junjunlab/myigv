@@ -1229,9 +1229,11 @@ public class IGVContentPane extends JPanel {
         DefaultListModel<String> model = new DefaultListModel<>();
         dataColumnTracks.clear();
         int bandBefore = 0;          // band-capable rows above the current row
+        int rowIdx = 0;              // absolute row position (0 = top), NOT the add order
         for (Object row : rows) {
             if (row instanceof CircularViewPanel.CircularLayer) {
                 CircularViewPanel.CircularLayer l = (CircularViewPanel.CircularLayer) row;
+                l.rowIndex = rowIdx;
                 model.addElement(layerLabel(l));
                 if (l.kind == CircularViewPanel.CircularLayer.Kind.HEATMAP && l.visible) {
                     // Each heatmap layer is its own ring band at its row position (several
@@ -1243,12 +1245,14 @@ public class IGVContentPane extends JPanel {
                     // visible labels row sits outermost, the next one an inner band, and so on.
                     l.bandIndex = bandBefore;
                 }
+                rowIdx++;
                 continue;
             }
             Track t = (Track) row;
             model.addElement(rowLabel(t));
             dataColumnTracks.add(t);
             if (isBandTrack(t) && t.isVisible()) bandBefore++;
+            rowIdx++;
         }
         dataColumnRows.clear();
         dataColumnRows.addAll(rows);

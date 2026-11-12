@@ -412,6 +412,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** Row position (band index) among the band-capable rows, so several labels layers each
          *  get their own ring band instead of sharing one. */
         public int bandIndex = 0;
+        /** Absolute row position in the Data Tracks column (0 = top). Newly imported layers are
+         *  inserted at the top, so this is NOT the add order; the ring stacks by THIS. */
+        public int rowIndex = 0;
         /** Outer radius of this layer's ring band (inside labels), computed each render. */
         public double slotOuterR = -1;
 
@@ -532,6 +535,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             if (l.kind == CircularLayer.Kind.LABELS && l.visible
                     && !l.labels.isEmpty() && l.labelInside(s)) out.add(l);
         }
+        out.sort(java.util.Comparator.comparingInt(l -> l.rowIndex));   // ROW order, not add order
         return out;
     }
 
@@ -581,9 +585,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double base = labelBaseRadius(w, h, s, false);
         int idx = 0;
         for (CircularLayer o : layers) {
-            if (o == l) break;
+            if (o == l) continue;
             if (o.kind == CircularLayer.Kind.LABELS && o.visible && !o.labels.isEmpty()
-                    && !o.labelInside(s)) idx++;
+                    && !o.labelInside(s) && o.rowIndex < l.rowIndex) idx++;
         }
         return base + idx * labelRingReserve(l, s);
     }
@@ -697,12 +701,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return l;
     }
 
-    /** The visible heatmap layers, in rows order. */
+    /** The visible heatmap layers, in ROW order (top row = outermost band). */
     private List<CircularLayer> visibleHeatmapLayers() {
         List<CircularLayer> out = new ArrayList<>();
         for (CircularLayer l : layers) {
             if (l.kind == CircularLayer.Kind.HEATMAP && l.visible && l.heatmap != null) out.add(l);
         }
+        out.sort(java.util.Comparator.comparingInt(l -> l.rowIndex));
         return out;
     }
 
