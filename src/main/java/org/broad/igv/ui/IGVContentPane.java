@@ -764,10 +764,11 @@ public class IGVContentPane extends JPanel {
             arrowMenu.add(it);
         }
         arrowMenu.addSeparator();
-        JMenuItem arrLen = new JMenuItem("Arrow length… ("
+        JMenuItem arrLen = new JMenuItem("Arrow length (thin links)… ("
                 + Math.round(s.linkArrowLength) + " px)");
+        arrLen.setToolTipText("Length of the small arrow heads drawn on stroked (non-ribbon) links.");
         arrLen.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(panel, "Arrow length (pixels):",
+            String v = JOptionPane.showInputDialog(panel, "Arrow length for thin links (pixels):",
                     Math.round(s.linkArrowLength));
             if (v != null) {
                 try {
@@ -777,20 +778,22 @@ public class IGVContentPane extends JPanel {
             }
         });
         arrowMenu.add(arrLen);
-        JMenuItem arrW = new JMenuItem("Arrow width… ("
-                + String.format(java.util.Locale.ROOT, "%.1f", s.linkArrowWidth) + "x band)");
-        arrW.addActionListener(e -> {
+        JMenuItem arrLenR = new JMenuItem("Arrow height (ribbons)… ("
+                + String.format(java.util.Locale.ROOT, "%.1f", s.linkArrowLenRatio) + "x band)");
+        arrLenR.setToolTipText("Ribbon arrow heads are triangles whose base equals the band width; "
+                + "this is how far the tip reaches inward as a multiple of that width.");
+        arrLenR.addActionListener(e -> {
             String v = JOptionPane.showInputDialog(panel,
-                    "Arrow base width as a multiple of the band width (1.0 - 4.0):",
-                    String.format(java.util.Locale.ROOT, "%.1f", s.linkArrowWidth));
+                    "Ribbon arrow height as a multiple of the band width (0.2 - 5.0):",
+                    String.format(java.util.Locale.ROOT, "%.1f", s.linkArrowLenRatio));
             if (v != null) {
                 try {
-                    s.linkArrowWidth = Math.max(1.0, Math.min(4.0, Double.parseDouble(v.trim())));
+                    s.linkArrowLenRatio = Math.max(0.2, Math.min(5.0, Double.parseDouble(v.trim())));
                     panel.refresh();
                 } catch (NumberFormatException ignore) { }
             }
         });
-        arrowMenu.add(arrW);
+        arrowMenu.add(arrLenR);
         popup.add(arrowMenu);
 
         JMenuItem linkAlpha = new JMenuItem("Transparency (0 = solid)… (" + (255 - s.linkAlpha) + ")");

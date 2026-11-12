@@ -172,9 +172,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public float   linkThickness = 1.2f;
         /** Arrow heads on links: 0 = none (default), 1 = start, 2 = end, 3 = both ends. */
         public int     linkArrow = 0;
-        /** Arrow length in px and base width as a multiple of the band width (circlize
-         *  arr.length / arr.width). */
+        /** Thin-chord arrow head length in px (circlize arr.length). Ribbon band arrows use
+         *  {@link #linkArrowLenRatio} instead, because their head must scale with the band. */
         public double  linkArrowLength = 9.0;
+        /** Ribbon band-arrow length as a MULTIPLE of the band width — the single knob for the
+         *  arrow's height on a ribbon. 1.5 gives a ~40 deg tip. */
+        public double  linkArrowLenRatio = 1.5;
+        /** Thin-chord arrow base width as a multiple of the line width (circlize arr.width). */
         public double  linkArrowWidth = 1.7;
         /** Cap on the number of links drawn per frame (Circos {@code record_limit}). */
         public int     linkRecordLimit = 5000;
@@ -211,6 +215,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public int     labelLevelGapPx = 3;
         /** Radial height (px) reserved for the label ring — circlize's labels_height. */
         public int     labelHeightPx = 40;
+        /** Radial room (px) the OUTSIDE label ring needs, measured from the real label texts on
+         *  every render. {@code > 0} makes {@link #ideogramOuterRadius(int, int, CircularSettings)}
+         *  shrink the ideogram so the labels fit on the canvas. 0 = no outside labels. */
+        public double  labelOutsideReservePx = 0;
         /** Heatmap colour-bar legend, drawn OUTSIDE the ring (same corner set as the Hi-C legend). */
         public boolean heatmapLegend = true;
         public org.broad.igv.hic.HiCTrack.LegendPosition heatmapLegendPosition =
@@ -247,6 +255,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.linkColor = linkColor; s.linkAlpha = linkAlpha;
             s.linkThickness = linkThickness; s.linkRecordLimit = linkRecordLimit;
             s.linkArrow = linkArrow; s.linkArrowLength = linkArrowLength;
+            s.linkArrowLenRatio = linkArrowLenRatio;
             s.linkArrowWidth = linkArrowWidth;
             s.linkColorByChromosome = linkColorByChromosome;
             s.linkEndsInsideTracks = linkEndsInsideTracks;
@@ -262,6 +271,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.labelShowLines = labelShowLines; s.labelGapPx = labelGapPx;
             s.labelInside = labelInside; s.labelInward = labelInward;
             s.labelLevelGapPx = labelLevelGapPx; s.labelHeightPx = labelHeightPx;
+            s.labelOutsideReservePx = labelOutsideReservePx;
             s.heatmapLegend = heatmapLegend;
             s.heatmapLegendPosition = heatmapLegendPosition;
             s.singleArcFraction = singleArcFraction;
@@ -470,9 +480,19 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double R = Math.min(w, h) / 2.0 - MARGIN;
             return Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
         }
-        // No automatic clearance and no ring shrink: the label ring starts right at the
-        // ideogram edge, so "Connector height" is the single manual knob for placing it.
-        return rOut;
+        // Outside: start beyond the chromosome names / tick labels, so the combs never run through
+        // the numbers. The ideogram itself has already been shrunk by labelOutsideReservePx, so
+        // labels + that clearance still fit on the canvas.
+        return rOut + chromosomeNameClearance(s) + 6;
+    }
+
+    /** Radial zone just outside the ideogram that the chromosome names / tick labels occupy. */
+    static double chromosomeNameClearance(CircularSettings s) {
+        if (s.heatmapOutside) {
+            return connectionTrackHeight(s)
+                    + Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50) + 14;
+        }
+        return (s.showAxis && s.showTickLabels && s.tickLabelsOutside) ? 32 : 16;
     }
 
     /** Base radius for the label text pass: the reserved label-band slot when the labels sit
@@ -488,6 +508,36 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             if (l.kind == CircularLayer.Kind.LABELS && l.visible && !l.labels.isEmpty()) return true;
         }
         return false;
+    }
+
+    /**
+     * Measure the OUTSIDE label ring from the real label texts and publish it on the settings, so
+     * {@link #ideogramOuterRadius(int, int, CircularSettings)} can shrink the ideogram enough for
+     * the labels to fit on the canvas. Must run once at the top of every render, before any radius
+     * is computed; with no outside labels it publishes 0 and the ring keeps its full radius (which
+     * is also how deleting the labels row restores it).
+     */
+    private void updateOutsideLabelReserve() {
+        if (settings.labelInside || !hasVisibleLabels()) {
+            settings.labelOutsideReservePx = 0;
+            return;
+        }
+        Font font = new Font("SansSerif", settings.labelBold ? Font.BOLD : Font.PLAIN,
+                settings.labelFontSize);
+        BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D pg = probe.createGraphics();
+        pg.setFont(font);
+        FontMetrics fm = pg.getFontMetrics();
+        int maxW = 0;
+        for (CircularLayer l : layers) {
+            if (l.kind != CircularLayer.Kind.LABELS || !l.visible) continue;
+            for (LabelRow row : l.labels) {
+                if (row == null || row.text == null) continue;
+                maxW = Math.max(maxW, fm.stringWidth(row.text));
+            }
+        }
+        pg.dispose();
+        settings.labelOutsideReservePx = maxW <= 0 ? 0 : settings.labelGapPx + maxW + 8;
     }
 
     public boolean hasLabelsLayer() {
@@ -1077,6 +1127,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (!key.equals(ringKey) || ringImage == null) {
             hicLimitsByTrack.clear();   // only legends for tracks drawn in THIS rebuild
             labelSlotOuterR = -1;       // recomputed by the band layout below
+            updateOutsideLabelReserve(); // may shrink the ideogram for outside labels, before any radius
             ringImage = new BufferedImage(bw, bh, BufferedImage.TYPE_INT_ARGB);
             Graphics2D ig = ringImage.createGraphics();
             ig.scale(sx, sy);   // draw in logical coords, mapped to device pixels
@@ -1175,6 +1226,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // Legends are collected during drawing; start clean so only the tracks drawn now report.
         hicLimitsByTrack.clear();
         labelSlotOuterR = -1;   // recomputed by the band layout below when labels sit inside
+        updateOutsideLabelReserve();   // may shrink the ideogram for outside labels, before any radius
 
         boolean geneMode = FrameManager.isGeneListMode();
         if (geneMode) {
@@ -1806,9 +1858,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double half = Math.min(w, h) / 2.0;
         double R = half - MARGIN;
         double rOut = R * s.bandOuter;
-        if (!s.heatmapOutside) return rOut;
-        double need = outsideAxisClearance(s) + connectionTrackHeight(s)
-                + Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50) + 18;
+        boolean outsideHeatmap = s.heatmapOutside;
+        boolean outsideLabels = s.labelOutsideReservePx > 0;   // measured from the real label texts
+        if (!outsideHeatmap && !outsideLabels) return rOut;
+        // Everything that lives outside the ring: the axis / chromosome names (and the heatmap ring
+        // when it is placed outside too), plus the label texts themselves.
+        double need = (outsideHeatmap ? outsideAxisClearance(s) : 0) + chromosomeNameClearance(s)
+                + (outsideLabels ? s.labelOutsideReservePx + 6 : 0);
         return Math.min(rOut, Math.max(R * 0.35, half - 8 - need));
     }
 
@@ -3445,20 +3501,22 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 double headLen = Math.max(3.0, s.linkArrowLength);
                 double[] e1 = ribbonEnd(a1s, a1e, s.linkRibbonMinDeg);
                 double[] e2 = ribbonEnd(a2s, a2e, s.linkRibbonMinDeg);
-                // A wide band needs a long head, otherwise its "arrow" is just a chamfer: keep the
-                // head at least as long as the band is wide, so the end really is a triangle.
-                double len1 = Math.max(headLen, Math.abs(e1[1] - e1[0]) * 2 * Math.PI * rEnd * 0.75);
-                double len2 = Math.max(headLen, Math.abs(e2[1] - e2[0]) * 2 * Math.PI * rEnd * 0.75);
+                // The head's height follows the band width so a wide band cannot end in a chamfer;
+                // linkArrowLenRatio is the user's knob (1.5x = ~40 deg tip).
+                double len1raw = Math.max(4, Math.abs(e1[1] - e1[0]) * 2 * Math.PI * rEnd
+                        * Math.max(0.1, s.linkArrowLenRatio));
+                double len2raw = Math.max(4, Math.abs(e2[1] - e2[0]) * 2 * Math.PI * rEnd
+                        * Math.max(0.1, s.linkArrowLenRatio));
                 // A band arrow is part of the ribbon, not an ornament on top of it: the body must
                 // stop at the head's BASE radius and the head closes the gap with a triangle whose
                 // tip sits ON the ring. Leaving the body at the ring (the old behaviour) painted a
-                // flat rectangle with two spikes where the wide base poked out past the band.
-                // Overlap the head by 2 px so the antialiased edge of the trimmed band cannot show
-                // through as a seam across the head's base.
-                double trim1 = (arrowStart && !point1) ? Math.max(0, len1 - 2) : 0;
-                double trim2 = (arrowEnd && !point2) ? Math.max(0, len2 - 2) : 0;
+                // The head is built INTO the ribbon polygon (see ribbonBand): the body stops at
+                // the head's base and the polygon runs to the tip on the ring and back, so the
+                // head's base IS the band's own end — same width, same alpha, no seam, no step.
+                double len1 = (arrowStart && !point1) ? len1raw : 0;
+                double len2 = (arrowEnd && !point2) ? len2raw : 0;
                 Path2D.Double path = ribbonBand(cx, cy, rEnd, s.linkTwist,
-                        a1s, a1e, a2s, a2e, trim1, trim2);
+                        a1s, a1e, a2s, a2e, len1, len2);
                 g2.fill(path);
                 if (s.linkRibbonStroke && s.linkRibbonStrokeThickness > 0) {
                     int strokeAlpha = Math.min(255, alpha + 85);
@@ -3466,18 +3524,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                             BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                     g2.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), strokeAlpha));
                     g2.draw(path);
-                    // back to the fill colour: the heads are painted AFTER the outline so the
-                    // trimmed band's end edge cannot show through the head as a seam.
                     g2.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), alpha));
                 }
-                if (arrowStart) {
-                    if (point1) drawThinArrow(g2, cx, cy, rEnd, e1, headLen * 0.65, 1.0);
-                    else drawBandArrow(g2, cx, cy, rEnd, e1, len1, s.linkArrowWidth);
-                }
-                if (arrowEnd) {
-                    if (point2) drawThinArrow(g2, cx, cy, rEnd, e2, headLen * 0.65, 1.0);
-                    else drawBandArrow(g2, cx, cy, rEnd, e2, len2, s.linkArrowWidth);
-                }
+                // A 1 bp end has no width, so it keeps the thin arrow drawn on the curve itself.
+                if (arrowStart && point1) drawThinArrow(g2, cx, cy, rEnd, e1, headLen * 0.65, 1.0);
+                if (arrowEnd && point2) drawThinArrow(g2, cx, cy, rEnd, e2, headLen * 0.65, 1.0);
             } else {
                 g2.setStroke(new BasicStroke(
                         link.thickness > 0 ? link.thickness : s.linkThickness,
@@ -3562,22 +3613,24 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * {@code w = 1}. The two edges connect the crossed endpoints ({@code P1b&lt;-&gt;P2a},
      * {@code P1a&lt;-&gt;P2b}); {@code twist} flips that pairing (circlize's {@code inverse}).</p>
      */
+    /** Plain ribbon, both ends closed by their own arc (no arrow heads). */
     static Path2D.Double ribbonBand(double cx, double cy, double rEnd, boolean twist,
                                     double a1s, double a1e, double a2s, double a2e) {
         return ribbonBand(cx, cy, rEnd, twist, a1s, a1e, a2s, a2e, 0, 0);
     }
 
     /**
-     * Same, with a per-end radial trim: {@code trim1}/{@code trim2} pull that end of the polygon
-     * inward by that many pixels, which is how a band arrow reserves room for its head. The head
-     * triangle then spans {@code rEnd - trim} .. {@code rEnd}, so body and head meet on the same
-     * circle and no flat end (or its corners) can stick out past the arrow.
+     * Same, with an optional ARROW at each end. {@code arrowLen1}/{@code arrowLen2} are the head
+     * lengths in pixels (0 = plain arc end): the end's arc is replaced by two straight segments
+     * that meet at a tip on the ring, so the head is part of the SAME polygon as the body. That is
+     * the only way its base can be exactly as wide as the band — drawing a separate triangle on
+     * top of a full-length band leaves a step where the two shapes meet.
      */
     static Path2D.Double ribbonBand(double cx, double cy, double rEnd, boolean twist,
                                     double a1s, double a1e, double a2s, double a2e,
-                                    double trim1, double trim2) {
-        double r1 = Math.max(4, rEnd - Math.max(0, trim1));
-        double r2 = Math.max(4, rEnd - Math.max(0, trim2));
+                                    double arrowLen1, double arrowLen2) {
+        double r1 = Math.max(4, rEnd - Math.max(0, arrowLen1));
+        double r2 = Math.max(4, rEnd - Math.max(0, arrowLen2));
         Point2D p1a = polar(cx, cy, r1, a1s);   // interval 1 start
         Point2D p1b = polar(cx, cy, r1, a1e);   // interval 1 end
         Point2D p2a = polar(cx, cy, r2, a2s);   // interval 2 start
@@ -3593,16 +3646,23 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         Path2D.Double path = new Path2D.Double();
         path.moveTo(e1.get(0).getX(), e1.get(0).getY());
         for (int i = 1; i < e1.size(); i++) path.lineTo(e1.get(i).getX(), e1.get(i).getY());
-        // arc along interval 2: from the first edge's end to the other end of interval 2
+        // along interval 2: from the first edge's end to the other end of interval 2, either as an
+        // arc (plain end) or through the arrow tip that sits on the ring
         double arc2From = inverse ? a2e : a2s;
         double arc2To = inverse ? a2s : a2e;
-        appendArcFrac(path, cx, cy, r2, arc2From, arc2To);
+        if (arrowLen2 > 0) lineToPoint(path, polar(cx, cy, rEnd, (a2s + a2e) / 2.0));
+        else appendArcFrac(path, cx, cy, r2, arc2From, arc2To);
         // second edge reversed: from its interval-2 end back to p1a
         for (int i = e2.size() - 1; i >= 0; i--) path.lineTo(e2.get(i).getX(), e2.get(i).getY());
-        // arc along interval 1
-        appendArcFrac(path, cx, cy, r1, a1s, a1e);
+        // along interval 1, likewise
+        if (arrowLen1 > 0) lineToPoint(path, polar(cx, cy, rEnd, (a1s + a1e) / 2.0));
+        else appendArcFrac(path, cx, cy, r1, a1s, a1e);
         path.closePath();
         return path;
+    }
+
+    private static void lineToPoint(Path2D.Double path, Point2D p) {
+        path.lineTo(p.getX(), p.getY());
     }
 
     /**
@@ -3711,10 +3771,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     /**
-     * Arrow head that CLOSES a ribbon's interval end: a plain triangle whose base is exactly the
-     * band's own width at {@code rEnd - len} (where the trimmed band stops) and whose tip sits ON
-     * the ring. No flare and no shoulders — the band simply tapers into a point, so nothing sticks
-     * out past the band's silhouette.
+     * Stand-alone band arrow, kept for callers outside the ribbon path (e.g. probes). The ribbon
+     * itself does NOT use this: its head is part of the ribbon polygon (see
+     * {@link #ribbonBand(double, double, double, boolean, double, double, double, double, double, double)})
+     * so that the head's base and the band's end are the same edge.
      */
     static void drawBandArrow(Graphics2D g2, double cx, double cy, double rEnd,
                               double[] e, double len, double widthScale) {
