@@ -35,7 +35,7 @@ public class AboutDialog extends JDialog {
     private static final String UPSTREAM = "https://igv.org";
 
     private static final String BASE_IGV_VERSION = "2.19.8";
-    private static final String FALLBACK_VERSION = "1.0.2";
+    private static final String FALLBACK_VERSION = "1.0.3";
 
     public AboutDialog(Frame parent, boolean modal) {
         super(parent, "About myigv", modal);

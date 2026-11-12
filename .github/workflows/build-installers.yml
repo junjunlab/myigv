@@ -64,7 +64,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           "$JAVA_HOME/bin/jpackage" --type exe \
-            --name myigv --app-version 1.0.2 --vendor junjunlab \
+            --name myigv --app-version 1.0.3 --vendor junjunlab \
             --runtime-image build/jp/runtime \
             --module-path build/myigv-dist/lib \
             --module org.igv/org.broad.igv.ui.Main \
@@ -82,7 +82,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           "$JAVA_HOME/bin/jpackage" --type dmg \
-            --name myigv --app-version 1.0.2 --vendor junjunlab \
+            --name myigv --app-version 1.0.3 --vendor junjunlab \
             --runtime-image build/jp/runtime \
             --module-path build/myigv-dist/lib \
             --module org.igv/org.broad.igv.ui.Main \

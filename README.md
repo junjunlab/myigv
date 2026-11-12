@@ -26,8 +26,8 @@ The guide documents only what myIGV adds on top of upstream IGV 2.19.8; for stoc
 
 Download the matching artifact from **Actions → Build** (or a **Release**):
 
-- Windows: run `myigv-1.0.2.exe`;
-- macOS: open `myigv-1.0.2.dmg` and drag myigv into Applications.
+- Windows: run `myigv-1.0.3.exe`;
+- macOS: open `myigv-1.0.3.dmg` and drag myigv into Applications.
 
 The installer bundles the Java runtime and offline annotations, so no separate Java install is needed.
 
