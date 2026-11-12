@@ -1083,10 +1083,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double bandOuter = Math.min(bandInner + heatH, Math.min(w, h) / 2.0 - 6);
             if (bandOuter - bandInner < 6) return cursor;
             if (connH > 0) {
-                // first heatmap: comb from the ideogram edge (as before); later ones: from the
-                // previous band's outer edge, so a comb never crosses another heatmap.
-                drawHeatmapConnectors(g2, cx, cy, outsideIndex == 0 ? rOut : slotTop,
-                        bandInner, true, chrs, sec, hm);
+                // The comb lives JUST OUTSIDE the chromosome names, hugging the heatmap band —
+                // the same "connector + band together" look as the labels comb. It must NOT start
+                // at the ideogram, or every comb would be a long line crossing the names / axis.
+                drawHeatmapConnectors(g2, cx, cy, slotTop, bandInner, true, chrs, sec, hm);
             }
             drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, hm, low, mid, high);
             return cursor;                              // outside: the inner stack is untouched
