@@ -2840,7 +2840,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
             // ---- circlize's smartAlign(): tile overlapping labels end to end ----
             int n = anchors.size();
-            double wl = wlShared;   // shared pitch so same-data layers line up radially
+            // Shared pitch keeps same-data layers radially aligned; but never let the total
+            // (n * wl) exceed one full turn, or the end-to-end tiling clamps and piles every
+            // label at one place (a tangled "spider web" of connectors). Cap at 1/n instead.
+            double wl = Math.min(wlShared, n > 0 ? 1.0 / n : wlShared);
             double[] s1 = new double[n], s2 = new double[n];
             for (int k = 0; k < n; k++) {
                 int oi = order[k];
