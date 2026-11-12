@@ -558,7 +558,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     public void removeLayer(CircularLayer l) {
         if (l == null) return;
         layers.remove(l);
-        if (l.kind == CircularLayer.Kind.HEATMAP && heatmap == l.heatmap) heatmap = null;
+        if (l.kind == CircularLayer.Kind.HEATMAP) {
+            if (heatmap == l.heatmap) heatmap = null;
+            // "Heatmap outside the ideogram" shrinks the ideogram to reserve the outer ring
+            // (ideogramOuterRadius). With the heatmap gone that reservation would stay behind as a
+            // blank band, so switch the outer placement off — the ring gets its radius back.
+            if (heatmap == null) settings.heatmapOutside = false;
+        }
         invalidateRing();
         log.info("Circular layer removed: " + l.name);
     }
@@ -644,6 +650,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     /** Replace the genomic heatmap. {@code null} clears it. */
     public void setHeatmap(GenomicHeatmap hm) {
         this.heatmap = hm;
+        // A cleared heatmap must also release the outer ring it reserved, otherwise the ideogram
+        // stays shrunk and the plot is left with an empty band (see removeLayer / ideogramOuterRadius).
+        if (hm == null) settings.heatmapOutside = false;
         invalidateRing();
         log.info("Circular heatmap: " + (hm == null ? 0 : hm.rows.size()) + " row(s), "
                 + (hm == null ? 0 : hm.samples) + " sample(s)");
@@ -3431,19 +3440,43 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 // circlize-style ribbon: two quadratic-Bezier edges + the two end arcs. The raw
                 // interval spans are used (no min-width floor) so a 1 bp anchor tapers to a point,
                 // exactly like circos.link.
-                Path2D.Double path = ribbonBand(cx, cy, rEnd, s.linkTwist, a1s, a1e, a2s, a2e);
+                boolean arrowStart = s.linkArrow == 1 || s.linkArrow == 3;
+                boolean arrowEnd = s.linkArrow == 2 || s.linkArrow == 3;
+                double headLen = Math.max(3.0, s.linkArrowLength);
+                double[] e1 = ribbonEnd(a1s, a1e, s.linkRibbonMinDeg);
+                double[] e2 = ribbonEnd(a2s, a2e, s.linkRibbonMinDeg);
+                // A wide band needs a long head, otherwise its "arrow" is just a chamfer: keep the
+                // head at least as long as the band is wide, so the end really is a triangle.
+                double len1 = Math.max(headLen, Math.abs(e1[1] - e1[0]) * 2 * Math.PI * rEnd * 0.75);
+                double len2 = Math.max(headLen, Math.abs(e2[1] - e2[0]) * 2 * Math.PI * rEnd * 0.75);
+                // A band arrow is part of the ribbon, not an ornament on top of it: the body must
+                // stop at the head's BASE radius and the head closes the gap with a triangle whose
+                // tip sits ON the ring. Leaving the body at the ring (the old behaviour) painted a
+                // flat rectangle with two spikes where the wide base poked out past the band.
+                // Overlap the head by 2 px so the antialiased edge of the trimmed band cannot show
+                // through as a seam across the head's base.
+                double trim1 = (arrowStart && !point1) ? Math.max(0, len1 - 2) : 0;
+                double trim2 = (arrowEnd && !point2) ? Math.max(0, len2 - 2) : 0;
+                Path2D.Double path = ribbonBand(cx, cy, rEnd, s.linkTwist,
+                        a1s, a1e, a2s, a2e, trim1, trim2);
                 g2.fill(path);
-                if (s.linkArrow > 0) {
-                    double[] e1 = ribbonEnd(a1s, a1e, s.linkRibbonMinDeg);
-                    double[] e2 = ribbonEnd(a2s, a2e, s.linkRibbonMinDeg);
-                    drawLinkArrows(g2, cx, cy, rEnd, e1, e2, point1, point2, s);
-                }
                 if (s.linkRibbonStroke && s.linkRibbonStrokeThickness > 0) {
                     int strokeAlpha = Math.min(255, alpha + 85);
                     g2.setStroke(new BasicStroke(s.linkRibbonStrokeThickness,
                             BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                     g2.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), strokeAlpha));
                     g2.draw(path);
+                    // back to the fill colour: the heads are painted AFTER the outline so the
+                    // trimmed band's end edge cannot show through the head as a seam.
+                    g2.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), alpha));
+                }
+                if (arrowStart) {
+                    if (point1) drawThinArrow(g2, cx, cy, rEnd, e1, headLen * 0.65, 1.0);
+                    else drawBandArrow(g2, cx, cy, rEnd, e1, len1, s.linkArrowWidth);
+                }
+                if (arrowEnd) {
+                    if (point2) drawThinArrow(g2, cx, cy, rEnd, e2, headLen * 0.65, 1.0);
+                    else drawBandArrow(g2, cx, cy, rEnd, e2, len2, s.linkArrowWidth);
                 }
             } else {
                 g2.setStroke(new BasicStroke(
@@ -3531,16 +3564,31 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      */
     static Path2D.Double ribbonBand(double cx, double cy, double rEnd, boolean twist,
                                     double a1s, double a1e, double a2s, double a2e) {
-        Point2D p1a = polar(cx, cy, rEnd, a1s);   // interval 1 start
-        Point2D p1b = polar(cx, cy, rEnd, a1e);   // interval 1 end
-        Point2D p2a = polar(cx, cy, rEnd, a2s);   // interval 2 start
-        Point2D p2b = polar(cx, cy, rEnd, a2e);   // interval 2 end
+        return ribbonBand(cx, cy, rEnd, twist, a1s, a1e, a2s, a2e, 0, 0);
+    }
+
+    /**
+     * Same, with a per-end radial trim: {@code trim1}/{@code trim2} pull that end of the polygon
+     * inward by that many pixels, which is how a band arrow reserves room for its head. The head
+     * triangle then spans {@code rEnd - trim} .. {@code rEnd}, so body and head meet on the same
+     * circle and no flat end (or its corners) can stick out past the arrow.
+     */
+    static Path2D.Double ribbonBand(double cx, double cy, double rEnd, boolean twist,
+                                    double a1s, double a1e, double a2s, double a2e,
+                                    double trim1, double trim2) {
+        double r1 = Math.max(4, rEnd - Math.max(0, trim1));
+        double r2 = Math.max(4, rEnd - Math.max(0, trim2));
+        Point2D p1a = polar(cx, cy, r1, a1s);   // interval 1 start
+        Point2D p1b = polar(cx, cy, r1, a1e);   // interval 1 end
+        Point2D p2a = polar(cx, cy, r2, a2s);   // interval 2 start
+        Point2D p2b = polar(cx, cy, r2, a2e);   // interval 2 end
         boolean inverse = twist;
 
         Point2D e1End = inverse ? p2b : p2a;
         Point2D e2End = inverse ? p2a : p2b;
-        List<Point2D> e1 = quadEdge(cx, cy, rEnd, p1b, e1End);
-        List<Point2D> e2 = quadEdge(cx, cy, rEnd, p1a, e2End);
+        double rou = Math.min(r1, r2);          // circlize bows the edge by the SMALLER radius
+        List<Point2D> e1 = quadEdge(cx, cy, rou, p1b, e1End);
+        List<Point2D> e2 = quadEdge(cx, cy, rou, p1a, e2End);
 
         Path2D.Double path = new Path2D.Double();
         path.moveTo(e1.get(0).getX(), e1.get(0).getY());
@@ -3548,11 +3596,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // arc along interval 2: from the first edge's end to the other end of interval 2
         double arc2From = inverse ? a2e : a2s;
         double arc2To = inverse ? a2s : a2e;
-        appendArcFrac(path, cx, cy, rEnd, arc2From, arc2To);
+        appendArcFrac(path, cx, cy, r2, arc2From, arc2To);
         // second edge reversed: from its interval-2 end back to p1a
         for (int i = e2.size() - 1; i >= 0; i--) path.lineTo(e2.get(i).getX(), e2.get(i).getY());
         // arc along interval 1
-        appendArcFrac(path, cx, cy, rEnd, a1s, a1e);
+        appendArcFrac(path, cx, cy, r1, a1s, a1e);
         path.closePath();
         return path;
     }
@@ -3624,29 +3672,25 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     /**
-     * Arrow heads on a link's ends, like circlize's {@code directional} + {@code arr.type =
-     * "triangle"}: a triangle whose tip sits on the ring and whose base is {@code linkArrowWidth}
-     * times the band width, pointing into the band. 0 = none (default), 1 = start, 2 = end,
-     * 3 = both.
+     * Thin arrow heads on a STROKED chord's two ends, like circlize's {@code directional} +
+     * {@code arr.type = "triangle"}: a small triangle whose tip sits on the ring. Ribbons use
+     * {@link #drawBandArrow} instead. 0 = none (default), 1 = start, 2 = end, 3 = both.
      */
     static void drawLinkArrows(Graphics2D g2, double cx, double cy, double rEnd,
                                double[] e1, double[] e2, boolean point1, boolean point2,
                                CircularSettings s) {
         if (s == null || s.linkArrow <= 0) return;
         double len = Math.max(3.0, s.linkArrowLength);
-        double scale = Math.max(1.0, s.linkArrowWidth);
         boolean start = s.linkArrow == 1 || s.linkArrow == 3;
         boolean end = s.linkArrow == 2 || s.linkArrow == 3;
-        // A point end gets a thin arrow on the curve; an interval end gets an arrow as wide as
-        // the band, so the head reads as the band flaring into a tip.
-        if (start) drawArrowHead(g2, cx, cy, rEnd, e1, point1 ? len * 0.65 : len,
-                point1 ? 1.0 : scale);
-        if (end) drawArrowHead(g2, cx, cy, rEnd, e2, point2 ? len * 0.65 : len,
-                point2 ? 1.0 : scale);
+        if (start) drawThinArrow(g2, cx, cy, rEnd, e1, point1 ? len * 0.65 : len,
+                point1 ? 1.0 : Math.max(1.0, s.linkArrowWidth));
+        if (end) drawThinArrow(g2, cx, cy, rEnd, e2, point2 ? len * 0.65 : len,
+                point2 ? 1.0 : Math.max(1.0, s.linkArrowWidth));
     }
 
-    /** One arrow head at the ring end of a band whose angular extent is {@code e}. */
-    static void drawArrowHead(Graphics2D g2, double cx, double cy, double rEnd,
+    /** One thin arrow head sitting on the curve, with its tip on the ring. */
+    static void drawThinArrow(Graphics2D g2, double cx, double cy, double rEnd,
                               double[] e, double len, double scale) {
         double mid = (e[0] + e[1]) / 2.0;
         Point2D tip = polar(cx, cy, rEnd, mid);
@@ -3664,6 +3708,36 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         p.lineTo(bx - nx * half, by - ny * half);
         p.closePath();
         g2.fill(p);
+    }
+
+    /**
+     * Arrow head that CLOSES a ribbon's interval end: a plain triangle whose base is exactly the
+     * band's own width at {@code rEnd - len} (where the trimmed band stops) and whose tip sits ON
+     * the ring. No flare and no shoulders — the band simply tapers into a point, so nothing sticks
+     * out past the band's silhouette.
+     */
+    static void drawBandArrow(Graphics2D g2, double cx, double cy, double rEnd,
+                              double[] e, double len, double widthScale) {
+        double mid = (e[0] + e[1]) / 2.0;
+        double baseR = Math.max(4, rEnd - Math.max(1.0, len));
+        // e is in fractions of the circle, so |e1-e0|/2 is already the base's half ANGLE.
+        double halfFrac = Math.max(0.0004, Math.abs(e[1] - e[0]) / 2.0);
+        Point2D tip = polar(cx, cy, rEnd, mid);
+        // The base follows the ARC, not a chord: the trimmed band also ends on that arc, and a
+        // straight base would leave a sliver of the band sticking out past the head's shoulders.
+        Point2D b1 = polar(cx, cy, baseR, mid - halfFrac);
+        Path2D.Double p = new Path2D.Double();
+        p.moveTo(tip.getX(), tip.getY());
+        p.lineTo(b1.getX(), b1.getY());
+        appendArcFrac(p, cx, cy, baseR, mid - halfFrac, mid + halfFrac);
+        p.closePath();
+        g2.fill(p);
+    }
+
+    /** Kept for callers outside this class: one arrow head, band-width based. */
+    static void drawArrowHead(Graphics2D g2, double cx, double cy, double rEnd,
+                              double[] e, double len, double scale) {
+        drawThinArrow(g2, cx, cy, rEnd, e, len, scale);
     }
 
     /**
