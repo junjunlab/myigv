@@ -421,9 +421,23 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public java.awt.Color lblColor, lblLineColor;
         /** HEATMAP: per-layer inside/outside override (null = inherit global heatmapOutside). */
         public Boolean heatOutside;
+        // ---- Per-layer HEATMAP overrides (null = inherit the global CircularSettings) ----
+        public Integer heatHeightPx, heatConnPx;
+        public Boolean heatConnectors;
+        public java.awt.Color heatLow, heatMid, heatHigh;
 
         public boolean heatmapOutside(CircularSettings s) {
             return heatOutside != null ? heatOutside : s.heatmapOutside;
+        }
+        public int heatHeight(CircularSettings s)      { return heatHeightPx != null ? heatHeightPx : s.heatmapHeightPx; }
+        public int heatConnPx(CircularSettings s)      { return heatConnPx != null ? heatConnPx : s.heatmapConnectionPx; }
+        public boolean heatConnectors(CircularSettings s) { return heatConnectors != null ? heatConnectors : s.heatmapConnectors; }
+        public java.awt.Color heatLow(CircularSettings s)  { return heatLow != null ? heatLow : s.heatmapLowColor; }
+        public java.awt.Color heatMid(CircularSettings s)  { return heatMid != null ? heatMid : s.heatmapMidColor; }
+        public java.awt.Color heatHigh(CircularSettings s) { return heatHigh != null ? heatHigh : s.heatmapHighColor; }
+        /** This layer's connection-track height (0 when the comb is off). */
+        public double heatConnTrack(CircularSettings s) {
+            return heatConnectors(s) && heatConnPx(s) > 0 ? heatConnPx(s) : 0;
         }
 
         public boolean labelInside(CircularSettings s)    { return lblInside != null ? lblInside : s.labelInside; }
@@ -946,7 +960,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * {@code stack = TRUE}: ytop = i + 0.5).
      */
     private void drawHeatmapRing(Graphics2D g2, int cx, int cy, double bandInner, double bandOuter,
-                                List<ChrInfo> chrs, List<double[]> sec, GenomicHeatmap hm) {
+                                List<ChrInfo> chrs, List<double[]> sec, GenomicHeatmap hm,
+                                Color low, Color mid, Color high) {
         double bandH = bandOuter - bandInner;
         if (bandH < 2 || hm == null || hm.rows.isEmpty()) return;
         java.util.Map<String, List<HeatRow>> byChr = rowsByChromosome(hm);
@@ -974,7 +989,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     double rIn = bandInner + bandH * j / samples;
                     double rOut = bandInner + bandH * (j + 1) / samples;
                     Shape cell = annularPath(cx, cy, rIn, rOut, a0, a1);
-                    g2.setColor(divergingColor(v, hm.min, hm.max, settings));
+                    g2.setColor(divergingColor(v, hm.min, hm.max, low, mid, high));
                     g2.fill(cell);
                     g2.setColor(Color.WHITE);
                     g2.draw(cell);
@@ -1036,23 +1051,29 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                                     CircularSettings s, CircularLayer hl, int[] outsideCounter) {
         boolean out = hl.heatmapOutside(s);
         double r = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor, chrs, sec, s,
-                hl.heatmap, true, outsideCounter[0], out);
+                hl, true, outsideCounter[0], out);
         if (out) outsideCounter[0]++;
         return r;
     }
 
     private double drawHeatmapBand(Graphics2D g2, int cx, int cy, int w, int h, double R, double rOut,
                                    double cursor, List<ChrInfo> chrs, List<double[]> sec,
-                                   CircularSettings s, GenomicHeatmap hm, boolean stackInside,
+                                   CircularSettings s, CircularLayer hl, boolean stackInside,
                                    int outsideIndex, boolean outside) {
-        double connH = connectionTrackHeight(s);
-        double heatH = Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50);
+        GenomicHeatmap hm = hl.heatmap;
+        if (hm == null) return cursor;
+        // Per-layer height / connection / colours (null override = global default).
+        double connH = hl.heatConnTrack(s);
+        double heatH = Math.max(8, hl.heatHeight(s) > 0 ? hl.heatHeight(s) : 50);
+        // Consistent outside slot pitch so bands with different heights don't overlap.
+        double slotPitch = connectionTrackHeight(s)
+                + Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50) + 6;
+        Color low = hl.heatLow(s), mid = hl.heatMid(s), high = hl.heatHigh(s);
         if (outside) {
             // The heatmap lives OUTSIDE the chromosome names + axis: those keep their normal
             // radius (see drawAll / chromosomeNameClearance) and the band grows beyond them.
             // Several outside heatmaps stack outward, one heatmap footprint each.
-            double slotTop = rOut + chromosomeNameClearance(s)
-                    + outsideIndex * (connH + heatH + 6);
+            double slotTop = rOut + chromosomeNameClearance(s) + outsideIndex * slotPitch;
             double bandInner = slotTop + connH;
             double bandOuter = Math.min(bandInner + heatH, Math.min(w, h) / 2.0 - 6);
             if (bandOuter - bandInner < 6) return cursor;
@@ -1062,7 +1083,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 drawHeatmapConnectors(g2, cx, cy, outsideIndex == 0 ? rOut : slotTop,
                         bandInner, true, chrs, sec, hm);
             }
-            drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, hm);
+            drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, hm, low, mid, high);
             return cursor;                              // outside: the inner stack is untouched
         }
         // INSIDE: the comb lives in its OWN track, exactly like circlize's connection track
@@ -1075,7 +1096,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (connH > 0) {
             drawHeatmapConnectors(g2, cx, cy, cursor, bandOuter, false, chrs, sec, hm);
         }
-        drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, hm);
+        drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, hm, low, mid, high);
         return bandInner - 5;
     }
 

@@ -1042,35 +1042,38 @@ public class IGVContentPane extends JPanel {
     static void addHeatmapItems(JPopupMenu popup, CircularViewPanel panel,
                                 CircularViewPanel.CircularLayer layer) {
         CircularViewPanel.CircularSettings s = panel.getSettings();
-        popup.add(linkCheck("Show heatmap connectors", s.heatmapConnectors,
-                v -> { s.heatmapConnectors = v; panel.refresh(); }));
+        // Per-layer heatmap settings: every edit writes to THIS layer's overrides, so several
+        // imported heatmap files keep independent colours / height / connection track.
+        popup.add(linkCheck("Show heatmap connectors", layer.heatConnectors(s),
+                v -> { layer.heatConnectors = v; panel.refresh(); }));
         // Per-layer inside/outside: an inner heatmap can be moved outside on its own.
         popup.add(linkCheck("Heatmap outside the ideogram", layer.heatmapOutside(s),
                 v -> { layer.heatOutside = v; panel.refresh(); }));
 
-        JMenuItem hmHeight = new JMenuItem("Heatmap height… (" + s.heatmapHeightPx + " px)");
+        int curHeight = layer.heatHeight(s);
+        JMenuItem hmHeight = new JMenuItem("Heatmap height… (" + curHeight + " px)");
         hmHeight.addActionListener(e -> {
             String v = JOptionPane.showInputDialog(panel, "Heatmap band height (pixels):",
-                    s.heatmapHeightPx);
+                    curHeight);
             if (v != null) {
                 try {
-                    s.heatmapHeightPx = Math.max(8, Integer.parseInt(v.trim()));
+                    layer.heatHeightPx = Math.max(8, Integer.parseInt(v.trim()));
                     panel.refresh();
                 } catch (NumberFormatException ignore) { }
             }
         });
         popup.add(hmHeight);
 
-        JMenuItem hmConn = new JMenuItem("Heatmap connection height… ("
-                + s.heatmapConnectionPx + " px)");
+        int curConn = layer.heatConnPx(s);
+        JMenuItem hmConn = new JMenuItem("Heatmap connection height… (" + curConn + " px)");
         hmConn.addActionListener(e -> {
             String v = JOptionPane.showInputDialog(panel,
                     "Height of the connection track between the ideogram and the heatmap\n"
                             + "(this is where the circlize comb lines are drawn):",
-                    s.heatmapConnectionPx);
+                    curConn);
             if (v != null) {
                 try {
-                    s.heatmapConnectionPx = Math.max(0, Integer.parseInt(v.trim()));
+                    layer.heatConnPx = Math.max(0, Integer.parseInt(v.trim()));
                     panel.refresh();
                 } catch (NumberFormatException ignore) { }
             }
@@ -1095,14 +1098,14 @@ public class IGVContentPane extends JPanel {
 
         // ---- colours: 3 stops when the range straddles 0, otherwise 2 stops ----
         popup.addSeparator();
-        CircularViewPanel.GenomicHeatmap hm = panel.getHeatmap();
+        CircularViewPanel.GenomicHeatmap hm = layer.heatmap;
         boolean straddles = hm != null && hm.min < 0 && hm.max > 0;
         JMenu colours = new JMenu(straddles ? "Heatmap colours (low / 0 / high)"
                 : "Heatmap colours (low / high)");
         JMenuItem low = new JMenuItem("Low (min)…");
         low.addActionListener(e -> {
-            Color c = JColorChooser.showDialog(panel, "Heatmap low colour", s.heatmapLowColor);
-            if (c != null) { s.heatmapLowColor = c; panel.refresh(); }
+            Color c = JColorChooser.showDialog(panel, "Heatmap low colour", layer.heatLow(s));
+            if (c != null) { layer.heatLow = c; panel.refresh(); }
         });
         colours.add(low);
         JMenuItem mid = new JMenuItem("Mid (0)…");
@@ -1110,22 +1113,22 @@ public class IGVContentPane extends JPanel {
         if (!straddles) mid.setToolTipText(
                 "Only used when the data range contains 0 (negative and positive values).");
         mid.addActionListener(e -> {
-            Color c = JColorChooser.showDialog(panel, "Heatmap mid colour", s.heatmapMidColor);
-            if (c != null) { s.heatmapMidColor = c; panel.refresh(); }
+            Color c = JColorChooser.showDialog(panel, "Heatmap mid colour", layer.heatMid(s));
+            if (c != null) { layer.heatMid = c; panel.refresh(); }
         });
         colours.add(mid);
         JMenuItem high = new JMenuItem("High (max)…");
         high.addActionListener(e -> {
-            Color c = JColorChooser.showDialog(panel, "Heatmap high colour", s.heatmapHighColor);
-            if (c != null) { s.heatmapHighColor = c; panel.refresh(); }
+            Color c = JColorChooser.showDialog(panel, "Heatmap high colour", layer.heatHigh(s));
+            if (c != null) { layer.heatHigh = c; panel.refresh(); }
         });
         colours.add(high);
         colours.addSeparator();
         JMenuItem resetCols = new JMenuItem("Reset (green / black / red)");
         resetCols.addActionListener(e -> {
-            s.heatmapLowColor = new Color(0, 150, 0);
-            s.heatmapMidColor = new Color(0, 0, 0);
-            s.heatmapHighColor = new Color(215, 40, 40);
+            layer.heatLow = new Color(0, 150, 0);
+            layer.heatMid = new Color(0, 0, 0);
+            layer.heatHigh = new Color(215, 40, 40);
             panel.refresh();
         });
         colours.add(resetCols);
