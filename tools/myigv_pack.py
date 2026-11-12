@@ -67,6 +67,17 @@ EXTRA_LISTS = [
     "https://raw.githubusercontent.com/igvteam/igv-data/refs/heads/main/data/url_mappings.tsv",
 ]
 
+# Gene tracks that the UCSC hub offers and the app can auto-select ("Refseq All" / "Refseq
+# Curated"), but which the genome JSON's own "tracks" list does not mention. Without these the
+# circular view has no genes to draw for those species when offline. dm6 is the common case:
+# its JSON lists only Refseq Curated, while the UI picks Refseq All from the hub.
+EXTRA_TRACKS = [
+    "https://hgdownload.soe.ucsc.edu/goldenPath/dm6/database/ncbiRefSeq.txt.gz",
+    "https://hgdownload.soe.ucsc.edu/goldenPath/ce11/database/ncbiRefSeq.txt.gz",
+    "https://hgdownload.soe.ucsc.edu/goldenPath/sacCer3/database/ncbiRefSeqCurated.txt.gz",
+    "https://hgdownload.soe.ucsc.edu/goldenPath/rn7/database/ncbiRefSeqCurated.txt.gz",
+]
+
 
 def fetch(url, dest):
     """用 curl 下载 url 到 dest，命中已有文件则跳过。返回是否成功。"""
@@ -247,6 +258,21 @@ def bundle_genome(entries, genome_id, config_url, with_hub_index):
 
 def main():
     clean = "--clean" in sys.argv
+
+    # Resolve the genome list BEFORE touching pack/: igv.org/genomes/genomes2.tsv can answer 403,
+    # and deleting first would leave an empty pack with nothing to rebuild from (the app would then
+    # have no genome configs at all). Fall back to the per-genome JSON URLs, which stay reachable.
+    list_text = read_text(LIST_URL)
+    mapping = parse_list(list_text) if list_text else {}
+    if not mapping:
+        print("警告：基因组清单 %s 不可用，改用 https://igv.org/genomes/json/<id>.json 直连"
+              % LIST_URL)
+        mapping = {gid: "https://igv.org/genomes/json/%s.json" % gid
+                   for gid in TARGET_GENOMES}
+    missing = [g for g in TARGET_GENOMES if g not in mapping]
+    if missing:
+        print("警告：以下基因组不在清单中，将被跳过: %s" % ", ".join(missing))
+
     if clean and os.path.isdir(PACK):
         print("清空 pack/ ...")
         shutil.rmtree(PACK)
@@ -258,15 +284,10 @@ def main():
     for url in EXTRA_LISTS:
         add(entries, url)
 
-    # 解析基因组清单，得到每个目标基因组的配置 URL
-    list_text = read_text(LIST_URL)
-    if not list_text:
-        print("错误：无法下载基因组清单 %s" % LIST_URL)
-        sys.exit(1)
-    mapping = parse_list(list_text)
-    missing = [g for g in TARGET_GENOMES if g not in mapping]
-    if missing:
-        print("警告：以下基因组不在 genomes2.tsv 中，将被跳过: %s" % ", ".join(missing))
+    # hub 里由 app 自动选中的基因轨道（见 EXTRA_TRACKS 注释）
+    for url in EXTRA_TRACKS:
+        add(entries, url)
+
     for gid in TARGET_GENOMES:
         url = mapping.get(gid)
         if url:

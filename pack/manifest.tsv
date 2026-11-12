@@ -5,6 +5,7 @@ https://hgdownload.soe.ucsc.edu/goldenPath/ce10/bigZips/ce10.chrom.sizes	data/2e
 https://hgdownload.soe.ucsc.edu/goldenPath/ce11/bigZips/ce11.chrom.sizes	data/d02ab87582-ce11.chrom.sizes
 https://hgdownload.soe.ucsc.edu/goldenPath/ce11/bigZips/ce11.chromAlias.txt	data/c203bce59d-ce11.chromAlias.txt
 https://hgdownload.soe.ucsc.edu/goldenPath/ce11/database/cytoBandIdeo.txt.gz	data/397c02e8b5-cytoBandIdeo.txt.gz
+https://hgdownload.soe.ucsc.edu/goldenPath/ce11/database/ncbiRefSeq.txt.gz	data/84763f56b7-ncbiRefSeq.txt.gz
 https://hgdownload.soe.ucsc.edu/goldenPath/ce11/database/ncbiRefSeqCurated.txt.gz	data/7827d062ed-ncbiRefSeqCurated.txt.gz
 https://hgdownload.soe.ucsc.edu/goldenPath/danRer11/bigZips/danRer11.chrom.sizes	data/281fb751b3-danRer11.chrom.sizes
 https://hgdownload.soe.ucsc.edu/goldenPath/danRer11/bigZips/danRer11.chromAlias.txt	data/c82731ee85-danRer11.chromAlias.txt
@@ -14,6 +15,7 @@ https://hgdownload.soe.ucsc.edu/goldenPath/dm3/database/refGene.txt.gz	data/62a3
 https://hgdownload.soe.ucsc.edu/goldenPath/dm6/bigZips/dm6.chrom.sizes	data/e76c5f1b6c-dm6.chrom.sizes
 https://hgdownload.soe.ucsc.edu/goldenPath/dm6/bigZips/dm6.chromAlias.txt	data/81c75ed5d1-dm6.chromAlias.txt
 https://hgdownload.soe.ucsc.edu/goldenPath/dm6/database/cytoBandIdeo.txt.gz	data/3e5b2766ce-cytoBandIdeo.txt.gz
+https://hgdownload.soe.ucsc.edu/goldenPath/dm6/database/ncbiRefSeq.txt.gz	data/df1bdd870b-ncbiRefSeq.txt.gz
 https://hgdownload.soe.ucsc.edu/goldenPath/dm6/database/ncbiRefSeqCurated.txt.gz	data/fe50a65b2e-ncbiRefSeqCurated.txt.gz
 https://hgdownload.soe.ucsc.edu/goldenPath/hg18/bigZips/hg18.chrom.sizes	data/c3f313714a-hg18.chrom.sizes
 https://hgdownload.soe.ucsc.edu/goldenPath/hg18/database/cytoBandIdeo.txt.gz	data/44d0865d8f-cytoBandIdeo.txt.gz
@@ -29,7 +31,9 @@ https://hgdownload.soe.ucsc.edu/goldenPath/mm9/database/refGene.txt.gz	data/7ae4
 https://hgdownload.soe.ucsc.edu/goldenPath/rn6/database/cytoBandIdeo.txt.gz	data/f796ce0bae-cytoBandIdeo.txt.gz
 https://hgdownload.soe.ucsc.edu/goldenPath/rn7/database/cytoBandIdeo.txt.gz	data/ced6d798b0-cytoBandIdeo.txt.gz
 https://hgdownload.soe.ucsc.edu/goldenPath/rn7/database/ncbiRefSeq.txt.gz	data/a6032381e5-ncbiRefSeq.txt.gz
+https://hgdownload.soe.ucsc.edu/goldenPath/rn7/database/ncbiRefSeqCurated.txt.gz	data/fb1774668f-ncbiRefSeqCurated.txt.gz
 https://hgdownload.soe.ucsc.edu/goldenPath/sacCer3/database/ncbiRefSeq.txt.gz	data/64d51184ec-ncbiRefSeq.txt.gz
+https://hgdownload.soe.ucsc.edu/goldenPath/sacCer3/database/ncbiRefSeqCurated.txt.gz	data/ec51e02d76-ncbiRefSeqCurated.txt.gz
 https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/215/GCF_000001215.4/hub.txt	data/bb030c8636-hub.txt
 https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/GCF_000001635.26.chromAlias.txt	data/1e774e3c04-GCF_000001635.26.chromAlias.txt
 https://hgdownload.soe.ucsc.edu/hubs/GCF/000/001/635/GCF_000001635.26/hub.txt	data/37c9c04bf1-hub.txt

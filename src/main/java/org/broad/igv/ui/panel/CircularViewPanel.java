@@ -2472,37 +2472,44 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             }
             // Background thread (not EDT): the first getFeatures on a remote refGene source may
             // block while it downloads/parses the whole file — must not freeze the UI.
-            featureLoader.submit(() -> {
-                boolean any = false;
-                for (int i = 0; i < todo.size(); i++) {
-                    String chr = todo.get(i);
-                    String key = ft.getName() + "|" + chr;
-                    // Try the genome's chromosome name, then the "chr"-stripped/added alias,
-                    // so annotation tracks with a different naming convention still resolve.
-                    List<Feature> list = tryFetch(ft, chr, lens.get(i));
-                    if (list.isEmpty()) {
-                        String alt = chr.startsWith("chr") ? chr.substring(3) : "chr" + chr;
-                        if (!alt.equals(chr)) {
-                            List<Feature> l2 = tryFetch(ft, alt, lens.get(i));
-                            if (!l2.isEmpty()) list = l2;
+            try {
+                featureLoader.submit(() -> {
+                    boolean any = false;
+                    for (int i = 0; i < todo.size(); i++) {
+                        String chr = todo.get(i);
+                        String key = ft.getName() + "|" + chr;
+                        try {
+                            // A genome with a chrom-alias table stores features under the
+                            // canonical name (sacCer3: chrI -> NC_001133.9), so try every alias.
+                            List<Feature> list = fetchAnyName(ft, genome, chr, lens.get(i));
+                            if (!list.isEmpty()) {
+                                featureCache.put(key, list);
+                                loadAttempts.remove(key);
+                                trackLoaded.put(ft.getName(), Boolean.TRUE);
+                                any = true;
+                                log.info("circular features " + key + " = " + list.size());
+                            } else if (any || Boolean.TRUE.equals(trackLoaded.get(ft.getName()))
+                                    || loadAttempts.getOrDefault(key, 0) >= 240) {
+                                // Only treat a 0 as "genuinely no features" once this SOURCE has
+                                // proved it is parsed (some chromosome returned data). While a
+                                // non-indexed .txt.gz is still parsing, every query returns 0 — so
+                                // caching that as empty is what used to freeze a species blank.
+                                featureCache.put(key, Collections.emptyList());
+                                log.info("circular features " + key + " = 0 (source parsed, empty)");
+                            }
+                        } catch (Throwable ex) {
+                            log.warn("circular features " + key + " failed: " + ex);
+                        } finally {
+                            pendingLoads.remove(key);   // never leave a chromosome blocked forever
                         }
                     }
-                    if (!list.isEmpty()) {
-                        featureCache.put(key, list);
-                        loadAttempts.remove(key);
-                        trackLoaded.put(ft.getName(), Boolean.TRUE);
-                        any = true;
-                        log.info("circular features " + key + " = " + list.size());
-                    } else if (loadAttempts.getOrDefault(key, 0) >= 120) {
-                        // Only after many attempts. A 0 does NOT mean "no features" while a
-                        // non-indexed .txt.gz source is still parsing; RefreshEvent purges empties.
-                        featureCache.put(key, Collections.emptyList());
-                        log.info("circular features " + key + " = 0 (give up)");
-                    }
-                    pendingLoads.remove(key);
-                }
-                if (any) SwingUtilities.invokeLater(this::invalidateRing);
-            });
+                    if (any) SwingUtilities.invokeLater(this::invalidateRing);
+                });
+            } catch (Throwable rejected) {
+                // Executor rejected (shutting down): release the pending marks so a later call retries.
+                for (String chr : todo) pendingLoads.remove(ft.getName() + "|" + chr);
+                log.warn("circular features: couldn't queue load for " + ft.getName(), rejected);
+            }
         }
     }
 
@@ -2514,33 +2521,68 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     private void ensureFeaturesLoadedBlocking(Genome genome) {
         if (genome == null || ringTracks.isEmpty()) return;
         boolean changed = false;
+        int total = 0;
         for (Track t : ringTracks) {
             if (!(t instanceof FeatureTrack)) continue;
             FeatureTrack ft = (FeatureTrack) t;
             org.broad.igv.util.ResourceLocator loc = ft.getResourceLocator();
-            if (loc == null || !loc.isLocal()) continue;      // remote: keep the async path
+            String path = loc == null ? null : loc.getPath();
+            // The offline pack is applied at the STREAM level (ParsingUtils / HttpUtils), so the
+            // locator of a genome-annotation track still carries the original https URL and
+            // isLocal() is false even though the bytes come from disk. Ask the pack directly:
+            // if the URL is bundled we can read it locally, so fill the cache synchronously;
+            // a genuinely remote track stays on the async path.
+            boolean readLocally = (path == null)
+                    || loc.isLocal()
+                    || org.broad.igv.local.LocalResourcePack.lookup(path) != null;
+            if (!readLocally) continue;
             for (String chr : genome.getLongChromosomeNames()) {
                 org.broad.igv.feature.Chromosome c = genome.getChromosome(chr);
                 if (c == null) continue;
                 if (!settings.shownChromosomes.isEmpty() && !settings.shownChromosomes.contains(chr)) continue;
                 String key = ft.getName() + "|" + chr;
                 if (featureCache.containsKey(key)) continue;
-                List<Feature> list = tryFetch(ft, chr, c.getLength());
-                if (list.isEmpty()) {
-                    String alt = chr.startsWith("chr") ? chr.substring(3) : "chr" + chr;
-                    if (!alt.equals(chr)) {
-                        List<Feature> l2 = tryFetch(ft, alt, c.getLength());
-                        if (!l2.isEmpty()) list = l2;
-                    }
-                }
+                // Same alias handling as the async path (canonical names, e.g. RefSeq accessions).
+                List<Feature> list = fetchAnyName(ft, genome, chr, c.getLength());
                 if (!list.isEmpty()) {
                     featureCache.put(key, list);
                     trackLoaded.put(ft.getName(), Boolean.TRUE);
                     changed = true;
+                    total += list.size();
                 }
             }
         }
-        if (changed) ringKey = null;   // force a rebuild so the new features are drawn
+        if (changed) {
+            ringKey = null;   // force a rebuild so the new features are drawn
+            log.info("circular features (sync fill): " + total + " feature(s) cached");
+        }
+    }
+
+    /**
+     * Chromosome names to try when asking a FeatureTrack for features, in order. A genome with a
+     * chrom-alias table canonicalises names inside the parser: for sacCer3 {@code chrI} becomes
+     * {@code NC_001133.9}, so the features are stored under the accession and a query with the
+     * display name returns 0 — which is why the linear view showed genes but the ring was blank.
+     */
+    private static List<String> queryChrNames(Genome genome, String chr) {
+        List<String> names = new ArrayList<>();
+        names.add(chr);
+        String canon = genome == null ? null : genome.getCanonicalChrName(chr);
+        if (canon != null && !names.contains(canon)) names.add(canon);
+        String alt = chr.startsWith("chr") ? chr.substring(3) : "chr" + chr;
+        if (!names.contains(alt)) names.add(alt);
+        String altCanon = genome == null ? null : genome.getCanonicalChrName(alt);
+        if (altCanon != null && !names.contains(altCanon)) names.add(altCanon);
+        return names;
+    }
+
+    /** First non-empty result over all candidate chromosome names for one ring chromosome. */
+    private static List<Feature> fetchAnyName(FeatureTrack ft, Genome genome, String chr, int len) {
+        for (String q : queryChrNames(genome, chr)) {
+            List<Feature> l = tryFetch(ft, q, len);
+            if (!l.isEmpty()) return l;
+        }
+        return Collections.emptyList();
     }
 
     private static List<Feature> tryFetch(FeatureTrack ft, String chr, int len) {
@@ -2548,6 +2590,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             List<Feature> l = ft.getFeatures(chr, 0, len);
             return l != null ? l : Collections.emptyList();
         } catch (Throwable ex) {
+            // Was silent: a real parse/IO error looked exactly like "no features yet", which made
+            // a broken species impossible to diagnose.
+            log.warn("circular features: getFeatures(\"" + chr + "\") threw " + ex);
             return Collections.emptyList();
         }
     }
