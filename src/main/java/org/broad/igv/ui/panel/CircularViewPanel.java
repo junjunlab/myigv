@@ -195,6 +195,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** true = heatmap ring sits OUTSIDE the ideogram (band + comb grow outward),
          *  false = inside, between the ideogram and the data tracks (circlize side=). */
         public boolean heatmapOutside = false;
+        /** Number of heatmap rings currently drawn OUTSIDE (they stack outward). Set every render
+         *  so {@link #ideogramOuterRadius(int, int, CircularSettings)} reserves room for all of them.
+         *  0 = no heatmap outside. */
+        public int     heatmapOutsideCount = 0;
         /** Heatmap ramp colours: low / mid (used only when the data straddles 0) / high. */
         public Color   heatmapLowColor = new Color(0, 150, 0);
         public Color   heatmapMidColor = new Color(0, 0, 0);
@@ -263,6 +267,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             s.heatmapHeightPx = heatmapHeightPx;
             s.heatmapConnectionPx = heatmapConnectionPx;
             s.heatmapOutside = heatmapOutside;
+            s.heatmapOutsideCount = heatmapOutsideCount;
             s.heatmapLowColor = heatmapLowColor;
             s.heatmapMidColor = heatmapMidColor;
             s.heatmapHighColor = heatmapHighColor;
@@ -410,6 +415,28 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** Outer radius of this layer's ring band (inside labels), computed each render. */
         public double slotOuterR = -1;
 
+        // ---- Per-layer LABELS overrides (null = inherit the global CircularSettings) ----
+        public Boolean lblInside, lblInward, lblShowLines, lblBold;
+        public Integer lblFontSize, lblGapPx, lblHeightPx, lblLevelGapPx;
+        public java.awt.Color lblColor, lblLineColor;
+        /** HEATMAP: per-layer inside/outside override (null = inherit global heatmapOutside). */
+        public Boolean heatOutside;
+
+        public boolean heatmapOutside(CircularSettings s) {
+            return heatOutside != null ? heatOutside : s.heatmapOutside;
+        }
+
+        public boolean labelInside(CircularSettings s)    { return lblInside != null ? lblInside : s.labelInside; }
+        public boolean labelInward(CircularSettings s)    { return lblInward != null ? lblInward : s.labelInward; }
+        public boolean labelShowLines(CircularSettings s) { return lblShowLines != null ? lblShowLines : s.labelShowLines; }
+        public boolean labelBold(CircularSettings s)      { return lblBold != null ? lblBold : s.labelBold; }
+        public int labelFontSize(CircularSettings s)      { return lblFontSize != null ? lblFontSize : s.labelFontSize; }
+        public int labelGapPx(CircularSettings s)         { return lblGapPx != null ? lblGapPx : s.labelGapPx; }
+        public int labelHeightPx(CircularSettings s)      { return lblHeightPx != null ? lblHeightPx : s.labelHeightPx; }
+        public int labelLevelGapPx(CircularSettings s)    { return lblLevelGapPx != null ? lblLevelGapPx : s.labelLevelGapPx; }
+        public java.awt.Color labelColor(CircularSettings s)     { return lblColor != null ? lblColor : s.labelColor; }
+        public java.awt.Color labelLineColor(CircularSettings s) { return lblLineColor != null ? lblLineColor : s.labelLineColor; }
+
         public CircularLayer(Kind kind, String name, String path) {
             this.kind = kind;
             this.name = name;
@@ -478,18 +505,41 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return s.labelGapPx + h;
     }
 
+    /** Per-layer label ring reserve (each layer can have its own gap / font / height). */
+    static double labelRingReserve(CircularLayer l, CircularSettings s) {
+        double h = Math.max(l.labelFontSize(s) + 8, l.labelHeightPx(s));
+        return l.labelGapPx(s) + h;
+    }
+
+    /** Visible labels layers whose own inside/outside flag says INSIDE (they need a ring slot). */
+    private List<CircularLayer> visibleInsideLabelLayers(CircularSettings s) {
+        List<CircularLayer> out = new ArrayList<>();
+        for (CircularLayer l : layers) {
+            if (l.kind == CircularLayer.Kind.LABELS && l.visible
+                    && !l.labels.isEmpty() && l.labelInside(s)) out.add(l);
+        }
+        return out;
+    }
+
     /** Radius the labels hang from: the ideogram's INNER edge when inside, outer when outside. */
     static double labelBaseRadius(int w, int h, CircularSettings s) {
+        return labelBaseRadius(w, h, s, s.labelInside);
+    }
+
+    /** Same, for a specific layer whose inside/outside flag may differ from the global default. */
+    static double labelBaseRadius(int w, int h, CircularSettings s, boolean inside) {
         double rOut = ideogramOuterRadius(w, h, s);
-        if (s.labelInside) {
+        if (inside) {
             double R = Math.min(w, h) / 2.0 - MARGIN;
             return Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
         }
         // Outside: start beyond the chromosome names / tick labels (and beyond the heatmap if it is
         // also placed outside), so the combs never run through the numbers. The ideogram itself has
         // already been shrunk by labelOutsideReservePx, so labels + that clearance still fit.
+        int outsideHm = Math.max(s.heatmapOutsideCount, s.heatmapOutside ? 1 : 0);
         return rOut + chromosomeNameClearance(s)
-                + (s.heatmapOutside ? outsideHeatmapFootprint(s) : 0) + 6;
+                + (outsideHm > 0 ? outsideHm * outsideHeatmapFootprint(s) : 0)
+                + 6;
     }
 
     /** Radial zone just outside the ideogram that the chromosome names / tick labels occupy.
@@ -508,8 +558,20 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     /** Base radius of one labels layer: its own reserved band slot when it sits INSIDE the ring,
      *  otherwise the plain outside radius. */
     private double layerBaseRadius(CircularLayer l, int w, int h, CircularSettings s) {
-        if (s.labelInside && l.slotOuterR > 0) return l.slotOuterR;
-        return labelBaseRadius(w, h, s);
+        boolean inside = l.labelInside(s);
+        if (inside) {
+            return l.slotOuterR > 0 ? l.slotOuterR : labelBaseRadius(w, h, s, true);
+        }
+        // OUTSIDE: several outside label layers stack outward (their order in the rows), so an
+        // inner layer moved outside lands on its own ring past the ones already outside.
+        double base = labelBaseRadius(w, h, s, false);
+        int idx = 0;
+        for (CircularLayer o : layers) {
+            if (o == l) break;
+            if (o.kind == CircularLayer.Kind.LABELS && o.visible && !o.labels.isEmpty()
+                    && !o.labelInside(s)) idx++;
+        }
+        return base + idx * labelRingReserve(l, s);
     }
 
     /** Clear the per-render slot radius of every labels layer (recomputed by the band layout). */
@@ -544,26 +606,35 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * is also how deleting the labels row restores it).
      */
     private void updateOutsideLabelReserve() {
-        if (settings.labelInside || !hasVisibleLabels()) {
-            settings.labelOutsideReservePx = 0;
-            return;
+        // Count how many heatmap rings sit OUTSIDE (per-layer override, else the global flag), so
+        // the ideogram reserves room for all of them.
+        int outsideHm = 0;
+        for (CircularLayer l : layers) {
+            if (l.kind == CircularLayer.Kind.HEATMAP && l.visible && l.heatmap != null
+                    && l.heatmapOutside(settings)) outsideHm++;
         }
-        Font font = new Font("SansSerif", settings.labelBold ? Font.BOLD : Font.PLAIN,
-                settings.labelFontSize);
+        settings.heatmapOutsideCount = outsideHm;
+        // Measure only the OUTSIDE label layers (per-layer inside/outside, per-layer font & gap).
         BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
         Graphics2D pg = probe.createGraphics();
-        pg.setFont(font);
-        FontMetrics fm = pg.getFontMetrics();
-        int maxW = 0;
+        double reserve = 0;
         for (CircularLayer l : layers) {
-            if (l.kind != CircularLayer.Kind.LABELS || !l.visible) continue;
+            if (l.kind != CircularLayer.Kind.LABELS || !l.visible || l.labels.isEmpty()) continue;
+            if (l.labelInside(settings)) continue;   // this layer hangs INSIDE, not outside
+            Font font = new Font("SansSerif", l.labelBold(settings) ? Font.BOLD : Font.PLAIN,
+                    l.labelFontSize(settings));
+            pg.setFont(font);
+            FontMetrics fm = pg.getFontMetrics();
+            int maxW = 0;
             for (LabelRow row : l.labels) {
                 if (row == null || row.text == null) continue;
                 maxW = Math.max(maxW, fm.stringWidth(row.text));
             }
+            // Outside layers STACK (see layerBaseRadius), so each one adds its own radial slot.
+            if (maxW > 0) reserve += l.labelGapPx(settings) + maxW + 8;
         }
         pg.dispose();
-        settings.labelOutsideReservePx = maxW <= 0 ? 0 : settings.labelGapPx + maxW + 8;
+        settings.labelOutsideReservePx = reserve;
     }
 
     public boolean hasLabelsLayer() {
@@ -602,24 +673,46 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         return l;
     }
 
-    /** Set (or replace) the heatmap layer; only one heatmap ring exists at a time. */
+    /** Add a heatmap layer (several heatmap rings stack up as independent bands). */
     public CircularLayer setHeatmapLayer(String name, String path, GenomicHeatmap hm) {
-        layers.removeIf(l -> l.kind == CircularLayer.Kind.HEATMAP);
         CircularLayer l = new CircularLayer(CircularLayer.Kind.HEATMAP, name, path);
         l.heatmap = hm;
         layers.add(l);
-        setHeatmap(hm);
+        setHeatmap(hm);   // legacy single-heatmap field points at the newest (legend/compat)
         log.info("Circular heatmap layer '" + name + "': " + l.summary());
         return l;
+    }
+
+    /** The visible heatmap layers, in rows order. */
+    private List<CircularLayer> visibleHeatmapLayers() {
+        List<CircularLayer> out = new ArrayList<>();
+        for (CircularLayer l : layers) {
+            if (l.kind == CircularLayer.Kind.HEATMAP && l.visible && l.heatmap != null) out.add(l);
+        }
+        return out;
+    }
+
+    /** True when at least one heatmap layer is visible (keeps the legacy field / flag in sync). */
+    private boolean hasVisibleHeatmap() {
+        return !visibleHeatmapLayers().isEmpty();
+    }
+
+    /** Keep the legacy single-heatmap field pointing at a still-visible heatmap (or clear it). */
+    private void syncLegacyHeatmap() {
+        List<CircularLayer> hms = visibleHeatmapLayers();
+        if (hms.isEmpty()) {
+            heatmap = null;
+            settings.heatmapOutside = false;   // release the outer ring the heatmap reserved
+        } else {
+            heatmap = hms.get(hms.size() - 1).heatmap;
+        }
     }
 
     /** Show / hide one layer without unloading it. */
     public void setLayerVisible(CircularLayer l, boolean v) {
         if (l == null) return;
         l.visible = v;
-        if (l.kind == CircularLayer.Kind.HEATMAP) {
-            heatmap = v ? l.heatmap : null;
-        }
+        if (l.kind == CircularLayer.Kind.HEATMAP) syncLegacyHeatmap();
         invalidateRing();
     }
 
@@ -627,13 +720,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     public void removeLayer(CircularLayer l) {
         if (l == null) return;
         layers.remove(l);
-        if (l.kind == CircularLayer.Kind.HEATMAP) {
-            if (heatmap == l.heatmap) heatmap = null;
-            // "Heatmap outside the ideogram" shrinks the ideogram to reserve the outer ring
-            // (ideogramOuterRadius). With the heatmap gone that reservation would stay behind as a
-            // blank band, so switch the outer placement off — the ring gets its radius back.
-            if (heatmap == null) settings.heatmapOutside = false;
-        }
+        if (l.kind == CircularLayer.Kind.HEATMAP) syncLegacyHeatmap();
         invalidateRing();
         log.info("Circular layer removed: " + l.name);
     }
@@ -716,12 +803,19 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     /** User-loaded genomic heatmap (from "Load heatmap…"). */
     private GenomicHeatmap heatmap = null;
 
-    /** Replace the genomic heatmap. {@code null} clears it. */
+    /** Replace the genomic heatmap. {@code null} clears every heatmap layer. Kept for the legacy
+     *  single-heatmap callers (and tests): when no heatmap layer exists it creates one, so a plain
+     *  {@code setHeatmap(hm)} still renders exactly one ring. */
     public void setHeatmap(GenomicHeatmap hm) {
         this.heatmap = hm;
-        // A cleared heatmap must also release the outer ring it reserved, otherwise the ideogram
-        // stays shrunk and the plot is left with an empty band (see removeLayer / ideogramOuterRadius).
-        if (hm == null) settings.heatmapOutside = false;
+        if (hm == null) {
+            layers.removeIf(l -> l.kind == CircularLayer.Kind.HEATMAP);
+            settings.heatmapOutside = false;
+        } else if (visibleHeatmapLayers().isEmpty()) {
+            CircularLayer l = new CircularLayer(CircularLayer.Kind.HEATMAP, "heatmap", null);
+            l.heatmap = hm;
+            layers.add(l);
+        }
         invalidateRing();
         log.info("Circular heatmap: " + (hm == null ? 0 : hm.rows.size()) + " row(s), "
                 + (hm == null ? 0 : hm.samples) + " sample(s)");
@@ -936,19 +1030,37 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * does. When outside, the whole ring is pulled in (see {@link #ideogramOuterRadius}) so the
      * connection track and the cells still fit inside the panel.
      */
+    /** Draw one heatmap layer (inside or outside) and advance the outside-stack counter. */
+    private double drawHeatmapLayer(Graphics2D g2, int cx, int cy, int w, int h, double R, double rOut,
+                                    double cursor, List<ChrInfo> chrs, List<double[]> sec,
+                                    CircularSettings s, CircularLayer hl, int[] outsideCounter) {
+        boolean out = hl.heatmapOutside(s);
+        double r = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor, chrs, sec, s,
+                hl.heatmap, true, outsideCounter[0], out);
+        if (out) outsideCounter[0]++;
+        return r;
+    }
+
     private double drawHeatmapBand(Graphics2D g2, int cx, int cy, int w, int h, double R, double rOut,
                                    double cursor, List<ChrInfo> chrs, List<double[]> sec,
-                                   CircularSettings s, GenomicHeatmap hm, boolean stackInside) {
+                                   CircularSettings s, GenomicHeatmap hm, boolean stackInside,
+                                   int outsideIndex, boolean outside) {
         double connH = connectionTrackHeight(s);
         double heatH = Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50);
-        if (s.heatmapOutside) {
+        if (outside) {
             // The heatmap lives OUTSIDE the chromosome names + axis: those keep their normal
             // radius (see drawAll / chromosomeNameClearance) and the band grows beyond them.
-            double bandInner = rOut + chromosomeNameClearance(s) + connH;
+            // Several outside heatmaps stack outward, one heatmap footprint each.
+            double slotTop = rOut + chromosomeNameClearance(s)
+                    + outsideIndex * (connH + heatH + 6);
+            double bandInner = slotTop + connH;
             double bandOuter = Math.min(bandInner + heatH, Math.min(w, h) / 2.0 - 6);
             if (bandOuter - bandInner < 6) return cursor;
             if (connH > 0) {
-                drawHeatmapConnectors(g2, cx, cy, rOut, bandInner, true, chrs, sec, hm);
+                // first heatmap: comb from the ideogram edge (as before); later ones: from the
+                // previous band's outer edge, so a comb never crosses another heatmap.
+                drawHeatmapConnectors(g2, cx, cy, outsideIndex == 0 ? rOut : slotTop,
+                        bandInner, true, chrs, sec, hm);
             }
             drawHeatmapRing(g2, cx, cy, bandInner, bandOuter, chrs, sec, hm);
             return cursor;                              // outside: the inner stack is untouched
@@ -1871,13 +1983,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double half = Math.min(w, h) / 2.0;
         double R = half - MARGIN;
         double rOut = R * s.bandOuter;
-        boolean outsideHeatmap = s.heatmapOutside;
+        int outsideHeatmaps = Math.max(s.heatmapOutsideCount, s.heatmapOutside ? 1 : 0);
+        boolean outsideHeatmap = outsideHeatmaps > 0;
         boolean outsideLabels = s.labelOutsideReservePx > 0;   // measured from the real label texts
         if (!outsideHeatmap && !outsideLabels) return rOut;
         // Everything that lives outside the ring, from inside out: the axis / chromosome names,
         // then the heatmap ring (when outside too), then the label texts themselves.
         double need = chromosomeNameClearance(s)
-                + (outsideHeatmap ? outsideHeatmapFootprint(s) : 0)
+                + (outsideHeatmap ? outsideHeatmaps * outsideHeatmapFootprint(s) : 0)
                 + (outsideLabels ? s.labelOutsideReservePx + 6 : 0);
         return Math.min(rOut, Math.max(R * 0.35, half - 8 - need));
     }
@@ -2206,21 +2319,24 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // Row order == radial order (top row = outermost). The heatmap and the inside label ring
         // are just another row each, so they are placed at their own position in the stack
         // instead of being pinned to one end.
-        int heatSlot = Math.max(0, Math.min(heatmapBandIndex, ringTracks.size()));
+        List<CircularLayer> heatLayers = visibleHeatmapLayers();
         // Each labels layer is its own ring band, placed at its row position among the band rows.
-        List<CircularLayer> labelLayers = s.labelInside ? visibleLabelLayers() : new ArrayList<>();
+        List<CircularLayer> labelLayers = visibleInsideLabelLayers(s);
         for (CircularLayer l : labelLayers) l.slotOuterR = -1;
-        int li = 0;
+        int hi = 0, li = 0;
+        int[] outIdx = {0};      // index among OUTSIDE heatmaps (for their outward stacking)
         int bandNo = 0;
         for (Track t : ringTracks) {
-            if (heatmap != null && bandNo == heatSlot) {
-                cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
-                        chrs, sec, s, heatmap, true);
+            while (hi < heatLayers.size() && heatLayers.get(hi).bandIndex == bandNo) {
+                CircularLayer hl = heatLayers.get(hi);
+                cursor = drawHeatmapLayer(g2, cx, cy, w, h, R, rOut, cursor,
+                        chrs, sec, s, hl, outIdx);
+                hi++;
             }
             while (li < labelLayers.size() && labelLayers.get(li).bandIndex == bandNo) {
                 CircularLayer l = labelLayers.get(li);
                 l.slotOuterR = cursor;
-                cursor -= labelRingReserve(s);
+                cursor -= labelRingReserve(l, s);
                 li++;
             }
             TrackRingConfig cfg = getRingConfig(t.getName());
@@ -2232,15 +2348,17 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             cursor = bandInner - 5;
             bandNo++;
         }
-        if (heatmap != null && bandNo == heatSlot) {
-            cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
-                    chrs, sec, s, heatmap, true);
+        // Heatmap / label layers whose row is past the last drawable band fall in innermost.
+        while (hi < heatLayers.size()) {
+            CircularLayer hl = heatLayers.get(hi);
+            cursor = drawHeatmapLayer(g2, cx, cy, w, h, R, rOut, cursor,
+                    chrs, sec, s, hl, outIdx);
+            hi++;
         }
-        // Label layers whose row is past the last drawable band fall in at the innermost position.
         while (li < labelLayers.size()) {
             CircularLayer l = labelLayers.get(li);
             l.slotOuterR = cursor;
-            cursor -= labelRingReserve(s);
+            cursor -= labelRingReserve(l, s);
             li++;
         }
     }
@@ -2257,20 +2375,23 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         float[] globalShared = s.ySharedAcrossTracks ? computeSharedYRange(chrs) : null;
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
         java.util.Map<String, java.util.Map<String, float[]>> perGeneGroups = needPerGeneGroups(chrs);
-        int heatSlot = Math.max(0, Math.min(heatmapBandIndex, ringTracks.size()));
-        List<CircularLayer> labelLayers = s.labelInside ? visibleLabelLayers() : new ArrayList<>();
+        List<CircularLayer> heatLayers = visibleHeatmapLayers();
+        List<CircularLayer> labelLayers = visibleInsideLabelLayers(s);
         for (CircularLayer l : labelLayers) l.slotOuterR = -1;
-        int li = 0;
+        int hi = 0, li = 0;
+        int[] outIdx = {0};      // index among OUTSIDE heatmaps (for their outward stacking)
         int bandNo = 0;
         for (Track t : ringTracks) {
-            if (heatmap != null && bandNo == heatSlot) {
-                cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
-                        chrs, sec, s, heatmap, true);
+            while (hi < heatLayers.size() && heatLayers.get(hi).bandIndex == bandNo) {
+                CircularLayer hl = heatLayers.get(hi);
+                cursor = drawHeatmapLayer(g2, cx, cy, w, h, R, rOut, cursor,
+                        chrs, sec, s, hl, outIdx);
+                hi++;
             }
             while (li < labelLayers.size() && labelLayers.get(li).bandIndex == bandNo) {
                 CircularLayer l = labelLayers.get(li);
                 l.slotOuterR = cursor;
-                cursor -= labelRingReserve(s);
+                cursor -= labelRingReserve(l, s);
                 li++;
             }
             TrackRingConfig cfg = getRingConfig(t.getName());
@@ -2281,14 +2402,16 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             cursor = bandInner - 5;
             bandNo++;
         }
-        if (heatmap != null && bandNo == heatSlot) {
-            cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
-                    chrs, sec, s, heatmap, true);
+        while (hi < heatLayers.size()) {
+            CircularLayer hl = heatLayers.get(hi);
+            cursor = drawHeatmapLayer(g2, cx, cy, w, h, R, rOut, cursor,
+                    chrs, sec, s, hl, outIdx);
+            hi++;
         }
         while (li < labelLayers.size()) {
             CircularLayer l = labelLayers.get(li);
             l.slotOuterR = cursor;
-            cursor -= labelRingReserve(s);
+            cursor -= labelRingReserve(l, s);
             li++;
         }
     }
@@ -2597,6 +2720,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     private List<ChrInfo> lastChrs;                 // sectors used by the last ring layout
     private final List<double[]> labelLayout = new ArrayList<>();
     private final List<String> labelTexts = new ArrayList<>();
+    private final List<CircularLayer> labelLayersOf = new ArrayList<>();   // layer per labelLayout entry
 
     /**
      * Lay out the label ring. Each label keeps its GENOMIC anchor (for the cap + upper stem,
@@ -2607,6 +2731,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     void layoutLabels(int w, int h, List<ChrInfo> chrs, CircularSettings s) {
         labelLayout.clear();
         labelTexts.clear();
+        labelLayersOf.clear();
         if (chrs == null || chrs.isEmpty()) return;
         java.util.Map<String, Integer> idx = chromosomeIndex(chrs);
         List<double[]> sec = sectorsFor(chrs, s);
@@ -2617,12 +2742,21 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         FontMetrics fm = pg.getFontMetrics();
         pg.dispose();
 
-        double dir = s.labelInside ? -1.0 : 1.0;
         for (CircularLayer l : layers) {
             if (l.kind != CircularLayer.Kind.LABELS || !l.visible || l.labels.isEmpty()) continue;
+            // Per-layer style: font / gap / inward / inside all resolve against the layer's own
+            // overrides, so editing one labels file never touches another.
+            Font lFont = new Font("SansSerif", l.labelBold(s) ? Font.BOLD : Font.PLAIN,
+                    l.labelFontSize(s));
+            pg = probe.createGraphics();
+            pg.setFont(lFont);
+            FontMetrics lfm = pg.getFontMetrics();
+            pg.dispose();
+            double dir = l.labelInside(s) ? -1.0 : 1.0;
             double rBase = layerBaseRadius(l, w, h, s);
-            double rLbl = rBase + dir * s.labelGapPx;
+            double rLbl = rBase + dir * l.labelGapPx(s);
             // {a0, a1, footprintPx, widthPx} for THIS layer; texts aligned with the same indices
+
             List<double[]> anchors = new ArrayList<>();
             List<String> texts = new ArrayList<>();
             for (LabelRow row : l.labels) {
@@ -2635,8 +2769,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 double a0 = f0 + span * clamp01(((double) row.start - c.viewStart) / vSpan);
                 double a1 = f0 + span * clamp01(((double) row.end - c.viewStart) / vSpan);
                 if (a1 < a0) { double t = a0; a0 = a1; a1 = t; }
-                double fp = fm.getHeight() + 3;
-                anchors.add(new double[]{a0, a1, fp, fm.stringWidth(row.text)});
+                double fp = lfm.getHeight() + 3;
+                anchors.add(new double[]{a0, a1, fp, lfm.stringWidth(row.text)});
                 texts.add(row.text);
             }
             if (anchors.isEmpty()) continue;
@@ -2649,7 +2783,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
             // ---- circlize's smartAlign(): tile overlapping labels end to end (per layer) ----
             int n = anchors.size();
-            double wl = (fm.getHeight() + 3 + Math.max(0, s.labelLevelGapPx))
+            double wl = (lfm.getHeight() + 3 + Math.max(0, l.labelLevelGapPx(s)))
                     / (2 * Math.PI * Math.max(8.0, rLbl));
             double[] s1 = new double[n], s2 = new double[n];
             for (int k = 0; k < n; k++) {
@@ -2702,6 +2836,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 labelLayout.add(new double[]{anchors.get(oi)[0], anchors.get(oi)[1], rBase, rLbl,
                         (s1[k] + s2[k]) / 2.0, anchors.get(oi)[3]});
                 labelTexts.add(texts.get(oi));
+                labelLayersOf.add(l);
             }
         }
     }
@@ -2715,46 +2850,45 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     void drawLabelLayers(Graphics2D g2, int w, int h, CircularSettings s) {
         if (labelLayout.isEmpty()) return;
         int cx = w / 2, cy = h / 2;
-        double dir = s.labelInside ? -1.0 : 1.0;
-        Font font = new Font("SansSerif", s.labelBold ? Font.BOLD : Font.PLAIN, s.labelFontSize);
         Stroke oldStroke = g2.getStroke();
         Color oldColor = g2.getColor();
         try {
-            if (s.labelShowLines) {
-                g2.setColor(s.labelLineColor);
-                g2.setStroke(new BasicStroke(0.7f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
-                for (int i = 0; i < labelLayout.size(); i++) {
-                    double a0 = labelLayout.get(i)[0], a1 = labelLayout.get(i)[1];
-                    double rBase = labelLayout.get(i)[2];
-                    double r = labelLayout.get(i)[3], fText = labelLayout.get(i)[4];
-                    double fReal = (a0 + a1) / 2.0;
-                    // The comb spans ONLY the gap between the layer's band edge and the near end
-                    // of the text (r), so no segment can run across the gene name.
-                    double hT = Math.abs(r - rBase);
-                    if (hT < 2) continue;
-                    double rMid = rBase + dir * hT / 3.0;
-                    double rLow = rBase + dir * 2 * hT / 3.0;
-
-                    // cap over the gene's real interval, hugging the layer's band edge
-                    g2.fill(annularPath(cx, cy, rBase - 0.4, rBase + 0.4, a0, a1));
-
-                    Point2D pTop = polar(cx, cy, rBase, fReal);
-                    Point2D pMid = polar(cx, cy, rMid, fReal);
-                    Point2D pLow = polar(cx, cy, rLow, fText);
-                    Point2D pBot = polar(cx, cy, r, fText);
-                    g2.draw(new Line2D.Double(pTop, pMid));
-                    g2.draw(new Line2D.Double(pMid, pLow));
-                    g2.draw(new Line2D.Double(pLow, pBot));
-                }
+            // Connectors: each entry uses ITS layer's colour / direction / show-lines flag, so the
+            // two labels files never share a style.
+            g2.setStroke(new BasicStroke(0.7f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
+            for (int i = 0; i < labelLayout.size(); i++) {
+                CircularLayer l = i < labelLayersOf.size() ? labelLayersOf.get(i) : null;
+                if (l == null || !l.labelShowLines(s)) continue;
+                double a0 = labelLayout.get(i)[0], a1 = labelLayout.get(i)[1];
+                double rBase = labelLayout.get(i)[2];
+                double r = labelLayout.get(i)[3], fText = labelLayout.get(i)[4];
+                double dir = l.labelInside(s) ? -1.0 : 1.0;
+                double fReal = (a0 + a1) / 2.0;
+                double hT = Math.abs(r - rBase);
+                if (hT < 2) continue;
+                double rMid = rBase + dir * hT / 3.0;
+                double rLow = rBase + dir * 2 * hT / 3.0;
+                g2.setColor(l.labelLineColor(s));
+                g2.fill(annularPath(cx, cy, rBase - 0.4, rBase + 0.4, a0, a1));
+                Point2D pTop = polar(cx, cy, rBase, fReal);
+                Point2D pMid = polar(cx, cy, rMid, fReal);
+                Point2D pLow = polar(cx, cy, rLow, fText);
+                Point2D pBot = polar(cx, cy, r, fText);
+                g2.draw(new Line2D.Double(pTop, pMid));
+                g2.draw(new Line2D.Double(pMid, pLow));
+                g2.draw(new Line2D.Double(pLow, pBot));
             }
             for (int i = 0; i < labelLayout.size(); i++) {
+                CircularLayer l = i < labelLayersOf.size() ? labelLayersOf.get(i) : null;
+                if (l == null) continue;
+                Font font = new Font("SansSerif", l.labelBold(s) ? Font.BOLD : Font.PLAIN,
+                        l.labelFontSize(s));
+                double dir = l.labelInside(s) ? -1.0 : 1.0;
                 double r = labelLayout.get(i)[3], fText = labelLayout.get(i)[4];
                 double len = labelLayout.get(i).length > 5 ? labelLayout.get(i)[5] : 0;
                 double rCenter = r + dir * len / 2.0;      // text centre, away from the ring
-                // Radial on both sides: the name always points at the centre. labelInward only
-                // decides whether it is read away from the centre or towards it.
-                drawRadialText(g2, cx, cy, rCenter, fText, labelTexts.get(i), font, s.labelColor,
-                        s.labelInward);
+                drawRadialText(g2, cx, cy, rCenter, fText, labelTexts.get(i), font,
+                        l.labelColor(s), l.labelInward(s));
             }
         } finally {
             g2.setStroke(oldStroke);

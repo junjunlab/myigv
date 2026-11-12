@@ -582,84 +582,120 @@ public class IGVContentPane extends JPanel {
         }
     }
 
-    /** Load a genomic heatmap (rows x samples, e.g. hg38_heatmap.bed) into the circular view. */
+    /** Load one or more genomic heatmaps (rows x samples); each becomes its own ring band. */
     private void loadHeatmapFromFile(CircularViewPanel panel) {
         java.awt.FileDialog fd = new java.awt.FileDialog(
                 (java.awt.Frame) null, "Load genomic heatmap (BED/TSV rows x samples)", java.awt.FileDialog.LOAD);
+        fd.setMultipleMode(true);
         fd.setVisible(true);
-        String dir = fd.getDirectory();
-        String file = fd.getFile();
-        if (dir == null || file == null) return;
-        String path = dir + file;
-        try {
-            org.broad.igv.util.ResourceLocator locator = new org.broad.igv.util.ResourceLocator(path);
-            CircularViewPanel.GenomicHeatmap hm = CircularViewPanel.parseHeatmap(locator);
-            if (hm == null) {
-                javax.swing.JOptionPane.showMessageDialog(panel, "No numeric heatmap rows found in:\n" + file,
-                        "Load heatmap", javax.swing.JOptionPane.WARNING_MESSAGE);
-                return;
+        java.io.File[] files = fd.getFiles();
+        if (files == null || files.length == 0) {
+            String dir = fd.getDirectory(), file = fd.getFile();
+            if (dir == null || file == null) return;
+            files = new java.io.File[]{new java.io.File(dir, file)};
+        }
+        int loaded = 0;
+        for (java.io.File f : files) {
+            String path = f.getAbsolutePath();
+            String file = f.getName();
+            try {
+                org.broad.igv.util.ResourceLocator locator = new org.broad.igv.util.ResourceLocator(path);
+                CircularViewPanel.GenomicHeatmap hm = CircularViewPanel.parseHeatmap(locator);
+                if (hm == null) {
+                    javax.swing.JOptionPane.showMessageDialog(panel,
+                            "No numeric heatmap rows found in:\n" + file,
+                            "Load heatmap", javax.swing.JOptionPane.WARNING_MESSAGE);
+                    continue;
+                }
+                circularDrawingArea.setHeatmapLayer(file, path, hm);
+                loaded++;
+                log.info("Loaded heatmap from " + path + " (" + hm.rows.size() + " rows, " + hm.samples + " samples)");
+            } catch (Throwable ex) {
+                log.error("Failed to load heatmap from " + path, ex);
+                javax.swing.JOptionPane.showMessageDialog(panel, "Could not load heatmap:\n" + ex.getMessage(),
+                        "Load heatmap", javax.swing.JOptionPane.ERROR_MESSAGE);
             }
-            circularDrawingArea.setHeatmapLayer(file, path, hm);
+        }
+        if (loaded > 0) {
             refreshDataColumn();
             circularDrawingArea.refresh();
-            log.info("Loaded heatmap from " + path + " (" + hm.rows.size() + " rows, " + hm.samples + " samples)");
-        } catch (Throwable ex) {
-            log.error("Failed to load heatmap from " + path, ex);
-            javax.swing.JOptionPane.showMessageDialog(panel, "Could not load heatmap:\n" + ex.getMessage(),
-                    "Load heatmap", javax.swing.JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    /** Import a labels file: one ring of text labels outside the ideogram (circos.genomicLabels). */
+    /** Import one or more labels files: each becomes its own ring of text labels (genomicLabels). */
     private void loadLabelsFromFile(CircularViewPanel panel) {
         java.awt.FileDialog fd = new java.awt.FileDialog(
                 (java.awt.Frame) null, "Import labels (BED, 4th column = name)",
                 java.awt.FileDialog.LOAD);
+        fd.setMultipleMode(true);
         fd.setVisible(true);
-        String dir = fd.getDirectory();
-        String file = fd.getFile();
-        if (dir == null || file == null) return;
-        String path = dir + file;
-        try {
-            org.broad.igv.util.ResourceLocator locator = new org.broad.igv.util.ResourceLocator(path);
-            java.util.List<CircularViewPanel.LabelRow> rows = CircularViewPanel.parseLabels(locator);
-            if (rows.isEmpty()) {
-                JOptionPane.showMessageDialog(panel,
-                        "No chr / start / end / name rows found in://n" + file,
-                        "Import labels", JOptionPane.WARNING_MESSAGE);
-                return;
+        java.io.File[] files = fd.getFiles();
+        if (files == null || files.length == 0) {
+            String dir = fd.getDirectory(), file = fd.getFile();
+            if (dir == null || file == null) return;
+            files = new java.io.File[]{new java.io.File(dir, file)};
+        }
+        int loaded = 0;
+        for (java.io.File f : files) {
+            String path = f.getAbsolutePath();
+            String file = f.getName();
+            try {
+                org.broad.igv.util.ResourceLocator locator = new org.broad.igv.util.ResourceLocator(path);
+                java.util.List<CircularViewPanel.LabelRow> rows = CircularViewPanel.parseLabels(locator);
+                if (rows.isEmpty()) {
+                    JOptionPane.showMessageDialog(panel,
+                            "No chr / start / end / name rows found in:\n" + file,
+                            "Import labels", JOptionPane.WARNING_MESSAGE);
+                    continue;
+                }
+                circularDrawingArea.addLabelsLayer(file, path, rows);
+                loaded++;
+                log.info("Loaded " + rows.size() + " circular labels from " + path);
+            } catch (Throwable ex) {
+                log.error("Failed to load labels from " + path, ex);
+                JOptionPane.showMessageDialog(panel, "Could not load labels:\n" + ex.getMessage(),
+                        "Import labels", JOptionPane.ERROR_MESSAGE);
             }
-            circularDrawingArea.addLabelsLayer(file, path, rows);
+        }
+        if (loaded > 0) {
             refreshDataColumn();
             circularDrawingArea.refresh();
-            log.info("Loaded " + rows.size() + " circular labels from " + path);
-        } catch (Throwable ex) {
-            log.error("Failed to load labels from " + path, ex);
-            JOptionPane.showMessageDialog(panel, "Could not load labels://n" + ex.getMessage(),
-                    "Import labels", JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    /** Parameters for a labels layer (font, colours, connector lines), same menu pattern as heatmap. */
-    private void addLabelItems(JPopupMenu popup, CircularViewPanel panel) {
+    /** Per-layer labels parameters (font, colours, inside/outside). Edits write to THIS layer, so
+     *  two imported labels files keep independent styles. */
+    private void addLabelItems(JPopupMenu popup, CircularViewPanel panel,
+                               CircularViewPanel.CircularLayer layer) {
         CircularViewPanel.CircularSettings s = panel.getSettings();
-        JCheckBoxMenuItem outside = new JCheckBoxMenuItem("Labels outside the ideogram",
-                !s.labelInside);
-        outside.addActionListener(e -> { s.labelInside = !outside.isSelected(); panel.refresh(); });
-        popup.add(outside);
-        popup.add(linkCheck("Read labels toward the centre", s.labelInward,
-                v -> { s.labelInward = v; panel.refresh(); }));
-        popup.add(linkCheck("Show connector lines", s.labelShowLines,
-                v -> { s.labelShowLines = v; panel.refresh(); }));
-        popup.add(linkCheck("Bold labels", s.labelBold,
-                v -> { s.labelBold = v; panel.refresh(); }));
+        // Effective values (this layer's override, else the global default) for the menu labels.
+        boolean inside = layer.labelInside(s);
+        boolean inward = layer.labelInward(s);
+        boolean showLines = layer.labelShowLines(s);
+        boolean bold = layer.labelBold(s);
+        int fontSize = layer.labelFontSize(s);
+        int gap = layer.labelGapPx(s);
+        int height = layer.labelHeightPx(s);
+        int spacing = layer.labelLevelGapPx(s);
+        Color labelCol = layer.labelColor(s);
+        Color lineCol = layer.labelLineColor(s);
 
-        JMenuItem font = new JMenuItem("Font size… (" + s.labelFontSize + " pt)");
+        JCheckBoxMenuItem outside = new JCheckBoxMenuItem("Labels outside the ideogram", !inside);
+        outside.addActionListener(e -> { layer.lblInside = !outside.isSelected(); panel.refresh(); });
+        popup.add(outside);
+        popup.add(linkCheck("Read labels toward the centre", inward,
+                v -> { layer.lblInward = v; panel.refresh(); }));
+        popup.add(linkCheck("Show connector lines", showLines,
+                v -> { layer.lblShowLines = v; panel.refresh(); }));
+        popup.add(linkCheck("Bold labels", bold,
+                v -> { layer.lblBold = v; panel.refresh(); }));
+
+        JMenuItem font = new JMenuItem("Font size… (" + fontSize + " pt)");
         font.addActionListener(e -> {
-            String v = JOptionPane.showInputDialog(panel, "Label font size (pt):", s.labelFontSize);
+            String v = JOptionPane.showInputDialog(panel, "Label font size (pt):", fontSize);
             if (v != null) {
                 try {
-                    s.labelFontSize = Math.max(4, Math.min(36, Integer.parseInt(v.trim())));
+                    layer.lblFontSize = Math.max(4, Math.min(36, Integer.parseInt(v.trim())));
                     panel.refresh();
                 } catch (NumberFormatException ignore) { }
             }
@@ -668,60 +704,60 @@ public class IGVContentPane extends JPanel {
 
         JMenuItem textCol = new JMenuItem("Label colour…");
         textCol.addActionListener(e -> {
-            Color c = JColorChooser.showDialog(panel, "Label colour", s.labelColor);
-            if (c != null) { s.labelColor = c; panel.refresh(); }
+            Color c = JColorChooser.showDialog(panel, "Label colour", labelCol);
+            if (c != null) { layer.lblColor = c; panel.refresh(); }
         });
         popup.add(textCol);
 
-        JMenuItem lineCol = new JMenuItem("Connector colour…");
-        lineCol.addActionListener(e -> {
-            Color c = JColorChooser.showDialog(panel, "Connector colour", s.labelLineColor);
-            if (c != null) { s.labelLineColor = c; panel.refresh(); }
+        JMenuItem lineColItem = new JMenuItem("Connector colour…");
+        lineColItem.addActionListener(e -> {
+            Color c = JColorChooser.showDialog(panel, "Connector colour", lineCol);
+            if (c != null) { layer.lblLineColor = c; panel.refresh(); }
         });
-        popup.add(lineCol);
+        popup.add(lineColItem);
 
-        JMenuItem connLen = new JMenuItem("Connector height… (" + s.labelGapPx + " px)");
+        JMenuItem connLen = new JMenuItem("Connector height… (" + gap + " px)");
         connLen.setToolTipText("Distance from the ideogram edge to the label ring "
                 + "(the comb lives in this gap).");
         connLen.addActionListener(e -> {
             String v = JOptionPane.showInputDialog(panel,
-                    "Connector height, ideogram edge to label ring (px):", s.labelGapPx);
+                    "Connector height, ideogram edge to label ring (px):", gap);
             if (v != null) {
                 try {
-                    s.labelGapPx = Math.max(2, Math.min(80, Integer.parseInt(v.trim())));
+                    layer.lblGapPx = Math.max(2, Math.min(80, Integer.parseInt(v.trim())));
                     panel.refresh();
                 } catch (NumberFormatException ignore) { }
             }
         });
         popup.add(connLen);
 
-        JMenuItem labH = new JMenuItem("Label height… (" + s.labelHeightPx + " px)");
+        JMenuItem labH = new JMenuItem("Label height… (" + height + " px)");
         labH.setToolTipText("Radial room reserved for the label ring (circlize labels_height).");
         labH.addActionListener(e -> {
             String v = JOptionPane.showInputDialog(panel,
-                    "Label ring height (px):", s.labelHeightPx);
+                    "Label ring height (px):", height);
             if (v != null) {
                 try {
-                    s.labelHeightPx = Math.max(10, Math.min(160, Integer.parseInt(v.trim())));
+                    layer.lblHeightPx = Math.max(10, Math.min(160, Integer.parseInt(v.trim())));
                     panel.refresh();
                 } catch (NumberFormatException ignore) { }
             }
         });
         popup.add(labH);
 
-        JMenuItem spacing = new JMenuItem("Label spacing… (" + s.labelLevelGapPx + " px)");
-        spacing.setToolTipText("Gap between two adjacent labels when they are tiled end to end.");
-        spacing.addActionListener(e -> {
+        JMenuItem spacingItem = new JMenuItem("Label spacing… (" + spacing + " px)");
+        spacingItem.setToolTipText("Gap between two adjacent labels when they are tiled end to end.");
+        spacingItem.addActionListener(e -> {
             String v = JOptionPane.showInputDialog(panel,
-                    "Gap between adjacent labels (px):", s.labelLevelGapPx);
+                    "Gap between adjacent labels (px):", spacing);
             if (v != null) {
                 try {
-                    s.labelLevelGapPx = Math.max(0, Math.min(30, Integer.parseInt(v.trim())));
+                    layer.lblLevelGapPx = Math.max(0, Math.min(30, Integer.parseInt(v.trim())));
                     panel.refresh();
                 } catch (NumberFormatException ignore) { }
             }
         });
-        popup.add(spacing);
+        popup.add(spacingItem);
     }
 
     public static void addLinkItems(JPopupMenu popup, CircularViewPanel panel) {
@@ -1003,12 +1039,14 @@ public class IGVContentPane extends JPanel {
     }
 
     /** Heatmap-ring parameters: shown on a heatmap layer row's context menu. */
-    static void addHeatmapItems(JPopupMenu popup, CircularViewPanel panel) {
+    static void addHeatmapItems(JPopupMenu popup, CircularViewPanel panel,
+                                CircularViewPanel.CircularLayer layer) {
         CircularViewPanel.CircularSettings s = panel.getSettings();
         popup.add(linkCheck("Show heatmap connectors", s.heatmapConnectors,
                 v -> { s.heatmapConnectors = v; panel.refresh(); }));
-        popup.add(linkCheck("Heatmap outside the ideogram", s.heatmapOutside,
-                v -> { s.heatmapOutside = v; panel.refresh(); }));
+        // Per-layer inside/outside: an inner heatmap can be moved outside on its own.
+        popup.add(linkCheck("Heatmap outside the ideogram", layer.heatmapOutside(s),
+                v -> { layer.heatOutside = v; panel.refresh(); }));
 
         JMenuItem hmHeight = new JMenuItem("Heatmap height… (" + s.heatmapHeightPx + " px)");
         hmHeight.addActionListener(e -> {
@@ -1187,14 +1225,15 @@ public class IGVContentPane extends JPanel {
 
         DefaultListModel<String> model = new DefaultListModel<>();
         dataColumnTracks.clear();
-        int bandBefore = 0;          // band-capable rows above the heatmap row
-        int heatSlot = -1;
+        int bandBefore = 0;          // band-capable rows above the current row
         for (Object row : rows) {
             if (row instanceof CircularViewPanel.CircularLayer) {
                 CircularViewPanel.CircularLayer l = (CircularViewPanel.CircularLayer) row;
                 model.addElement(layerLabel(l));
                 if (l.kind == CircularViewPanel.CircularLayer.Kind.HEATMAP && l.visible) {
-                    heatSlot = bandBefore;
+                    // Each heatmap layer is its own ring band at its row position (several
+                    // heatmaps stack, like several labels layers).
+                    l.bandIndex = bandBefore;
                 } else if (l.kind == CircularViewPanel.CircularLayer.Kind.LABELS
                         && l.visible && !l.labels.isEmpty()) {
                     // Each labels layer is its own ring band at its row position: the first
@@ -1212,7 +1251,6 @@ public class IGVContentPane extends JPanel {
         dataColumnRows.addAll(rows);
         if (model.isEmpty()) model.addElement("(no tracks loaded)");
         dataColumnList.setModel(model);
-        circularDrawingArea.setHeatmapBandIndex(heatSlot < 0 ? 0 : heatSlot);
         circularDrawingArea.setRingTracks(new ArrayList<>(dataColumnTracks));   // ordered top->bottom
 
         // Any interaction track that is already loaded also feeds the circular links, so a
@@ -1278,8 +1316,8 @@ public class IGVContentPane extends JPanel {
         menu.addSeparator();
 
         boolean labels = layer.kind == CircularViewPanel.CircularLayer.Kind.LABELS;
-        if (heat) addHeatmapItems(menu, circularDrawingArea);
-        else if (labels) addLabelItems(menu, circularDrawingArea);
+        if (heat) addHeatmapItems(menu, circularDrawingArea, layer);
+        else if (labels) addLabelItems(menu, circularDrawingArea, layer);
         else addLinkItems(menu, circularDrawingArea);
 
         menu.addSeparator();
