@@ -480,19 +480,24 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             double R = Math.min(w, h) / 2.0 - MARGIN;
             return Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
         }
-        // Outside: start beyond the chromosome names / tick labels, so the combs never run through
-        // the numbers. The ideogram itself has already been shrunk by labelOutsideReservePx, so
-        // labels + that clearance still fit on the canvas.
-        return rOut + chromosomeNameClearance(s) + 6;
+        // Outside: start beyond the chromosome names / tick labels (and beyond the heatmap if it is
+        // also placed outside), so the combs never run through the numbers. The ideogram itself has
+        // already been shrunk by labelOutsideReservePx, so labels + that clearance still fit.
+        return rOut + chromosomeNameClearance(s)
+                + (s.heatmapOutside ? outsideHeatmapFootprint(s) : 0) + 6;
     }
 
-    /** Radial zone just outside the ideogram that the chromosome names / tick labels occupy. */
+    /** Radial zone just outside the ideogram that the chromosome names / tick labels occupy.
+     *  This is the NORMAL position: chromosome names and the axis stay here regardless of whether
+     *  a heatmap or labels layer is drawn outside them (they must not be pushed outwards). */
     static double chromosomeNameClearance(CircularSettings s) {
-        if (s.heatmapOutside) {
-            return connectionTrackHeight(s)
-                    + Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50) + 14;
-        }
         return (s.showAxis && s.showTickLabels && s.tickLabelsOutside) ? 32 : 16;
+    }
+
+    /** Radial footprint of the connection track + heatmap band when the heatmap is OUTSIDE. */
+    static double outsideHeatmapFootprint(CircularSettings s) {
+        return connectionTrackHeight(s)
+                + Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50) + 14;
     }
 
     /** Base radius for the label text pass: the reserved label-band slot when the labels sit
@@ -923,7 +928,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double connH = connectionTrackHeight(s);
         double heatH = Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50);
         if (s.heatmapOutside) {
-            double bandInner = outsideHeatmapInner(rOut, s) + connH;
+            // The heatmap lives OUTSIDE the chromosome names + axis: those keep their normal
+            // radius (see drawAll / chromosomeNameClearance) and the band grows beyond them.
+            double bandInner = rOut + chromosomeNameClearance(s) + connH;
             double bandOuter = Math.min(bandInner + heatH, Math.min(w, h) / 2.0 - 6);
             if (bandOuter - bandInner < 6) return cursor;
             if (connH > 0) {
@@ -1714,18 +1721,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
 
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
-        // Chromosome names keep their default radius regardless of where a labels layer is
-        // drawn.  An outside labels layer must not push them outward (or shrink the ring, which
-        // would pull them inward): "Connector height" is the only knob the user asked for.
-        double chrLabelR;
-        if (s.heatmapOutside) {
-            // The heatmap ring lives outside the ideogram, so push the chromosome numbers past it
-            // instead of letting them sit under the cells.
-            chrLabelR = outsideHeatmapInner(rOut, s) + connectionTrackHeight(s)
-                    + Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50) + 14;
-        } else {
-            chrLabelR = rOut + ((s.showAxis && s.showTickLabels && s.tickLabelsOutside) ? 32 : 16);
-        }
+        // Chromosome names keep their default radius regardless of where a heatmap or labels layer
+        // is drawn.  An outside layer must not push them outward (or shrink the ring, which would
+        // pull them inward): the layer is placed OUTSIDE these names instead.
+        double chrLabelR = rOut + chromosomeNameClearance(s);
         for (int i = 0; i < chrs.size(); i++) {
             ChrInfo c = chrs.get(i);
             double f0 = sec.get(i)[0], f1 = sec.get(i)[1], spanDeg = sec.get(i)[2];
@@ -1848,11 +1847,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     /**
-     * Outer radius of the ideogram band. When the heatmap is placed OUTSIDE, the whole ring is
-     * pulled in so the connection track + heatmap band still fit inside the panel.  A labels
-     * layer deliberately does NOT shrink the ring: outside labels grow from this edge and are
-     * positioned manually with "Connector height", leaving chromosome names and the axis where
-     * they normally are.
+     * Outer radius of the ideogram band. When the heatmap or a labels layer is placed OUTSIDE, the
+     * whole ring is pulled in just enough for the outside stack — axis + chromosome names, then
+     * (optionally) the connection track + heatmap band, then (optionally) the label texts — to fit
+     * inside the panel. The chromosome names and the axis keep their normal position relative to
+     * this edge; the outside layers grow beyond them rather than pushing them out.
      */
     static double ideogramOuterRadius(int w, int h, CircularSettings s) {
         double half = Math.min(w, h) / 2.0;
@@ -1861,9 +1860,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         boolean outsideHeatmap = s.heatmapOutside;
         boolean outsideLabels = s.labelOutsideReservePx > 0;   // measured from the real label texts
         if (!outsideHeatmap && !outsideLabels) return rOut;
-        // Everything that lives outside the ring: the axis / chromosome names (and the heatmap ring
-        // when it is placed outside too), plus the label texts themselves.
-        double need = (outsideHeatmap ? outsideAxisClearance(s) : 0) + chromosomeNameClearance(s)
+        // Everything that lives outside the ring, from inside out: the axis / chromosome names,
+        // then the heatmap ring (when outside too), then the label texts themselves.
+        double need = chromosomeNameClearance(s)
+                + (outsideHeatmap ? outsideHeatmapFootprint(s) : 0)
                 + (outsideLabels ? s.labelOutsideReservePx + 6 : 0);
         return Math.min(rOut, Math.max(R * 0.35, half - 8 - need));
     }
@@ -2081,7 +2081,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (!s.linkEndsInsideTracks || ringTracks.isEmpty()) return -1;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return -1;
-        double cursor = bandStartRadius(R, s);   // leaves room for inside tick labels
+        double cursor = bandStartRadius(R, ideogramOuterRadius(w, h, s), s);   // honour the shrunk ring
         for (Track t : ringTracks) {
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandInner = cursor - ringHeightPx(t, cfg);
