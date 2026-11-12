@@ -2446,30 +2446,44 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         long now = System.currentTimeMillis();
         for (Track t : ringTracks) {
             if (!(t instanceof FeatureTrack)) continue;
-            FeatureTrack ft = (FeatureTrack) t;
+            final FeatureTrack ft = (FeatureTrack) t;
+            // Collect EVERY chromosome still missing for this track, and fetch them in ONE task.
+            // Submitting one task per chromosome used to race a still-parsing (non-indexed) source:
+            // the early tasks returned 0, and only the last chromosome (chrX for dm3) got data.
+            final List<String> todo = new ArrayList<>();
+            final List<Integer> lens = new ArrayList<>();
             for (String chr : genome.getLongChromosomeNames()) {
                 org.broad.igv.feature.Chromosome c = genome.getChromosome(chr);
                 if (c == null) continue;
                 if (!settings.shownChromosomes.isEmpty() && !settings.shownChromosomes.contains(chr)) continue;
-                final String key = ft.getName() + "|" + chr;
+                String key = ft.getName() + "|" + chr;
                 if (featureCache.containsKey(key) || pendingLoads.contains(key)) continue;
                 Long last = lastAttemptMs.get(key);
                 if (last != null && now - last < 1200) continue;      // cooldown between retries
+                todo.add(chr);
+                lens.add(c.getLength());
+            }
+            if (todo.isEmpty()) continue;
+            for (String chr : todo) {
+                String key = ft.getName() + "|" + chr;
                 lastAttemptMs.put(key, now);
-                int attempts = loadAttempts.merge(key, 1, Integer::sum);
-                final boolean giveUp = attempts >= 120;
-                final int len = c.getLength();
                 pendingLoads.add(key);
-                // Background thread (not EDT): the first getFeatures on a remote refGene source may
-                // block while it downloads/parses the whole file — must not freeze the UI.
-                featureLoader.submit(() -> {
+                loadAttempts.merge(key, 1, Integer::sum);
+            }
+            // Background thread (not EDT): the first getFeatures on a remote refGene source may
+            // block while it downloads/parses the whole file — must not freeze the UI.
+            featureLoader.submit(() -> {
+                boolean any = false;
+                for (int i = 0; i < todo.size(); i++) {
+                    String chr = todo.get(i);
+                    String key = ft.getName() + "|" + chr;
                     // Try the genome's chromosome name, then the "chr"-stripped/added alias,
                     // so annotation tracks with a different naming convention still resolve.
-                    List<Feature> list = tryFetch(ft, chr, len);
+                    List<Feature> list = tryFetch(ft, chr, lens.get(i));
                     if (list.isEmpty()) {
                         String alt = chr.startsWith("chr") ? chr.substring(3) : "chr" + chr;
                         if (!alt.equals(chr)) {
-                            List<Feature> l2 = tryFetch(ft, alt, len);
+                            List<Feature> l2 = tryFetch(ft, alt, lens.get(i));
                             if (!l2.isEmpty()) list = l2;
                         }
                     }
@@ -2477,22 +2491,56 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                         featureCache.put(key, list);
                         loadAttempts.remove(key);
                         trackLoaded.put(ft.getName(), Boolean.TRUE);
+                        any = true;
                         log.info("circular features " + key + " = " + list.size());
-                    } else if (giveUp) {
-                        // Only give up after many attempts. A per-chromosome 0 does NOT mean the
-                        // track is loaded -- non-indexed .txt.gz sources fill chromosomes gradually,
-                        // so an early 0 is usually "not parsed yet". Keep retrying until giveUp,
-                        // and RefreshEvent (data loaded) purges cached empties to refetch.
+                    } else if (loadAttempts.getOrDefault(key, 0) >= 120) {
+                        // Only after many attempts. A 0 does NOT mean "no features" while a
+                        // non-indexed .txt.gz source is still parsing; RefreshEvent purges empties.
                         featureCache.put(key, Collections.emptyList());
                         log.info("circular features " + key + " = 0 (give up)");
                     }
-                    // else: track data not ready yet -> leave uncached; the retry timer retries.
-                    // else: leave uncached so the retry timer tries again (track may still be loading)
                     pendingLoads.remove(key);
-                    SwingUtilities.invokeLater(this::invalidateRing);
-                });
+                }
+                if (any) SwingUtilities.invokeLater(this::invalidateRing);
+            });
+        }
+    }
+
+    /**
+     * Fill any missing chromosome caches in ONE synchronous pass, for LOCAL sources only, so the
+     * ring is drawn complete on the first paint instead of waiting for the async retry cycle.
+     * Remote sources are left to {@link #ensureFeaturesLoaded} (they may block for a long time).
+     */
+    private void ensureFeaturesLoadedBlocking(Genome genome) {
+        if (genome == null || ringTracks.isEmpty()) return;
+        boolean changed = false;
+        for (Track t : ringTracks) {
+            if (!(t instanceof FeatureTrack)) continue;
+            FeatureTrack ft = (FeatureTrack) t;
+            org.broad.igv.util.ResourceLocator loc = ft.getResourceLocator();
+            if (loc == null || !loc.isLocal()) continue;      // remote: keep the async path
+            for (String chr : genome.getLongChromosomeNames()) {
+                org.broad.igv.feature.Chromosome c = genome.getChromosome(chr);
+                if (c == null) continue;
+                if (!settings.shownChromosomes.isEmpty() && !settings.shownChromosomes.contains(chr)) continue;
+                String key = ft.getName() + "|" + chr;
+                if (featureCache.containsKey(key)) continue;
+                List<Feature> list = tryFetch(ft, chr, c.getLength());
+                if (list.isEmpty()) {
+                    String alt = chr.startsWith("chr") ? chr.substring(3) : "chr" + chr;
+                    if (!alt.equals(chr)) {
+                        List<Feature> l2 = tryFetch(ft, alt, c.getLength());
+                        if (!l2.isEmpty()) list = l2;
+                    }
+                }
+                if (!list.isEmpty()) {
+                    featureCache.put(key, list);
+                    trackLoaded.put(ft.getName(), Boolean.TRUE);
+                    changed = true;
+                }
             }
         }
+        if (changed) ringKey = null;   // force a rebuild so the new features are drawn
     }
 
     private static List<Feature> tryFetch(FeatureTrack ft, String chr, int len) {
@@ -2508,6 +2556,9 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if ((ringTracks.isEmpty() && heatmap == null && !hasVisibleLabels()
                 && visiblePointLineLayers().isEmpty())
                 || chrs == null || chrs.isEmpty()) return;
+        // Draw complete on the first paint: fill missing chromosome caches synchronously for LOCAL
+        // tracks (a bundled refGene is already parsed, so this is fast). Remote tracks stay async.
+        ensureFeaturesLoadedBlocking(GenomeManager.getInstance().getCurrentGenome());
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
