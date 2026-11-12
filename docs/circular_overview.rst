@@ -47,8 +47,11 @@ Anatomy of the figure
 Reading from the outside in:
 
 #. **Heatmap and label rings (optional, outermost when outside mode is on).**
-   ``Heatmap outside the ideogram`` and/or ``Labels outside the ideogram`` grow
-   outward; the ideogram radius shrinks to make room.
+   ``Heatmap outside the ideogram`` grows outward and shrinks the ideogram
+   radius to guarantee a radial slot for the band and its comb.
+   ``Labels outside the ideogram`` also grows outward, but leaves the ideogram
+   radius, chromosome names and coordinate axis untouched — position it with
+   ``Connector height…``.
 #. **Coordinate axis and tick labels.**  Major/minor ticks, Mb labels, and
    chromosome names.  Tick labels can sit outside (``Outside (above the band)``,
    default) or inside (``Inside (below the band)``).

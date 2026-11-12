@@ -457,17 +457,17 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
     /** Radius the labels hang from: the ideogram's INNER edge when inside, outer when outside. */
     static double labelBaseRadius(int w, int h, CircularSettings s) {
-        double rOut = ideogramOuterRadius(w, h, s, !s.labelInside ? true : false);
+        double rOut = ideogramOuterRadius(w, h, s);
         if (s.labelInside) {
             double R = Math.min(w, h) / 2.0 - MARGIN;
             return Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
         }
-        // No automatic clearance: the label ring starts right after the connector, so
-        // "Connector height" is the single manual knob for clearing the axis tick text.
+        // No automatic clearance and no ring shrink: the label ring starts right at the
+        // ideogram edge, so "Connector height" is the single manual knob for placing it.
         return rOut;
     }
 
-    /** True when at least one visible labels layer exists (drives the ring shrink). */
+    /** True when at least one visible labels layer exists (drives the inside-label band reservation). */
     public boolean hasVisibleLabels() {
         for (CircularLayer l : layers) {
             if (l.kind == CircularLayer.Kind.LABELS && l.visible && !l.labels.isEmpty()) return true;
@@ -1054,13 +1054,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                     drawMessage(ig, w, h, "Gene list empty or no genes recognised");
                 } else {
                     lastChrs = geneChrs;
-                    drawAll(ig, w, h, geneChrs, settings, hasVisibleLabels());
+                    drawAll(ig, w, h, geneChrs, settings);
                     drawTrackRings(ig, w, h, geneChrs, settings);
                 }
             } else if (Globals.CHR_ALL.equals(chr)) {
                 List<ChrInfo> chrs = buildAll(genome, zoom, rangeZoom, settings);
                 lastChrs = chrs;
-                drawAll(ig, w, h, chrs, settings, hasVisibleLabels());
+                drawAll(ig, w, h, chrs, settings);
                 drawTrackRings(ig, w, h, chrs, settings);
                 // Links are an independent z-layer drawn last, like Circos, so they sit on top.
                 drawLinks(ig, w, h, chrs, allLinks(), settings, linkAnchorRadius(w, h, settings));
@@ -1069,7 +1069,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 if (one == null) drawMessage(ig, w, h, "Chromosome not found: " + chr);
                 else {
                     lastChrs = Collections.singletonList(one);
-                    drawSingle(ig, w, h, one, settings, hasVisibleLabels());
+                    drawSingle(ig, w, h, one, settings);
                     drawTrackRingsSingle(ig, w, h, one, settings);
                     drawLinks(ig, w, h, Collections.singletonList(one), allLinks(), settings,
                             linkAnchorRadius(w, h, settings));
@@ -1145,13 +1145,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 return;
             }
             lastChrs = geneChrs;
-            drawAll(g2, w, h, geneChrs, settings, hasVisibleLabels());
+            drawAll(g2, w, h, geneChrs, settings);
             drawTrackRings(g2, w, h, geneChrs, settings);
             drawLinks(g2, w, h, geneChrs, allLinks(), settings, linkAnchorRadius(w, h, settings));
         } else if (Globals.CHR_ALL.equals(chr)) {
             List<ChrInfo> chrs = buildAll(genome, zoom, rangeZoom, settings);
             lastChrs = chrs;
-            drawAll(g2, w, h, chrs, settings, hasVisibleLabels());
+            drawAll(g2, w, h, chrs, settings);
             drawTrackRings(g2, w, h, chrs, settings);
             drawLinks(g2, w, h, chrs, allLinks(), settings, linkAnchorRadius(w, h, settings));
         } else {
@@ -1161,7 +1161,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 return;
             }
             lastChrs = Collections.singletonList(one);
-            drawSingle(g2, w, h, one, settings, hasVisibleLabels());
+            drawSingle(g2, w, h, one, settings);
             drawTrackRingsSingle(g2, w, h, one, settings);
             drawLinks(g2, w, h, Collections.singletonList(one), allLinks(), settings,
                     linkAnchorRadius(w, h, settings));
@@ -1614,24 +1614,19 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     private static void drawAll(Graphics2D g2, int w, int h, List<ChrInfo> chrs, CircularSettings s) {
-        drawAll(g2, w, h, chrs, s, false);
-    }
-
-    private static void drawAll(Graphics2D g2, int w, int h, List<ChrInfo> chrs,
-                                CircularSettings s, boolean reserveLabels) {
         if (chrs == null || chrs.isEmpty()) { drawMessage(g2, w, h, "Circular view — no chromosomes"); return; }
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double rOut = ideogramOuterRadius(w, h, s, reserveLabels);
+        double rOut = ideogramOuterRadius(w, h, s);
         double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
 
         List<double[]> sec = computeSectors(chrs, s.gapDeg);
+        // Chromosome names keep their default radius regardless of where a labels layer is
+        // drawn.  An outside labels layer must not push them outward (or shrink the ring, which
+        // would pull them inward): "Connector height" is the only knob the user asked for.
         double chrLabelR;
-        if (reserveLabels && !s.labelInside) {
-            // labels ring outside: keep the chromosome numbers beyond it
-            chrLabelR = labelBaseRadius(w, h, s) + labelRingReserve(s) + 12;
-        } else if (s.heatmapOutside) {
+        if (s.heatmapOutside) {
             // The heatmap ring lives outside the ideogram, so push the chromosome numbers past it
             // instead of letting them sit under the cells.
             chrLabelR = outsideHeatmapInner(rOut, s) + connectionTrackHeight(s)
@@ -1658,16 +1653,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     private static void drawSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {
-        drawSingle(g2, w, h, chr, s, false);
-    }
-
-    private static void drawSingle(Graphics2D g2, int w, int h, ChrInfo chr,
-                                   CircularSettings s, boolean reserveLabels) {
         if (chr == null || chr.length <= 0) return;
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
-        double rOut = ideogramOuterRadius(w, h, s, reserveLabels);
+        double rOut = ideogramOuterRadius(w, h, s);
         double rIn = Math.max(R * 0.2, rOut - s.chromosomeHeightPx);
 
         double[] sec = sectorsFor(Collections.singletonList(chr), s).get(0);
@@ -1767,18 +1757,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
     /**
      * Outer radius of the ideogram band. When the heatmap is placed OUTSIDE, the whole ring is
-     * pulled in so the connection track + heatmap band still fit inside the panel.
+     * pulled in so the connection track + heatmap band still fit inside the panel.  A labels
+     * layer deliberately does NOT shrink the ring: outside labels grow from this edge and are
+     * positioned manually with "Connector height", leaving chromosome names and the axis where
+     * they normally are.
      */
     static double ideogramOuterRadius(int w, int h, CircularSettings s) {
-        return ideogramOuterRadius(w, h, s, false);
-    }
-
-    /** Same, reserving room outside the ring for a labels layer (circos.genomicLabels). */
-    static double ideogramOuterRadius(int w, int h, CircularSettings s, boolean reserveLabels) {
         double half = Math.min(w, h) / 2.0;
         double R = half - MARGIN;
         double rOut = R * s.bandOuter;
-        if (reserveLabels && !s.labelInside) rOut = Math.min(rOut, R * 0.76);  // room outside
         if (!s.heatmapOutside) return rOut;
         double need = outsideAxisClearance(s) + connectionTrackHeight(s)
                 + Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50) + 18;

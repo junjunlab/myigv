@@ -69,8 +69,10 @@ Parameters
    * - ``Labels outside the ideogram``
      - off
      - ``off`` (default): the label ring is **inside** the ideogram.  ``on``:
-       the labels and their combs grow outwards.  Text stays radial in both
-       modes.
+       the labels and their combs grow outwards from the ideogram's outer edge.
+       Text stays radial in both modes.  Switching to outside mode does **not**
+       move the chromosome names or the coordinate axis, and does not shrink the
+       ring.
    * - ``Read labels toward the centre``
      - off
      - Flips the radial text baseline so the name reads from outside to inside.
@@ -104,15 +106,31 @@ Parameters
      - Gap between two adjacent names when ``smartAlign`` tiles them end to
        end.  Clamped to ``0 – 30``.
 
+.. important::
+
+   **Outside labels change nothing else in the layout.**  ``labelBaseRadius()``
+   returns the ideogram outer radius directly, with no automatic clearance
+   offset, and ``ideogramOuterRadius()`` no longer reserves room for a labels
+   layer.  As a result:
+
+   * the ideogram ring keeps its normal radius (``R × bandOuter``);
+   * chromosome names stay at their default radius just outside the ring —
+     they are **not** pushed out beyond the label ring;
+   * the coordinate axis, ticks and tick labels stay where they normally are.
+
+   This is deliberate: an outside labels layer is an overlay, not a reason to
+   re-layout the figure.
+
 .. tip::
 
-   **Outside mode does not auto-avoid the axis tick text.**  This is
-   intentional.  ``labelBaseRadius()`` returns the ideogram outer radius
-   directly for outside labels, with no automatic clearance offset; the label
-   ring starts immediately after the connector.  If outside names collide with
-   the coordinate-axis numbers, raise ``Connector height…`` — it is the single
-   manual knob for that clearance.  Alternatively switch tick labels to
-   ``Inside (below the band)`` in :doc:`circular_view_options`.
+   **Outside mode does not auto-avoid the axis tick text or the chromosome
+   names.**  If outside names collide with them, raise ``Connector height…`` —
+   it is the single manual knob for positioning the label ring.  Alternatively
+   switch tick labels to ``Inside (below the band)`` in
+   :doc:`circular_view_options`.  Contrast this with
+   ``Heatmap outside the ideogram`` (see :doc:`circular_heatmap`), which *does*
+   shrink the ring because the heatmap band and its comb need a guaranteed
+   radial slot.
 
 Inside versus outside
 ---------------------
@@ -122,14 +140,17 @@ Inside versus outside
    :width: 60%
 
    ``Labels outside the ideogram`` on.  Labels remain radial and still point
-   toward the centre; the ideogram radius shrinks to make room.
+   toward the centre.  The ideogram keeps its normal radius and the chromosome
+   names stay in their usual place; only the label ring and its combs grow
+   outward.
 
 .. figure:: images/labels_outside_zoom.png
    :alt: Zoomed detail of outside radial labels and outward comb connectors
    :width: 60%
 
-   Zoomed outside mode.  The comb now points outward, and the names are still
-   radial rather than horizontal.
+   Zoomed outside mode.  The comb points outward and the names are still
+   radial.  The chromosome numbers (``1``, ``2``, ``3``) stay at their usual
+   radius; raise ``Connector height…`` to move the label ring clear of them.
 
 .. figure:: images/labels_ring_inward.png
    :alt: Circular ring with labels reading toward the centre

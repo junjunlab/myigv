@@ -272,10 +272,12 @@ Labels
      - Zoomed radial labels with comb connectors and ``smartAlign`` tiling.
      - :doc:`circular_import`, :doc:`circular_labels`
    * - ``labels_ring_outside.png``
-     - ``Labels outside the ideogram`` — radial text outside the ring.
+     - ``Labels outside the ideogram`` — radial text outside the ring, with the
+       ideogram radius and chromosome names unchanged.
      - :doc:`circular_labels`
    * - ``labels_outside_zoom.png``
-     - Zoom of the outside label ring.
+     - Zoom of the outside label ring: outward combs, radial names and
+       chromosome numbers left at their default radius.
      - :doc:`circular_labels`
    * - ``labels_ring_inward.png``
      - ``Read labels toward the centre`` flips the reading direction.

@@ -459,7 +459,9 @@ Labels layer — right-click a Labels row
      - off
      - on / off
      - ``off`` (default) puts the label ring **inside** the ideogram with
-       radial text; ``on`` puts it outside, still radial.
+       radial text; ``on`` puts it outside, still radial.  Outside mode does
+       **not** shrink the ring or move the chromosome names / coordinate axis:
+       the label ring grows from the ideogram's normal outer edge.
    * - ``Read labels toward the centre``
      - off
      - on / off
@@ -577,8 +579,8 @@ Export dialog
 Full details, validation messages and format-specific behaviour are in
 :doc:`circular_export`.
 
-Three gotchas worth remembering
--------------------------------
+Four gotchas worth remembering
+------------------------------
 
 #. **Heatmap legend labels are upper-case enum names.**  ``Legend position``
    shows ``TOP_LEFT`` … ``NONE``, whereas the Hi-C ``Color legend`` shows
@@ -590,6 +592,11 @@ Three gotchas worth remembering
    height no longer changes with window size.
 #. **Outside labels do not auto-avoid tick text.**  Increase ``Connector
    height…`` manually until the label ring clears the coordinate axis labels.
+#. **Outside labels never re-layout the rest of the figure.**  Turning on
+   ``Labels outside the ideogram`` does not shrink the ideogram ring and does
+   not move the chromosome names or the axis — unlike ``Heatmap outside the
+   ideogram``, which does shrink the ring.  ``Connector height…`` is the only
+   control for where the outside label ring sits.
 
 .. seealso::
 

@@ -157,7 +157,8 @@ v1.0.2 tag.
      - :doc:`circular_heatmap`
    * - Genomic labels ring
      - Radial gene labels with comb connectors, circlize ``smartAlign`` for
-       dense regions, inward reading, and full typographic control.
+       dense regions, inward reading, and full typographic control.  Outside
+       mode leaves the ideogram radius, chromosome names and axis untouched.
      - :doc:`circular_labels`
    * - Hi-C on the ring
      - Triangle/square Hi-C contact matrices warped into a ring, with TAD
