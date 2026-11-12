@@ -52,6 +52,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseWheelEvent;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
 import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
@@ -401,7 +402,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      * the layer's own context menu (ribbon / heatmap parameters + Remove).
      */
     public static class CircularLayer {
-        public enum Kind { LINKS, HEATMAP, LABELS }
+        public enum Kind { LINKS, HEATMAP, LABELS, POINTS, LINES }
 
         public final Kind kind;
         public final String name;      // file name, shown in the Data Tracks column
@@ -412,6 +413,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public GenomicHeatmap heatmap;
         /** LABELS: name rows drawn outside the ideogram (circos.genomicLabels). */
         public final List<LabelRow> labels = new ArrayList<>();
+        /** POINTS / LINES: the (chr,start,end,value) rows. */
+        public PointLineData points;
+        // ---- Per-layer POINTS / LINES style (null = defaults) ----
+        public java.awt.Color plColor;
+        public Integer plPointSize, plLineWidth, plHeightPx;
+        public java.awt.Color plColor() { return plColor != null ? plColor : new java.awt.Color(35, 95, 175); }
+        public int plPointSize() { return plPointSize != null ? plPointSize : 4; }
+        public int plLineWidth() { return plLineWidth != null ? plLineWidth : 2; }
+        public int plHeight()    { return plHeightPx != null ? plHeightPx : 42; }
         public boolean visible = true;
         /** Row position (band index) among the band-capable rows, so several labels layers each
          *  get their own ring band instead of sharing one. */
@@ -474,6 +484,10 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             if (kind == Kind.HEATMAP) {
                 return heatmap == null ? "heatmap"
                         : "heatmap " + heatmap.rows.size() + " x " + heatmap.samples;
+            }
+            if (kind == Kind.POINTS || kind == Kind.LINES) {
+                return (kind == Kind.POINTS ? "points " : "lines ")
+                        + (points == null ? 0 : points.rows.size());
             }
             return "links " + links.size();
         }
@@ -914,6 +928,72 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         public HeatRow(String chr, long start, long end, double[] vals) {
             this.chr = chr; this.start = start; this.end = end; this.vals = vals;
         }
+    }
+
+    /** A (chr,start,end,value) series for the POINTS / LINES rings (circos.genomicPoints / Lines). */
+    public static class PointLineData {
+        public final double min, max;
+        public final List<HeatRow> rows;
+        public PointLineData(double min, double max, List<HeatRow> rows) {
+            this.min = min; this.max = max; this.rows = rows;
+        }
+    }
+
+    /** Parse a BED/TSV ({@code chr start end value}) into a {@link PointLineData} series. */
+    public static PointLineData parsePointLine(org.broad.igv.util.ResourceLocator locator)
+            throws java.io.IOException {
+        List<HeatRow> rows = new ArrayList<>();
+        double mn = Double.POSITIVE_INFINITY, mx = Double.NEGATIVE_INFINITY;
+        java.io.File f = new java.io.File(locator.getPath());
+        try (java.io.BufferedReader br = new java.io.BufferedReader(
+                new java.io.InputStreamReader(new java.io.FileInputStream(f),
+                        java.nio.charset.StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                String[] tok = line.split("\t");
+                if (tok.length < 4) tok = line.trim().split("\\s+");
+                if (tok.length < 4) continue;
+                long start, end; double v;
+                try {
+                    start = Long.parseLong(tok[1].trim());
+                    end = Long.parseLong(tok[2].trim());
+                    v = Double.parseDouble(tok[3].trim());
+                } catch (NumberFormatException e) {
+                    continue;   // header / non-numeric row
+                }
+                if (Double.isNaN(v)) continue;
+                if (v < mn) mn = v;
+                if (v > mx) mx = v;
+                rows.add(new HeatRow(tok[0], start, end, new double[]{v}));
+            }
+        }
+        if (rows.isEmpty()) return null;
+        if (!(mx > mn)) mx = mn + 1.0;
+        return new PointLineData(mn, mx, rows);
+    }
+
+    /** Add a POINTS / LINES layer (its own ring band, several stack up). */
+    public CircularLayer addPointLineLayer(CircularLayer.Kind kind, String name, String path,
+                                           PointLineData data) {
+        CircularLayer l = new CircularLayer(kind, name, path);
+        l.points = data;
+        layers.add(l);
+        invalidateRing();
+        log.info("Circular " + (kind == CircularLayer.Kind.POINTS ? "points" : "lines")
+                + " layer '" + name + "': " + (data == null ? 0 : data.rows.size()) + " row(s)");
+        return l;
+    }
+
+    /** Visible POINTS / LINES layers, in ROW order. */
+    private List<CircularLayer> visiblePointLineLayers() {
+        List<CircularLayer> out = new ArrayList<>();
+        for (CircularLayer l : layers) {
+            if (l.visible && (l.kind == CircularLayer.Kind.POINTS
+                    || l.kind == CircularLayer.Kind.LINES) && l.points != null) out.add(l);
+        }
+        out.sort(java.util.Comparator.comparingInt(l -> l.rowIndex));
+        return out;
     }
 
     /** A rows x samples matrix for the circular heatmap band. */
@@ -2402,7 +2482,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     private void drawTrackRings(Graphics2D g2, int w, int h, List<ChrInfo> chrs, CircularSettings s) {
-        if ((ringTracks.isEmpty() && heatmap == null && !hasVisibleLabels())
+        if ((ringTracks.isEmpty() && heatmap == null && !hasVisibleLabels()
+                && visiblePointLineLayers().isEmpty())
                 || chrs == null || chrs.isEmpty()) return;
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
@@ -2419,6 +2500,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // ignored for mixed heatmap/labels stacks.
         List<CircularLayer> bandLayers = new ArrayList<>();
         for (CircularLayer l : visibleHeatmapLayers()) bandLayers.add(l);
+        for (CircularLayer l : visiblePointLineLayers()) bandLayers.add(l);
         for (CircularLayer l : visibleInsideLabelLayers(s)) bandLayers.add(l);
         bandLayers.sort(java.util.Comparator.comparingInt(l -> l.rowIndex));
         for (CircularLayer l : bandLayers) if (l.kind == CircularLayer.Kind.LABELS) l.slotOuterR = -1;
@@ -2453,12 +2535,76 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (l.kind == CircularLayer.Kind.HEATMAP) {
             return drawHeatmapLayer(g2, cx, cy, w, h, R, rOut, cursor, chrs, sec, s, l, outIdx);
         }
+        if (l.kind == CircularLayer.Kind.POINTS || l.kind == CircularLayer.Kind.LINES) {
+            return drawPointLineBand(g2, cx, cy, cursor, chrs, sec, l);
+        }
         l.slotOuterR = cursor;
         return cursor - labelRingReserve(l, s);
     }
 
+    /**
+     * POINTS / LINES band: each row's value maps to a radius inside the band (low = inner,
+     * high = outer), the genomic midpoint maps to the angle. Points draw a small marker per row;
+     * lines connect consecutive rows on the same chromosome.
+     */
+    private double drawPointLineBand(Graphics2D g2, int cx, int cy, double cursor,
+                                     List<ChrInfo> chrs, List<double[]> sec, CircularLayer l) {
+        PointLineData d = l.points;
+        double bandOuter = cursor;
+        double bandInner = bandOuter - l.plHeight();
+        if (bandInner < 24) return cursor;   // not enough room: skip this band
+        if (d == null || d.rows.isEmpty()) return cursor;
+
+        java.util.Map<String, List<HeatRow>> byChr = new java.util.LinkedHashMap<>();
+        for (HeatRow r : d.rows) byChr.computeIfAbsent(r.chr, k -> new ArrayList<>()).add(r);
+        java.util.Map<String, Integer> idx = chromosomeIndex(chrs);
+        double span = d.max - d.min;
+        java.awt.Color color = l.plColor();
+        Stroke oldStroke = g2.getStroke();
+        Color oldColor = g2.getColor();
+        try {
+            g2.setColor(color);
+            double ps = Math.max(1, l.plPointSize());
+            for (java.util.Map.Entry<String, List<HeatRow>> e : byChr.entrySet()) {
+                Integer ii = sectorFor(idx, e.getKey());
+                if (ii == null) continue;
+                ChrInfo c = chrs.get(ii);
+                double f0 = sec.get(ii)[0], sSpan = sec.get(ii)[1] - f0;
+                if (sSpan <= 0) continue;
+                double vStart = c.viewStart, vSpan = c.viewSpan();
+                if (vSpan <= 0) vSpan = Math.max(1, c.length);
+                List<HeatRow> list = new ArrayList<>(e.getValue());
+                list.sort(java.util.Comparator.comparingLong(r -> r.start));
+                if (l.kind == CircularLayer.Kind.LINES) {
+                    g2.setStroke(new BasicStroke(Math.max(0.5f, l.plLineWidth()),
+                            BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                }
+                Point2D prev = null;
+                for (HeatRow r : list) {
+                    double mid = (r.start + r.end) / 2.0;
+                    double f = f0 + sSpan * clamp01((mid - vStart) / vSpan);
+                    double v = (r.vals != null && r.vals.length > 0) ? r.vals[0] : Double.NaN;
+                    if (Double.isNaN(v)) continue;
+                    double t = span > 1e-9 ? clamp01((v - d.min) / span) : 0.5;
+                    Point2D p = polar(cx, cy, bandInner + (bandOuter - bandInner) * t, f);
+                    if (l.kind == CircularLayer.Kind.POINTS) {
+                        g2.fill(new Ellipse2D.Double(p.getX() - ps / 2, p.getY() - ps / 2, ps, ps));
+                    } else {
+                        if (prev != null) g2.draw(new Line2D.Double(prev, p));
+                        prev = p;
+                    }
+                }
+            }
+        } finally {
+            g2.setStroke(oldStroke);
+            g2.setColor(oldColor);
+        }
+        return bandInner - 5;
+    }
+
     private void drawTrackRingsSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {
-        if (ringTracks.isEmpty() && heatmap == null && !hasVisibleLabels()) return;
+        if (ringTracks.isEmpty() && heatmap == null && !hasVisibleLabels()
+                && visiblePointLineLayers().isEmpty()) return;
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
@@ -2472,6 +2618,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // Same merged, row-ordered inside stack as drawTrackRings (heatmaps + labels interleaved).
         List<CircularLayer> bandLayers = new ArrayList<>();
         for (CircularLayer l : visibleHeatmapLayers()) bandLayers.add(l);
+        for (CircularLayer l : visiblePointLineLayers()) bandLayers.add(l);
         for (CircularLayer l : visibleInsideLabelLayers(s)) bandLayers.add(l);
         bandLayers.sort(java.util.Comparator.comparingInt(l -> l.rowIndex));
         for (CircularLayer l : bandLayers) if (l.kind == CircularLayer.Kind.LABELS) l.slotOuterR = -1;

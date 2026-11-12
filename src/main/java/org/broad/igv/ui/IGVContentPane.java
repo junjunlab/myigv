@@ -499,6 +499,14 @@ public class IGVContentPane extends JPanel {
         JMenuItem impLabels = new JMenuItem("Labels  (BED + name column)…");
         impLabels.addActionListener(e -> loadLabelsFromFile(panel));
         importMenu.add(impLabels);
+        JMenuItem impPoints = new JMenuItem("Points  (BED + value column)…");
+        impPoints.addActionListener(e ->
+                loadPointLineFromFile(panel, CircularViewPanel.CircularLayer.Kind.POINTS));
+        importMenu.add(impPoints);
+        JMenuItem impLines = new JMenuItem("Lines  (BED + value column)…");
+        impLines.addActionListener(e ->
+                loadPointLineFromFile(panel, CircularViewPanel.CircularLayer.Kind.LINES));
+        importMenu.add(impLines);
         importMenu.addSeparator();
         JMenuItem impHint = new JMenuItem("Imported data is drawn in the circular view only");
         impHint.setEnabled(false);
@@ -667,6 +675,103 @@ public class IGVContentPane extends JPanel {
             refreshDataColumn();
             circularDrawingArea.refresh();
         }
+    }
+
+    /** Import one or more POINTS / LINES files: each becomes its own ring band. */
+    private void loadPointLineFromFile(CircularViewPanel panel,
+                                       CircularViewPanel.CircularLayer.Kind kind) {
+        boolean pts = kind == CircularViewPanel.CircularLayer.Kind.POINTS;
+        java.awt.FileDialog fd = new java.awt.FileDialog(
+                (java.awt.Frame) null,
+                (pts ? "Import points" : "Import lines") + " (BED: chr start end value)",
+                java.awt.FileDialog.LOAD);
+        fd.setMultipleMode(true);
+        fd.setVisible(true);
+        java.io.File[] files = fd.getFiles();
+        if (files == null || files.length == 0) {
+            String dir = fd.getDirectory(), file = fd.getFile();
+            if (dir == null || file == null) return;
+            files = new java.io.File[]{new java.io.File(dir, file)};
+        }
+        int loaded = 0;
+        for (java.io.File f : files) {
+            try {
+                CircularViewPanel.PointLineData d = CircularViewPanel.parsePointLine(
+                        new org.broad.igv.util.ResourceLocator(f.getAbsolutePath()));
+                if (d == null) {
+                    JOptionPane.showMessageDialog(panel,
+                            "No numeric value rows found in:\n" + f.getName(),
+                            "Import", JOptionPane.WARNING_MESSAGE);
+                    continue;
+                }
+                circularDrawingArea.addPointLineLayer(kind, f.getName(), f.getAbsolutePath(), d);
+                loaded++;
+                log.info("Loaded " + (pts ? "points" : "lines") + " from " + f.getAbsolutePath()
+                        + " (" + d.rows.size() + " rows)");
+            } catch (Throwable ex) {
+                log.error("Failed to load " + kind + " from " + f.getAbsolutePath(), ex);
+                JOptionPane.showMessageDialog(panel, "Could not load:\n" + ex.getMessage(),
+                        "Import", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+        if (loaded > 0) {
+            refreshDataColumn();
+            circularDrawingArea.refresh();
+        }
+    }
+
+    /** Per-layer POINTS / LINES parameters: colour, marker size / stroke width, band height. */
+    private void addPointLineItems(JPopupMenu popup, CircularViewPanel panel,
+                                   CircularViewPanel.CircularLayer layer) {
+        boolean pts = layer.kind == CircularViewPanel.CircularLayer.Kind.POINTS;
+        JMenuItem colour = new JMenuItem("Colour…");
+        colour.addActionListener(e -> {
+            Color c = JColorChooser.showDialog(panel, "Colour", layer.plColor());
+            if (c != null) { layer.plColor = c; panel.refresh(); }
+        });
+        popup.add(colour);
+
+        if (pts) {
+            int ps = layer.plPointSize();
+            JMenuItem size = new JMenuItem("Point size… (" + ps + " px)");
+            size.addActionListener(e -> {
+                String v = JOptionPane.showInputDialog(panel, "Point size (px):", ps);
+                if (v != null) {
+                    try {
+                        layer.plPointSize = Math.max(1, Math.min(30, Integer.parseInt(v.trim())));
+                        panel.refresh();
+                    } catch (NumberFormatException ignore) { }
+                }
+            });
+            popup.add(size);
+        } else {
+            int lw = layer.plLineWidth();
+            JMenuItem width = new JMenuItem("Line width… (" + lw + " px)");
+            width.addActionListener(e -> {
+                String v = JOptionPane.showInputDialog(panel, "Line width (px):", lw);
+                if (v != null) {
+                    try {
+                        layer.plLineWidth = Math.max(1, Math.min(20, Integer.parseInt(v.trim())));
+                        panel.refresh();
+                    } catch (NumberFormatException ignore) { }
+                }
+            });
+            popup.add(width);
+        }
+
+        int h = layer.plHeight();
+        JMenuItem height = new JMenuItem("Band height… (" + h + " px)");
+        height.setToolTipText("Radial room this track occupies on the ring.");
+        height.addActionListener(e -> {
+            String v = JOptionPane.showInputDialog(panel, "Band height (px):", h);
+            if (v != null) {
+                try {
+                    layer.plHeightPx = Math.max(10, Math.min(200, Integer.parseInt(v.trim())));
+                    panel.refresh();
+                } catch (NumberFormatException ignore) { }
+            }
+        });
+        popup.add(height);
     }
 
     /** Per-layer labels parameters (font, colours, inside/outside). Edits write to THIS layer, so
@@ -1405,10 +1510,13 @@ public class IGVContentPane extends JPanel {
     private void showLayerPopup(MouseEvent e, CircularViewPanel.CircularLayer layer, JList<String> list) {
         JPopupMenu menu = new JPopupMenu();
         final boolean heat = layer.kind == CircularViewPanel.CircularLayer.Kind.HEATMAP;
+        final boolean pts = layer.kind == CircularViewPanel.CircularLayer.Kind.POINTS;
+        final boolean lines = layer.kind == CircularViewPanel.CircularLayer.Kind.LINES;
 
         String showLabel = heat ? "Show heatmap"
-                : (layer.kind == CircularViewPanel.CircularLayer.Kind.LABELS
-                        ? "Show labels" : "Show this links layer");
+                : (layer.kind == CircularViewPanel.CircularLayer.Kind.LABELS ? "Show labels"
+                : pts ? "Show points"
+                : lines ? "Show lines" : "Show this links layer");
         menu.add(linkCheck(showLabel, layer.visible, v -> {
             circularDrawingArea.setLayerVisible(layer, v);
             refreshDataColumn();
@@ -1418,13 +1526,15 @@ public class IGVContentPane extends JPanel {
         boolean labels = layer.kind == CircularViewPanel.CircularLayer.Kind.LABELS;
         if (heat) addHeatmapItems(menu, circularDrawingArea, layer);
         else if (labels) addLabelItems(menu, circularDrawingArea, layer);
+        else if (pts || lines) addPointLineItems(menu, circularDrawingArea, layer);
         else addLinkItems(menu, circularDrawingArea);
 
         menu.addSeparator();
         JMenuItem remove = new JMenuItem(heat ? "Remove heatmap from circular view…"
-                : (layer.kind == CircularViewPanel.CircularLayer.Kind.LABELS
-                        ? "Remove labels from circular view…"
-                        : "Remove links from circular view…"));
+                : (labels ? "Remove labels from circular view…"
+                : pts ? "Remove points from circular view…"
+                : lines ? "Remove lines from circular view…"
+                : "Remove links from circular view…"));
         remove.addActionListener(a -> {
             circularDrawingArea.removeLayer(layer);
             refreshDataColumn();
