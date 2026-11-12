@@ -555,7 +555,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // also placed outside), so the combs never run through the numbers. The ideogram itself has
         // already been shrunk by labelOutsideReservePx, so labels + that clearance still fit.
         int outsideHm = Math.max(s.heatmapOutsideCount, s.heatmapOutside ? 1 : 0);
-        return rOut + chromosomeNameClearance(s)
+        return rOut + chromosomeNameOuter(s)
                 + (outsideHm > 0 ? outsideHm * outsideHeatmapFootprint(s) : 0)
                 + 6;
     }
@@ -565,6 +565,13 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
      *  a heatmap or labels layer is drawn outside them (they must not be pushed outwards). */
     static double chromosomeNameClearance(CircularSettings s) {
         return (s.showAxis && s.showTickLabels && s.tickLabelsOutside) ? 32 : 16;
+    }
+
+    /** Radius just PAST the chromosome-name text (names are centred on {@link #chromosomeNameClearance},
+     *  so their glyphs extend half a line further out). Outside layers must start here, not at the
+     *  names' centre line, or their combs overlap the labels. */
+    static double chromosomeNameOuter(CircularSettings s) {
+        return chromosomeNameClearance(s) + Math.max(8, s.chromosomeLabelSize / 2 + 5);
     }
 
     /** Radial footprint of the connection track + heatmap band when the heatmap is OUTSIDE. */
@@ -1078,7 +1085,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             // The heatmap lives OUTSIDE the chromosome names + axis: those keep their normal
             // radius (see drawAll / chromosomeNameClearance) and the band grows beyond them.
             // Several outside heatmaps stack outward, one heatmap footprint each.
-            double slotTop = rOut + chromosomeNameClearance(s) + outsideIndex * slotPitch;
+            double slotTop = rOut + chromosomeNameOuter(s) + outsideIndex * slotPitch;
             double bandInner = slotTop + connH;
             double bandOuter = Math.min(bandInner + heatH, Math.min(w, h) / 2.0 - 6);
             if (bandOuter - bandInner < 6) return cursor;
@@ -2015,7 +2022,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         if (!outsideHeatmap && !outsideLabels) return rOut;
         // Everything that lives outside the ring, from inside out: the axis / chromosome names,
         // then the heatmap ring (when outside too), then the label texts themselves.
-        double need = chromosomeNameClearance(s)
+        double need = chromosomeNameOuter(s)
                 + (outsideHeatmap ? outsideHeatmaps * outsideHeatmapFootprint(s) : 0)
                 + (outsideLabels ? s.labelOutsideReservePx + 6 : 0);
         return Math.min(rOut, Math.max(R * 0.35, half - 8 - need));
