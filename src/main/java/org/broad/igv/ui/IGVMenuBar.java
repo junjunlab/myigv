@@ -735,36 +735,27 @@ public class IGVMenuBar extends JMenuBar implements IGVEventObserver {
 
         menuItems.add(new JSeparator());
 
-        // ----- Horizontal / circular view toggles -----
-        menuAction = new MenuAction("Horizontal View", null, KeyEvent.VK_H) {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                JCheckBoxMenuItem mi = (JCheckBoxMenuItem) e.getSource();
-                IGVContentPane cp = igv.getContentPane();
-                if (!mi.isSelected() && !cp.isShowCircularView()) {
-                    mi.setSelected(true);
-                    MessageUtils.showMessage("At least one view must remain visible (Horizontal or Circular).");
-                    return;
-                }
-                cp.setShowHorizontalView(mi.isSelected());
-            }
-        };
-        menuItems.add(MenuAndToolbarUtils.createMenuItem(menuAction, igv.getContentPane().isShowHorizontalView()));
-
-        menuAction = new MenuAction("Circular View", null, KeyEvent.VK_C) {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                JCheckBoxMenuItem mi = (JCheckBoxMenuItem) e.getSource();
-                IGVContentPane cp = igv.getContentPane();
-                if (!mi.isSelected() && !cp.isShowHorizontalView()) {
-                    mi.setSelected(true);
-                    MessageUtils.showMessage("At least one view must remain visible (Horizontal or Circular).");
-                    return;
-                }
-                cp.setShowCircularView(mi.isSelected());
-            }
-        };
-        menuItems.add(MenuAndToolbarUtils.createMenuItem(menuAction, igv.getContentPane().isShowCircularView()));
+        // ----- View mode: Horizontal / Circular / Both (mutually exclusive) -----
+        // Three radio options instead of two independent checkboxes: picking Horizontal or Circular
+        // on its own shows ONLY that view, and "Both" is the only way to see them side by side.
+        IGVContentPane cpView = igv.getContentPane();
+        JRadioButtonMenuItem rbHorizontal = new JRadioButtonMenuItem("Horizontal View");
+        JRadioButtonMenuItem rbCircular = new JRadioButtonMenuItem("Circular View");
+        JRadioButtonMenuItem rbBoth = new JRadioButtonMenuItem("Both (Horizontal + Circular)");
+        ButtonGroup viewModeGroup = new ButtonGroup();
+        viewModeGroup.add(rbHorizontal);
+        viewModeGroup.add(rbCircular);
+        viewModeGroup.add(rbBoth);
+        boolean hOn = cpView.isShowHorizontalView(), cOn = cpView.isShowCircularView();
+        rbHorizontal.setSelected(hOn && !cOn);
+        rbCircular.setSelected(!hOn && cOn);
+        rbBoth.setSelected(hOn && cOn);
+        rbHorizontal.addActionListener(e -> igv.getContentPane().setViewMode(true, false));
+        rbCircular.addActionListener(e -> igv.getContentPane().setViewMode(false, true));
+        rbBoth.addActionListener(e -> igv.getContentPane().setViewMode(true, true));
+        menuItems.add(rbHorizontal);
+        menuItems.add(rbCircular);
+        menuItems.add(rbBoth);
 
         menuItems.add(new JSeparator());
         menuItems.add(new HistoryMenu("Go to"));

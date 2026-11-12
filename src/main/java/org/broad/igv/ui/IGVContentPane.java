@@ -219,6 +219,20 @@ public class IGVContentPane extends JPanel {
     }
 
     /**
+     * Set BOTH view flags at once and rebuild the layout. The menu offers three mutually exclusive
+     * modes — Horizontal only, Circular only, Both — so switching from "Horizontal only" to "Both"
+     * must flip the circular flag without first passing through "neither" (which
+     * {@link #updateViewLayout()} would snap back to Horizontal and leave both on). Never leaves the
+     * window empty.
+     */
+    public void setViewMode(boolean horizontal, boolean circular) {
+        if (!horizontal && !circular) horizontal = true;   // at least one view must stay visible
+        this.showHorizontalView = horizontal;
+        this.showCircularView = circular;
+        updateViewLayout();
+    }
+
+    /**
      * Rebuild the center region according to the horizontal / circular view toggles:
      *  - both on  -> [data column | horizontal view (intact) | circular]  (4 visual columns)
      *  - only horizontal -> horizontal fills the center (IGV's original look)
