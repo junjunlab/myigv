@@ -1026,10 +1026,19 @@ public class IGVContentPane extends JPanel {
         return t instanceof FeatureTrack || t instanceof DataTrack || t instanceof HiCTrack;
     }
 
-    /** Row label for a circular-only layer: name + what it contains. */
+    /** Row label for a circular-only layer: name + what it contains + where it is drawn. */
     private String layerLabel(CircularViewPanel.CircularLayer l) {
         String tag = l.summary();
-        return l.name + "   (" + tag + ")" + (l.visible ? "" : "   (hidden)");
+        CircularViewPanel.CircularSettings s = circularDrawingArea.getSettings();
+        // Make the inside/outside mode explicit: an "outside" layer ignores the row order, which
+        // is otherwise very confusing when dragging does not move it on the ring.
+        String where = "";
+        if (l.kind == CircularViewPanel.CircularLayer.Kind.HEATMAP) {
+            where = l.heatmapOutside(s) ? "   · outside" : "   · inside";
+        } else if (l.kind == CircularViewPanel.CircularLayer.Kind.LABELS) {
+            where = l.labelInside(s) ? "   · inside" : "   · outside";
+        }
+        return l.name + "   (" + tag + ")" + where + (l.visible ? "" : "   (hidden)");
     }
 
     /** Row label for the data column; hidden ring tracks are marked so removal is visible. */
