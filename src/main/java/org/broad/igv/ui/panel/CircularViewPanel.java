@@ -404,6 +404,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         /** LABELS: name rows drawn outside the ideogram (circos.genomicLabels). */
         public final List<LabelRow> labels = new ArrayList<>();
         public boolean visible = true;
+        /** Row position (band index) among the band-capable rows, so several labels layers each
+         *  get their own ring band instead of sharing one. */
+        public int bandIndex = 0;
+        /** Outer radius of this layer's ring band (inside labels), computed each render. */
+        public double slotOuterR = -1;
 
         public CircularLayer(Kind kind, String name, String path) {
             this.kind = kind;
@@ -500,11 +505,18 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 + Math.max(8, s.heatmapHeightPx > 0 ? s.heatmapHeightPx : 50) + 14;
     }
 
-    /** Base radius for the label text pass: the reserved label-band slot when the labels sit
-     *  INSIDE the ring, otherwise the plain outside radius. */
-    private double effectiveLabelBaseRadius(int w, int h, CircularSettings s) {
-        if (s.labelInside && labelSlotOuterR > 0) return labelSlotOuterR;
+    /** Base radius of one labels layer: its own reserved band slot when it sits INSIDE the ring,
+     *  otherwise the plain outside radius. */
+    private double layerBaseRadius(CircularLayer l, int w, int h, CircularSettings s) {
+        if (s.labelInside && l.slotOuterR > 0) return l.slotOuterR;
         return labelBaseRadius(w, h, s);
+    }
+
+    /** Clear the per-render slot radius of every labels layer (recomputed by the band layout). */
+    private void resetLabelSlots() {
+        for (CircularLayer l : layers) {
+            if (l.kind == CircularLayer.Kind.LABELS) l.slotOuterR = -1;
+        }
     }
 
     /** True when at least one visible labels layer exists (drives the inside-label band reservation). */
@@ -513,6 +525,15 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             if (l.kind == CircularLayer.Kind.LABELS && l.visible && !l.labels.isEmpty()) return true;
         }
         return false;
+    }
+
+    /** The visible labels layers, in rows order (top row first). */
+    private List<CircularLayer> visibleLabelLayers() {
+        List<CircularLayer> out = new ArrayList<>();
+        for (CircularLayer l : layers) {
+            if (l.kind == CircularLayer.Kind.LABELS && l.visible && !l.labels.isEmpty()) out.add(l);
+        }
+        return out;
     }
 
     /**
@@ -561,15 +582,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
     public int getHeatmapBandIndex() { return heatmapBandIndex; }
 
-    /** Where the labels band sits in the band stack: 0 = outermost (first row),
-     *  ringTracks.size() = innermost (last row). This makes the Data Tracks row order place the
-     *  inside label ring exactly like a data band, so dragging the labels row to the end moves the
-     *  label ring to the innermost position (previously it was always pinned just under the ring). */
+    /** Legacy single-label-band index, kept for API compatibility (per-layer bandIndex supersedes it). */
     private int labelBandIndex = 0;
-
-    /** Outer radius of the reserved label band, captured during the ring layout so the later text
-     *  pass hangs the labels from exactly that radius. -1 = not placed (outside / no labels). */
-    private double labelSlotOuterR = -1;
 
     public void setLabelBandIndex(int i) { labelBandIndex = Math.max(0, i); invalidateRing(); }
 
@@ -1133,7 +1147,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         String key = gid + "|" + chr + "|" + bw + "x" + bh + geneSig;
         if (!key.equals(ringKey) || ringImage == null) {
             hicLimitsByTrack.clear();   // only legends for tracks drawn in THIS rebuild
-            labelSlotOuterR = -1;       // recomputed by the band layout below
+            resetLabelSlots();       // recomputed by the band layout below
             updateOutsideLabelReserve(); // may shrink the ideogram for outside labels, before any radius
             ringImage = new BufferedImage(bw, bh, BufferedImage.TYPE_INT_ARGB);
             Graphics2D ig = ringImage.createGraphics();
@@ -1232,7 +1246,7 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
 
         // Legends are collected during drawing; start clean so only the tracks drawn now report.
         hicLimitsByTrack.clear();
-        labelSlotOuterR = -1;   // recomputed by the band layout below when labels sit inside
+        resetLabelSlots();   // recomputed by the band layout below when labels sit inside
         updateOutsideLabelReserve();   // may shrink the ideogram for outside labels, before any radius
 
         boolean geneMode = FrameManager.isGeneListMode();
@@ -2178,7 +2192,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     }
 
     private void drawTrackRings(Graphics2D g2, int w, int h, List<ChrInfo> chrs, CircularSettings s) {
-        if ((ringTracks.isEmpty() && heatmap == null) || chrs == null || chrs.isEmpty()) return;
+        if ((ringTracks.isEmpty() && heatmap == null && !hasVisibleLabels())
+                || chrs == null || chrs.isEmpty()) return;
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
@@ -2192,17 +2207,21 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         // are just another row each, so they are placed at their own position in the stack
         // instead of being pinned to one end.
         int heatSlot = Math.max(0, Math.min(heatmapBandIndex, ringTracks.size()));
-        boolean labelBand = s.labelInside && hasVisibleLabels();
-        int labelSlot = Math.max(0, Math.min(labelBandIndex, ringTracks.size()));
+        // Each labels layer is its own ring band, placed at its row position among the band rows.
+        List<CircularLayer> labelLayers = s.labelInside ? visibleLabelLayers() : new ArrayList<>();
+        for (CircularLayer l : labelLayers) l.slotOuterR = -1;
+        int li = 0;
         int bandNo = 0;
         for (Track t : ringTracks) {
             if (heatmap != null && bandNo == heatSlot) {
                 cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
                         chrs, sec, s, heatmap, true);
             }
-            if (labelBand && bandNo == labelSlot) {
-                labelSlotOuterR = cursor;
+            while (li < labelLayers.size() && labelLayers.get(li).bandIndex == bandNo) {
+                CircularLayer l = labelLayers.get(li);
+                l.slotOuterR = cursor;
                 cursor -= labelRingReserve(s);
+                li++;
             }
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor;
@@ -2217,15 +2236,17 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
                     chrs, sec, s, heatmap, true);
         }
-        // Labels whose row is past the last drawable band fall in at the innermost position.
-        if (labelBand && labelSlotOuterR < 0 && labelSlot >= bandNo) {
-            labelSlotOuterR = cursor;
+        // Label layers whose row is past the last drawable band fall in at the innermost position.
+        while (li < labelLayers.size()) {
+            CircularLayer l = labelLayers.get(li);
+            l.slotOuterR = cursor;
             cursor -= labelRingReserve(s);
+            li++;
         }
     }
 
     private void drawTrackRingsSingle(Graphics2D g2, int w, int h, ChrInfo chr, CircularSettings s) {
-        if (ringTracks.isEmpty() && heatmap == null) return;
+        if (ringTracks.isEmpty() && heatmap == null && !hasVisibleLabels()) return;
         int cx = w / 2, cy = h / 2;
         double R = Math.min(w, h) / 2.0 - MARGIN;
         if (R <= 20) return;
@@ -2237,17 +2258,20 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         java.util.Map<String, float[]> groups = computeGroupRanges(chrs);
         java.util.Map<String, java.util.Map<String, float[]>> perGeneGroups = needPerGeneGroups(chrs);
         int heatSlot = Math.max(0, Math.min(heatmapBandIndex, ringTracks.size()));
-        boolean labelBand = s.labelInside && hasVisibleLabels();
-        int labelSlot = Math.max(0, Math.min(labelBandIndex, ringTracks.size()));
+        List<CircularLayer> labelLayers = s.labelInside ? visibleLabelLayers() : new ArrayList<>();
+        for (CircularLayer l : labelLayers) l.slotOuterR = -1;
+        int li = 0;
         int bandNo = 0;
         for (Track t : ringTracks) {
             if (heatmap != null && bandNo == heatSlot) {
                 cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
                         chrs, sec, s, heatmap, true);
             }
-            if (labelBand && bandNo == labelSlot) {
-                labelSlotOuterR = cursor;
+            while (li < labelLayers.size() && labelLayers.get(li).bandIndex == bandNo) {
+                CircularLayer l = labelLayers.get(li);
+                l.slotOuterR = cursor;
                 cursor -= labelRingReserve(s);
+                li++;
             }
             TrackRingConfig cfg = getRingConfig(t.getName());
             double bandOuter = cursor, bandInner = bandOuter - ringHeightPx(t, cfg);
@@ -2261,10 +2285,11 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
             cursor = drawHeatmapBand(g2, cx, cy, w, h, R, rOut, cursor,
                     chrs, sec, s, heatmap, true);
         }
-        // Labels whose row is past the last drawable band fall in at the innermost position.
-        if (labelBand && labelSlotOuterR < 0 && labelSlot >= bandNo) {
-            labelSlotOuterR = cursor;
+        while (li < labelLayers.size()) {
+            CircularLayer l = labelLayers.get(li);
+            l.slotOuterR = cursor;
             cursor -= labelRingReserve(s);
+            li++;
         }
     }
 
@@ -2592,13 +2617,14 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
         FontMetrics fm = pg.getFontMetrics();
         pg.dispose();
 
-        double rBase = effectiveLabelBaseRadius(w, h, s);
         double dir = s.labelInside ? -1.0 : 1.0;
-        // {a0, a1, widthPx} in anchor order; texts aligned with the same indices
-        List<double[]> anchors = new ArrayList<>();
-        List<String> texts = new ArrayList<>();
         for (CircularLayer l : layers) {
-            if (l.kind != CircularLayer.Kind.LABELS || !l.visible) continue;
+            if (l.kind != CircularLayer.Kind.LABELS || !l.visible || l.labels.isEmpty()) continue;
+            double rBase = layerBaseRadius(l, w, h, s);
+            double rLbl = rBase + dir * s.labelGapPx;
+            // {a0, a1, footprintPx, widthPx} for THIS layer; texts aligned with the same indices
+            List<double[]> anchors = new ArrayList<>();
+            List<String> texts = new ArrayList<>();
             for (LabelRow row : l.labels) {
                 Integer i = sectorFor(idx, row.chr);
                 if (i == null) continue;
@@ -2609,79 +2635,74 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 double a0 = f0 + span * clamp01(((double) row.start - c.viewStart) / vSpan);
                 double a1 = f0 + span * clamp01(((double) row.end - c.viewStart) / vSpan);
                 if (a1 < a0) { double t = a0; a0 = a1; a1 = t; }
-                // radial text on both sides: the arc footprint is the line height
                 double fp = fm.getHeight() + 3;
                 anchors.add(new double[]{a0, a1, fp, fm.stringWidth(row.text)});
                 texts.add(row.text);
             }
-        }
-        if (anchors.isEmpty()) return;
+            if (anchors.isEmpty()) continue;
 
-        Integer[] order = new Integer[anchors.size()];
-        for (int i = 0; i < order.length; i++) order[i] = i;
-        final List<double[]> a = anchors;
-        java.util.Arrays.sort(order, (x, y) -> Double.compare(
-                (a.get(x)[0] + a.get(x)[1]) / 2.0, (a.get(y)[0] + a.get(y)[1]) / 2.0));
+            Integer[] order = new Integer[anchors.size()];
+            for (int i = 0; i < order.length; i++) order[i] = i;
+            final List<double[]> a = anchors;
+            java.util.Arrays.sort(order, (x, y) -> Double.compare(
+                    (a.get(x)[0] + a.get(x)[1]) / 2.0, (a.get(y)[0] + a.get(y)[1]) / 2.0));
 
-        // ---- circlize's smartAlign(): tile overlapping labels end to end ----
-        // Every label starts centred on its own anchor; labels whose extents overlap are grouped
-        // into a cluster and re-tiled end to end around the cluster's midpoint, so a dense group
-        // fans out clockwise AND counter-clockwise instead of stacking at the same angle.
-        int n = anchors.size();
-        double rLbl = rBase + dir * s.labelGapPx;
-        double wl = (fm.getHeight() + 3 + Math.max(0, s.labelLevelGapPx))
-                / (2 * Math.PI * Math.max(8.0, rLbl));                            // arc per label
-        double[] s1 = new double[n], s2 = new double[n];
-        for (int k = 0; k < n; k++) {
-            int oi = order[k];
-            double f = (anchors.get(oi)[0] + anchors.get(oi)[1]) / 2.0;
-            s1[k] = f - wl / 2.0;
-            s2[k] = f + wl / 2.0;
-        }
-        int nclBefore = -1;
-        for (int guard = 0; guard < 200; guard++) {
-            // cluster consecutive overlapping extents
-            int[] cluster = new int[n];
-            int ncl = 0;
+            // ---- circlize's smartAlign(): tile overlapping labels end to end (per layer) ----
+            int n = anchors.size();
+            double wl = (fm.getHeight() + 3 + Math.max(0, s.labelLevelGapPx))
+                    / (2 * Math.PI * Math.max(8.0, rLbl));
+            double[] s1 = new double[n], s2 = new double[n];
             for (int k = 0; k < n; k++) {
-                if (k == 0 || s1[k] > s2[k - 1]) ncl++;
-                cluster[k] = ncl;
+                int oi = order[k];
+                double f = (anchors.get(oi)[0] + anchors.get(oi)[1]) / 2.0;
+                s1[k] = f - wl / 2.0;
+                s2[k] = f + wl / 2.0;
             }
-            if (ncl == nclBefore) break;             // stable
-            nclBefore = ncl;
-            double[] n1 = new double[n], n2 = new double[n];
-            for (int c = 1; c <= ncl; c++) {
-                int first = -1, last = -1;
-                double total = 0, lo = Double.MAX_VALUE, hi = -Double.MAX_VALUE;
+            int nclBefore = -1;
+            for (int guard = 0; guard < 200; guard++) {
+                int[] cluster = new int[n];
+                int ncl = 0;
                 for (int k = 0; k < n; k++) {
-                    if (cluster[k] != c) continue;
-                    if (first < 0) first = k;
-                    last = k;
-                    total += s2[k] - s1[k];
-                    lo = Math.min(lo, s1[k]);
-                    hi = Math.max(hi, s2[k]);
+                    if (k == 0 || s1[k] > s2[k - 1]) ncl++;
+                    cluster[k] = ncl;
                 }
-                if (first < 0) continue;
-                double mid = (lo + hi) / 2.0;
-                double p = mid - total / 2.0;
-                if (p < 0) p = 0;
-                if (p + total > 1) p = 1 - total;
-                for (int k = first; k <= last; k++) {
-                    if (cluster[k] != c) continue;
-                    double len = s2[k] - s1[k];
-                    n1[k] = p;
-                    n2[k] = p + len;
-                    p += len;
+                if (ncl == nclBefore) break;
+                nclBefore = ncl;
+                double[] n1 = new double[n], n2 = new double[n];
+                for (int c = 1; c <= ncl; c++) {
+                    int first = -1, last = -1;
+                    double total = 0, lo = Double.MAX_VALUE, hi = -Double.MAX_VALUE;
+                    for (int k = 0; k < n; k++) {
+                        if (cluster[k] != c) continue;
+                        if (first < 0) first = k;
+                        last = k;
+                        total += s2[k] - s1[k];
+                        lo = Math.min(lo, s1[k]);
+                        hi = Math.max(hi, s2[k]);
+                    }
+                    if (first < 0) continue;
+                    double mid = (lo + hi) / 2.0;
+                    double p = mid - total / 2.0;
+                    if (p < 0) p = 0;
+                    if (p + total > 1) p = 1 - total;
+                    for (int k = first; k <= last; k++) {
+                        if (cluster[k] != c) continue;
+                        double len = s2[k] - s1[k];
+                        n1[k] = p;
+                        n2[k] = p + len;
+                        p += len;
+                    }
                 }
+                s1 = n1;
+                s2 = n2;
             }
-            s1 = n1;
-            s2 = n2;
-        }
-        for (int k = 0; k < n; k++) {
-            int oi = order[k];
-            labelLayout.add(new double[]{anchors.get(oi)[0], anchors.get(oi)[1], rLbl,
-                    (s1[k] + s2[k]) / 2.0, anchors.get(oi)[3]});
-            labelTexts.add(texts.get(oi));
+            for (int k = 0; k < n; k++) {
+                int oi = order[k];
+                // {a0, a1, rBase, rLbl, textAngle, widthPx}
+                labelLayout.add(new double[]{anchors.get(oi)[0], anchors.get(oi)[1], rBase, rLbl,
+                        (s1[k] + s2[k]) / 2.0, anchors.get(oi)[3]});
+                labelTexts.add(texts.get(oi));
+            }
         }
     }
 
@@ -2694,7 +2715,6 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
     void drawLabelLayers(Graphics2D g2, int w, int h, CircularSettings s) {
         if (labelLayout.isEmpty()) return;
         int cx = w / 2, cy = h / 2;
-        double rBase = effectiveLabelBaseRadius(w, h, s);
         double dir = s.labelInside ? -1.0 : 1.0;
         Font font = new Font("SansSerif", s.labelBold ? Font.BOLD : Font.PLAIN, s.labelFontSize);
         Stroke oldStroke = g2.getStroke();
@@ -2705,16 +2725,17 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 g2.setStroke(new BasicStroke(0.7f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
                 for (int i = 0; i < labelLayout.size(); i++) {
                     double a0 = labelLayout.get(i)[0], a1 = labelLayout.get(i)[1];
-                    double r = labelLayout.get(i)[2], fText = labelLayout.get(i)[3];
+                    double rBase = labelLayout.get(i)[2];
+                    double r = labelLayout.get(i)[3], fText = labelLayout.get(i)[4];
                     double fReal = (a0 + a1) / 2.0;
-                    // The comb spans ONLY the gap between the ideogram and the near end of the
-                    // text (r), so no segment can run across the gene name.
+                    // The comb spans ONLY the gap between the layer's band edge and the near end
+                    // of the text (r), so no segment can run across the gene name.
                     double hT = Math.abs(r - rBase);
                     if (hT < 2) continue;
                     double rMid = rBase + dir * hT / 3.0;
                     double rLow = rBase + dir * 2 * hT / 3.0;
 
-                    // cap over the gene's real interval, hugging the ideogram edge
+                    // cap over the gene's real interval, hugging the layer's band edge
                     g2.fill(annularPath(cx, cy, rBase - 0.4, rBase + 0.4, a0, a1));
 
                     Point2D pTop = polar(cx, cy, rBase, fReal);
@@ -2727,8 +2748,8 @@ public class CircularViewPanel extends JPanel implements IGVEventObserver {
                 }
             }
             for (int i = 0; i < labelLayout.size(); i++) {
-                double r = labelLayout.get(i)[2], fText = labelLayout.get(i)[3];
-                double len = labelLayout.get(i).length > 4 ? labelLayout.get(i)[4] : 0;
+                double r = labelLayout.get(i)[3], fText = labelLayout.get(i)[4];
+                double len = labelLayout.get(i).length > 5 ? labelLayout.get(i)[5] : 0;
                 double rCenter = r + dir * len / 2.0;      // text centre, away from the ring
                 // Radial on both sides: the name always points at the centre. labelInward only
                 // decides whether it is read away from the centre or towards it.
