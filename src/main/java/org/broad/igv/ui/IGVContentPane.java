@@ -1306,6 +1306,34 @@ public class IGVContentPane extends JPanel {
     }
 
     /**
+     * Delete every selected Data Tracks row at once: circular-only layers are removed from the
+     * ring, real tracks are unloaded from the session. Used by the multi-select "Delete selected".
+     */
+    private void deleteSelectedRows(int[] sel) {
+        if (sel == null || sel.length == 0) return;
+        List<CircularViewPanel.CircularLayer> layerSel = new ArrayList<>();
+        List<Track> trackSel = new ArrayList<>();
+        for (int si : sel) {
+            if (si < 0 || si >= dataColumnRows.size()) continue;
+            Object o = dataColumnRows.get(si);
+            if (o instanceof CircularViewPanel.CircularLayer) {
+                layerSel.add((CircularViewPanel.CircularLayer) o);
+            } else if (o instanceof Track) {
+                trackSel.add((Track) o);
+            }
+        }
+        for (CircularViewPanel.CircularLayer l : layerSel) circularDrawingArea.removeLayer(l);
+        if (!trackSel.isEmpty()) {
+            deleteTracks(trackSel);   // unloads the tracks and refreshes the column + ring
+        } else {
+            refreshDataColumn();
+            circularDrawingArea.refresh();
+            if (igv != null) igv.repaint();
+        }
+        log.info("Deleted " + (layerSel.size() + trackSel.size()) + " selected circular row(s)");
+    }
+
+    /**
      * Context menu for a circular-only layer row: the parameters that belong to THAT layer
      * (ribbon styling for a links file, ring geometry for a heatmap) plus removal. This is why
      * they are no longer buried in View options.
@@ -1352,6 +1380,18 @@ public class IGVContentPane extends JPanel {
         // A circular-only layer row has its own menu (ribbon / heatmap parameters + Remove).
         final Object hitRow = dataColumnRows.get(idx);
         if (hitRow instanceof CircularViewPanel.CircularLayer) {
+            int[] sel = dataColumnList.getSelectedIndices();
+            boolean inSel = false;
+            for (int si : sel) if (si == idx) { inSel = true; break; }
+            if (inSel && sel.length > 1) {
+                // Multiple rows selected: offer a bulk delete of every selected row (layers + tracks).
+                JPopupMenu menu = new JPopupMenu();
+                JMenuItem del = new JMenuItem("Delete selected (" + sel.length + ")");
+                del.addActionListener(a -> deleteSelectedRows(sel));
+                menu.add(del);
+                menu.show(dataColumnList, e.getX(), e.getY());
+                return;
+            }
             dataColumnList.setSelectedIndex(idx);
             showLayerPopup(e, (CircularViewPanel.CircularLayer) hitRow);
             return;
