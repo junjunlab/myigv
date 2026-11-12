@@ -1,0 +1,30 @@
+# Normalise text to LF in the repository so a Windows checkout, a macOS build and the
+# CI runners all produce identical blobs. Without this, a file edited through the GitHub
+# API (LF) and one written by a Windows checkout (CRLF) show up as a whole-file diff.
+* text=auto eol=lf
+
+# Binary assets: never touch, never diff as text.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.icns binary
+*.gz   binary
+*.bgz  binary
+*.bb   binary
+*.bw   binary
+*.ix   binary
+*.tbi  binary
+*.csi  binary
+*.2bit binary
+*.fa   text eol=lf
+*.fasta text eol=lf
+*.jar  binary
+*.class binary
+*.exe  binary
+*.dmg  binary
+*.so   binary
+*.dylib binary
+*.dll binary
+*.zip  binary
