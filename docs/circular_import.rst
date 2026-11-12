@@ -1,9 +1,9 @@
 Import: circular-only data layers
 =================================
 
-``Import ▾`` is the first button in the Circular View toolbar.  It loads three
-kinds of data that exist **only in the Circular View** — links, a genomic
-heatmap, and genomic labels.
+``Import ▾`` is the first button in the Circular View toolbar.  It loads data
+that exists **only in the Circular View**: links, a genomic heatmap, genomic
+labels, and four interval+value tracks (points, lines, histogram, rectangles).
 
 .. important::
 
@@ -17,7 +17,7 @@ heatmap, and genomic labels.
 The Import menu
 ---------------
 
-The dropdown contains exactly four entries:
+The dropdown contains these entries:
 
 .. list-table::
    :header-rows: 1
@@ -31,12 +31,25 @@ The dropdown contains exactly four entries:
      - ``Load genomic heatmap (BED/TSV rows x samples)``
    * - ``Labels  (BED + name column)…``
      - ``Import labels (BED, 4th column = name)``
+   * - ``Points  (BED + value column)…``
+     - ``Import points (BED: chr start end value)``
+   * - ``Lines  (BED + value column)…``
+     - ``Import lines (BED: chr start end value)``
+   * - ``Histogram  (BED + value column)…``
+     - ``Import histogram (BED: chr start end value)``
+   * - ``Rectangles  (BED + value column)…``
+     - ``Import rectangles (BED: chr start end value)``
    * - ``Imported data is drawn in the circular view only``
      - Disabled hint (not clickable)
 
-Each choice opens a native ``java.awt.FileDialog`` for a **local file only**.
-There is no remote/URL input in these dialogs: ``parseHeatmap`` and
-``parseLabels`` read the path directly with ``FileInputStream``.
+Every dialog opens a native ``java.awt.FileDialog`` for **local files only**
+and is **multi-select**: Ctrl/Shift-click several files in one dialog and each
+one becomes its own layer.  There is no remote/URL input in these dialogs:
+the parsers read the path directly with ``FileInputStream``.
+
+Each import creates a **new** layer; importing a second file of the same kind
+stacks a second band rather than replacing the first, so you can overlay several
+heatmaps, label sets, or value tracks and style each one independently.
 
 Links: BEDPE / Circos links
 ---------------------------
@@ -167,8 +180,9 @@ columns), whose first row is::
    committed to it.  The repository contains only rendered PNGs whose names
    mention them, plus ``test/data/bedpe/interleaved_chrs.bedpe``.
 
-Importing another heatmap **replaces** the existing heatmap layer rather than
-adding a second one.
+Importing another heatmap **adds a second heatmap layer** — several heatmaps
+stack as independent bands, and each keeps its own colours, heights and
+connection track (see :doc:`circular_heatmap`).
 
 .. figure:: images/circlize_heatmap_links.png
    :alt: Circular ring with green-black-red heatmap cells and an outside colour legend
@@ -232,6 +246,107 @@ four-segment comb.  There is no alternative leader-line style — see
 
    Zoomed detail: the comb stops at the near end of each gene name, so the
    connector never runs through the text.
+
+Interval + value tracks: points, lines, histogram, rectangles
+-------------------------------------------------------------
+
+These four layer kinds share one parser and one file format — a 4-column
+BED-like file whose fourth column is a single numeric value::
+
+    chr   start     end       value
+    chr1  1000000   2000000   0.83
+    chr1  2000000   3000000   -1.04
+    chr9  12709305  12783498  2.51
+
+Parsing rules (``parsePointLine``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 32 68
+
+   * - Rule
+     - Behaviour
+   * - Encoding / location
+     - UTF-8, local file only.
+   * - Delimiter
+     - Tab, with the same whitespace fallback as the other parsers.
+   * - Comments
+     - Empty lines and ``#`` lines are skipped.
+   * - Minimum columns
+     - 4; ``start`` / ``end`` must be integers and the value must parse as a
+       number, otherwise the row is skipped.
+   * - Range
+     - Global ``min`` / ``max`` over the value column drives the radial mapping.
+   * - Multi-select
+     - Several files can be picked in one dialog; each becomes its own band.
+
+All four map **value → radius** inside their ring band (low values near the
+inner edge, high values near the outer edge) and **genomic position → angle**
+(interval start/end for the filled kinds, the interval midpoint for points and
+lines).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 47 35
+
+   * - Kind
+     - Drawing
+     - Right-click parameters
+   * - Points
+     - A small filled marker per row at the interval midpoint.
+     - ``Colour…``, ``Point size…``, ``Band height…``, ``Points outside the
+       ideogram``
+   * - Lines
+     - Consecutive rows on the same chromosome joined into a polyline.
+     - ``Colour…``, ``Line width…``, ``Band height…``, ``Lines outside the
+       ideogram``
+   * - Histogram
+     - One bar per row, from the band's inner edge up to the value's radius,
+       spanning the interval's angular width.
+     - ``Bar colour…``, ``Band height…``, ``Histogram outside the ideogram``
+   * - Rectangles
+     - Each interval fills the whole band, coloured by value.
+     - ``Colours`` submenu (below), ``Expand overlapping rectangles``,
+       ``Band height…``, ``Rectangles outside the ideogram``
+
+The **Rectangles** ``Colours`` submenu controls fill and border:
+
+* ``Fill by value (ramp)`` — on (default): the fill interpolates from the low
+  colour to the high colour by value.  Off: a single solid fill is used.
+* ``Fill colour…`` — one solid fill colour for every cell.
+* ``Border colour…`` / ``No border`` — outline each cell, or clear the outline.
+* ``Low value colour…`` / ``High value colour…`` — the two ends of the ramp.
+
+**Expand overlapping rectangles.**  When intervals overlap, later cells would
+otherwise cover earlier ones.  With ``Expand overlapping rectangles`` on, the
+overlapping intervals are assigned radial **lanes** by greedy interval
+scheduling, so each one occupies its own sub-slice of the band and stays
+visible.  Off, every cell fills the whole band and overlaps cover each other.
+
+All four kinds can also be drawn **outside the ideogram**; the checkbox in each
+menu moves the layer to the ``Outside the ideogram`` column — see
+:doc:`circular_data_tracks`.
+
+.. figure:: images/points_lines.png
+   :alt: Circular ring with a scatter band and a polyline band
+   :width: 65%
+
+   A Points band (outer, markers at each interval midpoint) and a Lines band
+   (inner, consecutive midpoints joined per chromosome).
+
+.. figure:: images/hist_rect.png
+   :alt: Circular ring with a histogram band and a value-coloured rectangle band
+   :width: 65%
+
+   A histogram band (bars) and a rectangle band (cells coloured by value)
+   stacked inside the ideogram.
+
+.. figure:: images/rect_colours.png
+   :alt: Two rings comparing value-ramp fill and solid fill with borders
+   :width: 90%
+
+   Left: rectangles filled by value with no border.  Right: one solid fill
+   colour with a black border around every cell.
 
 Troubleshooting
 ---------------

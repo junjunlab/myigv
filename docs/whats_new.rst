@@ -138,10 +138,30 @@ v1.0.2 tag.
        bands; the Data Tracks column order *is* the radial order.
      - :doc:`circular_data_tracks`
    * - ``Import ▾`` menu and circular-only layers
-     - Links / Heatmap / Labels files are parsed into layers that exist only in
-       the Circular View — never as IGV tracks, never in the horizontal view,
-       never in a saved session.
+     - Links / Heatmap / Labels / Points / Lines / Histogram / Rectangles files
+       are parsed into layers that exist only in the Circular View — never as
+       IGV tracks, never in the horizontal view, never in a saved session.  The
+       dialogs are multi-select, so several files can be imported at once.
      - :doc:`circular_import`
+   * - Interval + value tracks
+     - Points (markers), Lines (polyline), Histogram (bars from the band edge)
+       and Rectangles (value-coloured cells with optional fill + border colours
+       and ``Expand overlapping rectangles``, which splits overlaps into radial
+       lanes).  Each has its own right-click parameters and can sit inside or
+       outside the ideogram.
+     - :doc:`circular_import`
+   * - Inside / outside column sections
+     - The Data Tracks column is split into ``Data Tracks`` (inside) and
+       ``Outside the ideogram``; the outside section appears only when a layer
+       is set outside, and its row order is the outward order.  Row order is
+       radial order in both sections, and heatmap / labels / value bands are
+       interleaved by that row order.
+     - :doc:`circular_data_tracks`
+   * - View modes: Horizontal / Circular / Both
+     - The ``View`` menu offers three mutually exclusive modes: horizontal
+       only, circular only, or a side-by-side split of both.  Selecting one of
+       the single views turns the other off; only ``Both`` shows them together.
+     - :doc:`circular_overview`
    * - Per-layer context menus
      - Right-clicking a layer row shows only the parameters relevant to that
        layer kind.

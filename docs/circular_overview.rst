@@ -22,8 +22,9 @@ left-to-right order:
    * - Button
      - Purpose
    * - ``Import ▾``
-     - **First button.** Loads Links, Heatmap and Labels files as
-       circular-only layers. See :doc:`circular_import`.
+     - **First button.** Loads Links, Heatmap, Labels, Points, Lines,
+       Histogram and Rectangles files as circular-only layers (multi-select).
+       See :doc:`circular_import`.
    * - ``View options ▾``
      - Axis, ticks, chromosome ring, arc span, and ``All settings…``. See
        :doc:`circular_view_options`.
@@ -40,6 +41,28 @@ left-to-right order:
 
 The Import dropdown ends with a disabled (greyed-out) hint that states the key
 contract: ``Imported data is drawn in the circular view only``.
+
+Showing the ring: the View menu
+--------------------------------
+
+The main window's ``View`` menu offers three **mutually exclusive** modes:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Menu item
+     - Effect
+   * - ``Horizontal View``
+     - Horizontal (linear) view only; the circular view is hidden.
+   * - ``Circular View``
+     - Circular view only; the horizontal view is hidden.
+   * - ``Both (Horizontal + Circular)``
+     - Side-by-side split: the horizontal view on the left, the circular view
+       on the right.
+
+Selecting ``Horizontal View`` or ``Circular View`` turns the other view off, so
+both are only visible together when ``Both`` is selected.
 
 Anatomy of the figure
 ---------------------

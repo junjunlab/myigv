@@ -41,12 +41,25 @@ Where a parameter lives
    * - Right-click a **Labels** row in Data Tracks
      - Label placement, reading direction, connector lines, font, colours,
        connector height, label height, label spacing.
+   * - Right-click a **Points / Lines / Histogram / Rectangles** row in Data
+       Tracks
+     - Inside/outside placement, colour, point size / line width (Rectangles:
+       the ``Colours`` fill + border submenu and ``Expand overlapping
+       rectangles``), band height.
    * - Right-click an ordinary **track** row in Data Tracks
      - Per-band height, feature stacking, graph type, Y-axis range and
        multi-sample group scaling (``TrackRingConfig``).
    * - ``Export ▾`` → ``Export circular view`` dialog
      - Format, width, height, resolution, output path.  See
        :doc:`circular_export`.
+
+.. note::
+
+   Every circular-layer parameter is stored **on that layer**.  Two imports of
+   the same kind have independent colours, sizes, band heights and
+   inside/outside placement, so editing one never changes the other.  The
+   ``… outside the ideogram`` item moves the row between the ``Data Tracks`` and
+   ``Outside the ideogram`` sections; see :doc:`circular_data_tracks`.
 
 .. note::
 
@@ -509,6 +522,81 @@ Labels layer — right-click a Labels row
      - Gap inserted between two adjacent labels when circlize ``smartAlign``
        tiles a dense cluster end to end.
    * - ``Remove labels from circular view…``
+     - —
+     - action
+     - Removes the layer.
+
+Interval + value layers — right-click a Points / Lines / Histogram / Rectangles row
+-----------------------------------------------------------------------------------
+
+These four kinds share one parser (``chr start end value``) and one set of
+row-position rules; only the drawing and a few items differ.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 38 13 18 31
+
+   * - Menu item (verbatim)
+     - Default
+     - Range / values
+     - What it does
+   * - ``Show points`` / ``Show lines`` / ``Show histogram`` /
+       ``Show rectangles``
+     - on
+     - on / off
+     - Visibility of that layer.
+   * - ``Points outside the ideogram`` / ``Lines outside the ideogram`` /
+       ``Histogram outside the ideogram`` / ``Rectangles outside the ideogram``
+     - off
+     - on / off
+     - ``on`` moves the row to the ``Outside the ideogram`` column and draws the
+       band beyond the chromosome names; outside bands stack in their row order.
+   * - ``Colour…`` (Points / Lines) or ``Bar colour…`` (Histogram)
+     - blue
+     - any colour
+     - Marker / polyline / bar colour for that layer (``plColor``).
+   * - ``Point size… (4 px)``
+     - ``4``
+     - ``1``–``30`` px
+     - Diameter of the point markers (Points only, ``plPointSize``).
+   * - ``Line width… (2 px)``
+     - ``2``
+     - ``1``–``20`` px
+     - Stroke width of the polyline (Lines only, ``plLineWidth``).
+   * - ``Colours`` ▸ ``Fill by value (ramp)``
+     - on
+     - on / off
+     - Rectangles only.  On: fill interpolates from the low to the high colour
+       by value.  Off: a single solid ``Fill colour…`` is used.
+   * - ``Colours`` ▸ ``Fill colour…``
+     - —
+     - any colour
+     - Rectangles only.  One solid fill colour for every cell
+       (``rectFill``); ignored while ``Fill by value (ramp)`` is on.
+   * - ``Colours`` ▸ ``Border colour…``
+     - none
+     - any colour
+     - Rectangles only.  Outline every cell in this colour (``rectBorder``).
+   * - ``Colours`` ▸ ``No border``
+     - —
+     - action
+     - Rectangles only.  Clears the border colour.
+   * - ``Colours`` ▸ ``Low value colour…`` / ``High value colour…``
+     - blue / red
+     - any colour
+     - Rectangles only.  The two ends of the value ramp (``rectLow`` /
+       ``rectHigh``).
+   * - ``Expand overlapping rectangles``
+     - off
+     - on / off
+     - Rectangles only.  On: overlapping intervals are assigned radial lanes by
+       greedy interval scheduling, so each one stays visible instead of covering
+       the others.  Off: every cell fills the whole band.
+   * - ``Band height… (42 px)``
+     - ``42``
+     - ``10``–``200`` px
+     - Radial room this band occupies on the ring (``plHeightPx``).
+   * - ``Remove points|lines|histogram|rectangles from circular view…``
      - —
      - action
      - Removes the layer.

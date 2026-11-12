@@ -9,8 +9,11 @@ open its parameters.
 
 .. note::
 
-   Importing another heatmap **replaces** the current heatmap layer.  Links and
-   labels layers, by contrast, accumulate.
+   Importing another heatmap **adds a second heatmap layer** — several heatmaps
+   stack as independent bands, and each keeps its own colours, height,
+   connection track and inside/outside placement.  Links and labels layers
+   accumulate the same way.  The heatmap's position among the other bands comes
+   from its row in the Data Tracks column (see :doc:`circular_data_tracks`).
 
 What the heatmap ring actually draws
 ------------------------------------
@@ -228,3 +231,10 @@ In order, the heatmap layer context menu contains: ``Show heatmap``,
 height…``, ``Heatmap connection height…``, ``Show heatmap legend``,
 ``Legend position``, ``Heatmap colours (low / 0 / high)`` (or ``(low / high)``),
 and ``Remove heatmap from circular view…``.
+
+Every item above except the legend settings applies to **that heatmap layer
+only**: two imported heatmaps can have different colours, heights, connection
+tracks and inside/outside placement.  ``Heatmap outside the ideogram`` moves the
+row to the ``Outside the ideogram`` column, where outside heatmaps stack
+outward in their row order, and the comb starts just outside the chromosome
+names instead of running across them.

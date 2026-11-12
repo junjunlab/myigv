@@ -11,15 +11,34 @@ circular-only layers created by :doc:`circular_import`.
    the bottom row is the innermost.  Dragging a row changes the figure
    immediately; there is no separate "apply" step.
 
-One list, two kinds of row
---------------------------
+Two stacked sections
+--------------------
 
-``dataColumnRows`` is a single ordered list whose entries are either a
-``CircularViewPanel.CircularLayer`` or an IGV ``Track``.
+The column is **one column with two sections**:
 
 .. list-table::
    :header-rows: 1
-   :widths: 26 37 37
+   :widths: 30 70
+
+   * - Section
+     - Contents
+   * - ``Data Tracks``
+     - Normal IGV tracks and every circular-only layer whose mode is *inside*.
+   * - ``Outside the ideogram``
+     - Only layers whose mode is *outside*.  **Hidden entirely while it is
+       empty**, so it takes no space until you set a layer outside.
+
+Every circular-only layer (heatmap, labels, points, lines, histogram,
+rectangles) has an ``… outside the ideogram`` checkbox in its right-click menu.
+Ticking it moves that row from ``Data Tracks`` down to ``Outside the ideogram``
+and draws it beyond the chromosome band; unticking moves it back.  The outside
+rows stack in their own order — first row nearest the chromosome, each next row
+one step further out — whatever the layer kind, so heatmaps, labels and value
+tracks can all be mixed in the outside stack.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 40 36
 
    * - Row kind
      - Label text
@@ -28,50 +47,47 @@ One list, two kinds of row
      - ``<file>   (links N)``
      - Ribbons/chords in the empty centre of the ring.
    * - Heatmap layer
-     - ``<file>   (heatmap R x S)``
-     - A concentric band whose radial position is **its row position**.
+     - ``<file>   (heatmap R x S)   · inside|outside``
+     - A concentric band at its row position, or beyond the ideogram.
    * - Labels layer
-     - ``<file>   (labels N)``
-     - A dedicated label ring (inside or outside the ideogram), placed at
-       **its row position** when the labels sit inside the ring.
+     - ``<file>   (labels N)   · inside|outside``
+     - A label ring at its row position, or beyond the ideogram.
+   * - Points / Lines / Histogram / Rectangles
+     - ``<file>   (points|lines|hist|rect N)   · inside|outside``
+     - A data band at its row position, or one of the outside bands.
    * - Normal IGV track
      - ``<track display name>``
      - A concentric data band.
 
 A hidden row gets a ``   (hidden)`` suffix.  ``refreshDataColumn()`` preserves
-the existing order, appends newly imported layers at the top and newly loaded
-tracks at the bottom, then recomputes ``heatmapBandIndex`` **and**
-``labelBandIndex`` from the row list and calls ``setRingTracks(...)`` with the
-tracks in that same order.
+the dragged order in **both** sections, appends newly imported layers at the
+**bottom** of the main section (so the first import stays on top), and
+recomputes each layer's ``rowIndex`` / ``bandIndex`` (inside) or
+``outsideIndex`` (outside) from the row list.
 
 .. note::
 
-   The heatmap is **not** pinned to the innermost or outermost ring.  Because
-   ``heatmapBandIndex`` is derived from the row list, moving the heatmap row
-   between two track rows moves its band between those two bands.  This is what
-   fixes the historical problem of a heatmap overlapping a RefSeq band that was
-   listed after it.
+   **Heatmap and labels bands are interleaved by row order.**  A labels row
+   above a heatmap row really draws outside that heatmap band, and vice versa —
+   the two kinds are not drawn in separate passes.  The same holds for the
+   points / lines / histogram / rectangles bands.
 
 .. note::
 
-   The label ring follows the same rule.  ``labelBandIndex`` is the number of
-   data bands listed **above** the labels row, and ``drawTrackRings`` reserves
-   ``labelRingReserve()`` worth of radial room at exactly that position — so
-   dragging the labels row to the last place moves the labels to the
-   **innermost** ring, below every data band, instead of leaving them pinned
-   just under the ideogram.  With the labels row at the top (the default) they
-   sit directly under the ideogram, which is the historical layout.  The slot
-   applies only when ``Labels inside the ideogram`` is on: outside labels hang
-   from the ideogram's outer edge regardless of row order, and a slot past the
-   last band clamps to the innermost position.
+   A layer set to ``outside`` is drawn beyond the ideogram regardless of its
+   row in ``Data Tracks`` (it has moved to the other section), so moving its
+   row inside that section only reorders it among the other outside layers.
 
 Dragging rows
 -------------
 
-``TrackReorderHandler`` implements drag-and-drop on the list.  On drop,
-``moveDataRow`` reorders ``dataColumnRows``, ``refreshDataColumn()`` re-derives
-the band order, and the ring repaints.  The horizontal view is unaffected —
-this reorders only the Circular View composition.
+Each section has its own ``TrackReorderHandler``.  On drop, ``moveDataRow``
+reorders that section's row list, ``refreshDataColumn()`` re-derives the band
+order, and the ring repaints.  Dragging inside ``Data Tracks`` changes the inner
+band order; dragging inside ``Outside the ideogram`` changes the outward order.
+To move a layer between the two sections, use its ``… outside the ideogram``
+checkbox.  The horizontal view is unaffected — this reorders only the Circular
+View composition.
 
 .. figure:: images/polish_heat_first.png
    :alt: Circular ring with heatmap band placed first in the Data Tracks order
@@ -97,7 +113,7 @@ blocks:
 
    .. list-table::
       :header-rows: 1
-      :widths: 30 70
+      :widths: 34 66
 
       * - Layer kind
         - Visibility item
@@ -105,20 +121,27 @@ blocks:
         - ``Show heatmap``
       * - Labels
         - ``Show labels``
+      * - Points / Lines / Histogram / Rectangles
+        - ``Show points`` / ``Show lines`` / ``Show histogram`` /
+          ``Show rectangles``
       * - Links
         - ``Show this links layer``
 
-#. All parameters for that layer kind:
+#. All parameters for that layer kind, including the ``… outside the ideogram``
+   checkbox that moves the row between the two sections:
 
    * Links → :doc:`circular_links`
    * Heatmap → :doc:`circular_heatmap`
    * Labels → :doc:`circular_labels`
+   * Points / Lines / Histogram / Rectangles → :doc:`circular_import`
+     (colour, point size / line width, the Rectangles ``Colours`` fill+border
+     submenu and ``Expand overlapping rectangles``, band height)
 
 #. A removal item:
 
    .. list-table::
       :header-rows: 1
-      :widths: 30 70
+      :widths: 34 66
 
       * - Layer kind
         - Removal item
@@ -126,6 +149,8 @@ blocks:
         - ``Remove heatmap from circular view…``
       * - Labels
         - ``Remove labels from circular view…``
+      * - Points / Lines / Histogram / Rectangles
+        - ``Remove points|lines|histogram|rectangles from circular view…``
       * - Links
         - ``Remove links from circular view…``
 
@@ -169,11 +194,19 @@ Typical workflow
 ----------------
 
 #. Load a genome and the tracks you want (they become band rows).
-#. ``Import ▾ → Heatmap  (BED with value columns)…`` and/or ``Labels  (BED +
-   name column)…`` and/or ``Links  (BEDPE / Circos links)…``.
-#. Drag rows until the radial stacking is right.
+#. ``Import ▾`` → any of ``Links``, ``Heatmap``, ``Labels``, ``Points``,
+   ``Lines``, ``Histogram``, ``Rectangles`` (Ctrl/Shift-click several files at
+   once to import many layers).
+#. Drag rows until the radial stacking is right; use each layer's ``… outside
+   the ideogram`` checkbox to move it to the outside stack.
 #. Right-click each layer row to set its parameters.
 #. ``Export ▾`` to write the figure (see :doc:`circular_export`).
+
+.. tip::
+
+   To delete several layers, Ctrl/Shift-click the rows in either section, then
+   right-click one of the selected rows → ``Delete selected (N)``.  Circular
+   layers are removed from the ring and normal tracks are unloaded.
 
 .. tip::
 
