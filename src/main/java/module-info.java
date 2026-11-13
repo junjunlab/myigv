@@ -51,6 +51,8 @@ module org.igv {
     exports org.broad.igv.lists;
     exports org.broad.igv.repeats;
     exports org.broad.igv.bedpe;
+    // Self-update: version check, download and in-place replacement
+    exports org.broad.igv.update;
     exports org.broad.igv.gwas;
     exports org.broad.igv.charts;
     exports org.broad.igv.sashimi;

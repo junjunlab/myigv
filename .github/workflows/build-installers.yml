@@ -30,6 +30,38 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@417ae3ccd767c252f5661f1ace9f835f9654f2b5 # v3.1.0
 
+      # ---- Version drift guard -------------------------------------------------
+      # The updater trusts what the application reports (AboutDialog's FALLBACK_VERSION
+      # when no -Pversion was stamped).  If a release bumps the jpackage version but not
+      # that constant, the freshly installed build still claims to be the old version and
+      # the updater offers the same release on every launch.  Fail the build instead.
+      - name: Verify version consistency
+        run: |
+          set -e
+          ABOUT=$(sed -n 's/.*FALLBACK_VERSION *= *"\([^"]*\)".*/\1/p' \
+                    src/main/java/org/broad/igv/ui/AboutDialog.java | head -1)
+          JPACKAGE=$(grep -o -- '--app-version [0-9][0-9.]*' .github/workflows/build-installers.yml \
+                     | awk '{print $2}' | sort -u)
+          ZIPNAMES=$(grep -o -- 'myigv-[0-9][0-9.]*-\(win\|mac\)-app\.zip' .github/workflows/build-installers.yml \
+                     | sed 's/^myigv-//; s/-win-app\.zip$//; s/-mac-app\.zip$//' | sort -u)
+          echo "AboutDialog FALLBACK_VERSION : '${ABOUT}'"
+          echo "workflow --app-version       : '${JPACKAGE}'"
+          echo "workflow zip names           : '${ZIPNAMES}'"
+          if [ -z "$ABOUT" ]; then
+            echo "::error::could not read FALLBACK_VERSION from AboutDialog.java"
+            exit 1
+          fi
+          if [ "$JPACKAGE" != "$ABOUT" ]; then
+            echo "::error::--app-version (${JPACKAGE}) does not match FALLBACK_VERSION (${ABOUT})"
+            exit 1
+          fi
+          if [ "$ZIPNAMES" != "$ABOUT" ]; then
+            echo "::error::app-image zip names (${ZIPNAMES}) do not match FALLBACK_VERSION (${ABOUT})"
+            exit 1
+          fi
+          echo "version ${ABOUT} is consistent everywhere"
+        shell: bash
+
       # ---- Build the plain distribution (jars + offline annotation pack) ----
       - name: Build distribution
         run: ./gradlew createDist --no-daemon
@@ -97,6 +129,51 @@ jobs:
             --dest build/installer
         shell: bash
 
+      # ---- Incremental update payloads --------------------------------------
+      # The in-app updater does not download the (large) installer: it fetches the
+      # app-image archive and copies app\ / runtime\ over the existing installation.
+      # Keep --app-version in sync with the installer steps above.
+      - name: Create Windows app-image archive
+        if: runner.os == 'Windows'
+        run: |
+          mkdir -p build/installer
+          "$JAVA_HOME/bin/jpackage" --type app-image \
+            --name myigv --app-version 1.0.3 --vendor junjunlab \
+            --runtime-image build/jp/runtime \
+            --module-path build/myigv-dist/lib \
+            --module org.igv/org.broad.igv.ui.Main \
+            --java-options "-Xmx4g" \
+            --java-options "-Dproduction=true" \
+            --java-options "-Djava.net.preferIPv4Stack=true" \
+            --java-options "-Dsun.java2d.noddraw=true" \
+            --app-content build/jp/app-content \
+            --icon resources/IGV_64.ico \
+            --dest build/jp/appimg
+          powershell -NoProfile -Command "Compress-Archive -Path 'build/jp/appimg/myigv' -DestinationPath 'build/installer/myigv-1.0.3-win-app.zip' -Force"
+        shell: bash
+
+      - name: Create macOS app-image archive
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p build/installer
+          "$JAVA_HOME/bin/jpackage" --type app-image \
+            --name myigv --app-version 1.0.3 --vendor junjunlab \
+            --runtime-image build/jp/runtime \
+            --module-path build/myigv-dist/lib \
+            --module org.igv/org.broad.igv.ui.Main \
+            --java-options "-Xmx4g" \
+            --java-options "-Dproduction=true" \
+            --java-options "-Djava.net.preferIPv4Stack=true" \
+            --java-options "-Dsun.java2d.noddraw=true" \
+            --app-content build/jp/app-content \
+            --icon resources/IGV_64.icns \
+            --mac-package-name myigv \
+            --mac-package-identifier org.junjunlab.myigv \
+            --dest build/jp/appimg
+          cd build/jp/appimg
+          zip -qry ../../installer/myigv-1.0.3-mac-app.zip myigv.app
+        shell: bash
+
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
@@ -104,6 +181,7 @@ jobs:
           path: |
             build/installer/*.exe
             build/installer/*.dmg
+            build/installer/*.zip
           if-no-files-found: error
 
       - name: Attach installer to release
@@ -113,6 +191,7 @@ jobs:
           files: |
             build/installer/*.exe
             build/installer/*.dmg
+            build/installer/*.zip
           # Release 正文由维护者按版本手工填写，只写「本版新增」。
           # 不要开 generate_release_notes：覆盖重发时它会反复追加重复的 Full Changelog，
           # 也不再罗列「相比原版 IGV 的全部改进」这类累计清单（历史改动看 README/提交历史）。

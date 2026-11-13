@@ -296,6 +296,19 @@ public class Main {
 
         igv.startUp(igvArgs);
 
+        // Look for a newer release once the window is up.  The check runs on a daemon thread and
+        // fails silently, so it can never delay or disturb startup.
+        SwingUtilities.invokeLater(() -> {
+            try {
+                // An update that could not be completed last time leaves a marker next to the
+                // application; report it before anything else so the user is not left guessing.
+                org.broad.igv.update.UpdateChecker.checkPendingFailure(IGV.getInstance().getMainFrame());
+                org.broad.igv.update.UpdateChecker.checkOnStartup(IGV.getInstance().getMainFrame());
+            } catch (Throwable t) {
+                log.warn("Automatic update check could not be started: " + t.getMessage());
+            }
+        });
+
         // TODO Should this be done here?  Will this step on other key dispatchers?
         KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(GlobalKeyDispatcher.getInstance());
     }

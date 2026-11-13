@@ -134,4 +134,12 @@ public class AboutDialog extends JDialog {
         }
         return version;
     }
+
+    /**
+     * The version this build reports, for code outside the dialog (the updater compares against
+     * it).  Single source of truth: whatever the About box shows is what the updater compares.
+     */
+    public static String appVersion() {
+        return displayVersion();
+    }
 }

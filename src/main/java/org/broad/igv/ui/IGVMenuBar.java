@@ -858,6 +858,17 @@ public class IGVMenuBar extends JMenuBar implements IGVEventObserver {
         }
 
         menuAction =
+                new MenuAction("Check for updates…") {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        org.broad.igv.update.UpdateChecker.checkManually(igv.getMainFrame());
+                    }
+                };
+        menuAction.setToolTipText("Check GitHub for a newer myIGV release");
+        menuItems.add(MenuAndToolbarUtils.createMenuItem(menuAction));
+
+        menuAction =
                 new MenuAction("About myigv") {
 
                     @Override
