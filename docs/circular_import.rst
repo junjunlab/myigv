@@ -57,11 +57,17 @@ Links: BEDPE / Circos links
 Links are parsed by ``org.broad.igv.bedpe.BedPEParser`` — the same parser the
 linear interaction-track loader uses.  It auto-detects **UTF-8, UTF-16LE and
 UTF-16BE from the BOM**, so files produced by Windows PowerShell ``Out-File``
-work, and it accepts a minimal 6-column BEDPE::
+work, and it accepts a minimal 6-column BEDPE.  The reference links file is
+``../hg38_links.bed`` — 600 rows, six tab-separated columns, ``chrN``
+chromosome names.  Its first three rows are::
 
-    chrom1  start1  end1  chrom2  start2  end2
-    chr1    1000000 1000000 chr9   80000000 80000000
-    chr2    5000000 5200000 chr17  41000000 41200000
+    chr1  3409043   3424043   chr1  3661928   3666928
+    chr1  18802323  18842323  chrY  47460604  47485604
+    chr1  47601256  47621256  chr4  143491541 143496541
+
+The six columns are ``chrom1  start1  end1  chrom2  start2  end2``; the two
+anchors may sit on different chromosomes (``chrY`` and ``chr4`` above).  See
+:doc:`real_data_examples` for the full data inventory.
 
 Optional columns (``name``, ``score``, ``strand1``, ``strand2``, ``color``,
 …) are read when present.  Per-record ``score``, ``color``, ``thickness`` and
@@ -90,8 +96,10 @@ single ``#`` header line::
     #chrom1  start1  end1  chrom2  start2  end2  name  score  strand1  strand2  color  thickness
     X        71124   76124 X       242555  247555 LONG_0001  94.0  +  -  31,119,180  1
 
-A real 10-column example ships inside the repository at
-``test/data/bedpe/interleaved_chrs.bedpe`` (78 rows).  Its first row is::
+A real 10-column example lives in the **upstream IGV source tree**, not in
+this repository, at
+``igv_mod/igv-main/test/data/bedpe/interleaved_chrs.bedpe`` (78 rows) — one
+level above the ``myigv_v1.3`` checkout.  Its first row is::
 
     chr5  135399049  135399149  chr5  135398825  135398922  VH01587:178:...  255  -  +
 
@@ -131,11 +139,13 @@ Heatmap: BED with value columns
 -------------------------------
 
 The heatmap parser reads a BED-like text file, one genomic interval per row and
-one or more numeric sample columns::
+one or more numeric sample columns.  The reference file is
+``../hg38_heatmap.bed`` (107 rows, one interval plus four numeric value
+columns); its first three rows are::
 
-    chr   start    end      v1      v2      v3      v4
-    chr1  1000000  2000000  -0.83   0.42    1.17    -0.05
-    chr1  2000000  3000000  0.31    -1.04   0.68    0.22
+    chr1  12349422  17367982  0.0521477005103746   0.142378383327149   0.27553691609403  -0.339657653591206
+    chr1  34220407  65129873  -0.124433856269414  0.83281386326271    0.492758871260362 -0.536050429644896
+    chr1  76239000  81288814  -0.245211130992809  0.451441410890585  -0.223131824672254  0.417541349308881
 
 Exact parsing rules:
 
@@ -167,18 +177,22 @@ Exact parsing rules:
    * - Chromosome names
      - ``1`` ↔ ``chr1`` aliases and case differences are resolved.
 
-The reference example is ``../hg38_heatmap.bed`` (107 rows, 4 numeric
-columns), whose first row is::
-
-    chr1  12349422  17367982  0.0521477005103746  0.142378383327149  0.27553691609403  -0.339657653591206
+The three rows quoted at the start of this section are the first three lines
+of ``../hg38_heatmap.bed`` (107 rows, 4 numeric columns).  It uses ``chrN``
+chromosome names and its global min/max over all numeric cells drives the
+colour ramp — see :doc:`real_data_examples` for the full data inventory.
 
 .. note::
 
-   The demo data files (``hg38_heatmap.bed``, ``hg38_genes.bed``,
-   ``hg38_links.bed``, ``links_demo_line_band.bed``) live in the workspace
-   directory **one level above** the ``myigv_v1.3`` repository and are not
-   committed to it.  The repository contains only rendered PNGs whose names
-   mention them, plus ``test/data/bedpe/interleaved_chrs.bedpe``.
+   The real data files used throughout this guide (``hg38_heatmap.bed``,
+   ``hg38_genes.bed``, ``hg38_links.bed``, ``hg38_val.bed``, the ``.bw``,
+   ``.hic`` / ``.mcool`` / ``.cool`` / ``.h5`` contact matrices and the
+   ``HiC_TAD_results/`` products) live in the workspace directory **one level
+   above** the ``myigv_v1.3`` repository (``../``) and are **not committed to
+   it**; the headless probes read them by that ``../`` relative path.  The
+   BEDPE example quoted above belongs to the upstream IGV test data at
+   ``igv_mod/igv-main/test/data/bedpe/``.  See :doc:`real_data_examples` for
+   the full inventory.
 
 Importing another heatmap **adds a second heatmap layer** — several heatmaps
 stack as independent bands, and each keeps its own colours, heights and
@@ -195,12 +209,13 @@ connection track (see :doc:`circular_heatmap`).
 Labels: BED + name column
 -------------------------
 
-The labels parser reads a 4-column BED-like file::
+The labels parser reads a 4-column BED-like file.  The reference file is
+``../hg38_genes.bed`` (100 rows, ``chr`` / ``start`` / ``end`` / ``name``);
+its first three rows are::
 
-    chr   start    end      name
-    chr1  11869    14409    DDX11L1
-    chr1  69091    70008    OR4F5
-    chr9  12709305 12783498 MTHFR
+    chr1  11785722  11805964  MTHFR
+    chr1  26696014  26782104  ARID1A
+    chr1  94529172  94541759  F3
 
 Exact parsing rules:
 
@@ -223,10 +238,10 @@ Exact parsing rules:
    * - Extra columns
      - Ignored; only column 4 is used as the text.
 
-The reference example is ``../hg38_genes.bed`` (100 rows, gene names such as
-``MTHFR``, ``ARID1A``, ``F3``), whose first row is::
-
-    chr1  11785722  11805964  MTHFR
+The three rows quoted at the start of this section are the first three lines
+of ``../hg38_genes.bed`` (100 rows, gene names such as ``MTHFR``, ``ARID1A``,
+``F3``).  It uses ``chrN`` chromosome names; see
+:doc:`real_data_examples` for the full data inventory.
 
 Each import creates a **new** labels layer.  Labels are radial, sit inside the
 ideogram by default, and are connected to their genomic position by a
@@ -251,12 +266,17 @@ Interval + value tracks: points, lines, histogram, rectangles
 -------------------------------------------------------------
 
 These four layer kinds share one parser and one file format — a 4-column
-BED-like file whose fourth column is a single numeric value::
+BED-like file whose fourth column is a single numeric value.  The reference
+file is ``../hg38_val.bed`` (600 rows); its first three rows are::
 
-    chr   start     end       value
-    chr1  1000000   2000000   0.83
-    chr1  2000000   3000000   -1.04
-    chr9  12709305  12783498  2.51
+    chr1  3409043   3424043   -1.1572
+    chr1  18802323  18842323  0.0211
+    chr1  47601256  47621256  -0.4700
+
+Its first three columns are the **same intervals** used by the links file
+``../hg38_links.bed``, so a value track and a links layer line up exactly when
+both are loaded.  The value column spans roughly ``-1.99 … +2.00`` (the first
+row reads ``-1.1572``); this global min/max drives the radial mapping.
 
 Parsing rules (``parsePointLine``):
 
@@ -325,28 +345,55 @@ visible.  Off, every cell fills the whole band and overlaps cover each other.
 
 All four kinds can also be drawn **outside the ideogram**; the checkbox in each
 menu moves the layer to the ``Outside the ideogram`` column — see
-:doc:`circular_data_tracks`.
+:doc:`circular_data_tracks`.  The figure below shows the **Histogram** band
+moved outside the ideogram with ``Histogram outside the ideogram`` enabled.
+
+.. figure:: images/hist_rect_outside.png
+   :alt: Circular ring with the histogram band drawn outside the ideogram
+   :width: 65%
+
+   A Histogram band placed **outside the ideogram** (``Histogram outside the
+   ideogram``), with the bars radiating outward from the ring.  Rendered from
+   the real ``hg38_val.bed``.
 
 .. figure:: images/points_lines.png
    :alt: Circular ring with a scatter band and a polyline band
    :width: 65%
 
    A Points band (outer, markers at each interval midpoint) and a Lines band
-   (inner, consecutive midpoints joined per chromosome).
+   (inner, consecutive midpoints joined per chromosome), rendered from the
+   real ``hg38_val.bed``.
 
 .. figure:: images/hist_rect.png
    :alt: Circular ring with a histogram band and a value-coloured rectangle band
    :width: 65%
 
    A histogram band (bars) and a rectangle band (cells coloured by value)
-   stacked inside the ideogram.
+   stacked inside the ideogram, rendered from the real ``hg38_val.bed``.
 
 .. figure:: images/rect_colours.png
    :alt: Two rings comparing value-ramp fill and solid fill with borders
    :width: 90%
 
-   Left: rectangles filled by value with no border.  Right: one solid fill
-   colour with a black border around every cell.
+   Left: rectangles filled by value (blue = low, red = high) with a 1 px cell
+   border.  Right: one solid fill colour with a black border around every
+   cell.  Both are rendered from the real ``hg38_val.bed``.
+
+All four kinds can be driven by the **same** file.  The composite below stacks
+Points, Lines, Histogram and Rectangles in one ring, each layer imported from
+the identical ``../hg38_val.bed`` so the four radial mappings are directly
+comparable.
+
+.. figure:: images/real_value_tracks.png
+   :alt: Four value tracks (Points, Lines, Histogram, Rectangles) rendered from one real BED file
+   :width: 90%
+
+   Four numeric bands — Points, Lines, Histogram and Rectangles — stacked
+   from the same real ``hg38_val.bed``.  All four are drawn for one 0.8 Mb
+   window (chr8:82.70–83.50 Mb, 11 of the file's 600 rows) so that the
+   Histogram and Rectangle bands are wider than a single pixel; because every
+   layer reads the same file, their value → radius mapping shares one global
+   minimum and maximum.
 
 Troubleshooting
 ---------------

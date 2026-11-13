@@ -41,26 +41,28 @@ The changes are confined to ``DataPanel.mouseWheelMoved``:
 * ``e.consume()`` prevents the event from also triggering vertical scrolling.
 
 .. figure:: images/zoom_tip.png
-   :alt: A circular ring sector with red interaction arcs before zooming
+   :alt: A circular ring sector with red interaction arcs before a wheel notch
    :width: 100%
 
-   Zoomed detail of a circular ring sector before the zoom gesture: two red
-   interaction arcs above a curved ideogram segment with kb tick labels.
+   Zoomed detail of a circular ring sector before a single wheel notch: two
+   red interaction arcs above a curved ideogram segment with kb tick labels.
 
 .. figure:: images/zoom_tip_after.png
-   :alt: The same circular sector after zooming toward the cursor
+   :alt: The same circular sector after one wheel notch toward the cursor
    :width: 100%
 
-   After zooming toward the cursor, the locus that was under the pointer stays
-   at the same screen X while the arcs and ideogram scale up around it.
+   The same sector after one wheel notch toward the cursor.  The two captures
+   differ in only a small fraction of pixels — the difference is deliberately
+   subtle: the locus under the pointer stays put, rather than the arcs and
+   ideogram visibly scaling up.
 
 .. note::
 
    These two captures come from the headless render harness and show a
    **circular ring sector**, not a tooltip or a horizontal track panel.  They
-   illustrate the geometry of zoom-to-cursor; the same
-   ``doIncrementZoomAtCursor`` call is used by the linear ``DataPanel`` and by
-   the Sashimi plot.
+   are a before/after pair for a single zoom step, not a dramatic
+   magnification; the same ``doIncrementZoomAtCursor`` call is used by the
+   linear ``DataPanel`` and by the Sashimi plot.
 
 .. note::
 
@@ -97,11 +99,14 @@ global preferences. The setting is **global** — it affects the range labels of
 all data tracks.
 
 .. figure:: images/group_scale_axis_zoom.png
-   :alt: Y-axis range labels on grouped data tracks
+   :alt: Genome selector and grouped data tracks with a red zoom annotation
    :width: 100%
 
-   Y-axis ``[min - max]`` range labels on grouped data tracks, shown with the
-   configurable font size and position.
+   A grouped data-track panel showing the ``Human (GRCh38/hg38)`` genome
+   selector, black/white band tracks and a thick red line with a red box
+   marking the zoomed region.  This capture contains no ``[min - max]`` range
+   labels; the configurable ``[min - max]`` labels themselves are visible in
+   ``group_scale_axis_zoom2.png`` in the Group Autoscale section below.
 
 .. note::
 

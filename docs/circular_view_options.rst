@@ -169,12 +169,14 @@ Axis on / off
 
    All four visibility switches off — a clean ideogram-only figure.
 
-``All settings…`` dialog
-------------------------
+``All settings…`` — effects on the rendering
+--------------------------------------------------
 
 ``All settings…`` opens a modal dialog titled ``Circular View Settings`` with
 ``OK`` / ``Cancel``.  It exposes the same values with bounded spinners, which is
-safer than the free-text menu dialogs.
+safer than the free-text menu dialogs.  The captures in this section show the
+**rendered effect** of those settings on the ring; this guide does not include
+a screenshot of the dialog itself.
 
 .. list-table::
    :header-rows: 1

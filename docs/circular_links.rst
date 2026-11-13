@@ -129,11 +129,13 @@ toward the Cartesian midpoint.  It has no menu item and does not affect filled
 ribbons (those follow circlize's ``getQuadraticPoints`` geometry).
 
 .. figure:: images/ribbon_single.png
-   :alt: One Circos ribbon link between two intervals, bowing toward the centre
+   :alt: One point-to-band Circos ribbon, bowing toward the centre
    :width: 55%
 
-   A single interval-to-interval ribbon: two Bézier edges bowing toward the
-   centre, closed by the two end arcs and tapering where the anchors are narrow.
+   A single **point → band** ribbon (the first row of
+   ``../links_demo_line_band.bed``): one 1 bp line end and one wide interval
+   end.  Two Bézier edges bow toward the centre; the narrow point end tapers
+   while the wide end keeps its full width.
 
 .. figure:: images/circular_links_ribbon_mixed.png
    :alt: Mixed point-anchor and interval-anchor ribbons in one ring

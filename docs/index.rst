@@ -58,6 +58,8 @@ Where to start
      - :doc:`parameter_reference`
    * - Browse every screenshot used in this guide
      - :doc:`screenshots`
+   * - See which real data files every screenshot comes from
+     - :doc:`real_data_examples`
 
 Document map
 ------------
@@ -100,6 +102,7 @@ Document map
    :caption: Reference
 
    parameter_reference
+   real_data_examples
    screenshots
 
 Conventions used in this guide

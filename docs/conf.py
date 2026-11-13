@@ -13,8 +13,8 @@ author = "myIGV developers"
 copyright = "%s, %s" % (datetime.date.today().year, author)
 
 # The short X.Y version and the full version, including alpha/beta/rc tags.
-version = "1.0.2"
-release = "1.0.2"
+version = "1.0.3"
+release = "1.0.3"
 
 # -- General configuration ---------------------------------------------------
 

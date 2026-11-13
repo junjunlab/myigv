@@ -38,13 +38,24 @@ Selecting any of the three opens the same modal dialog, titled
 succeeds, a message box titled ``Export circular view`` reports
 ``Exported <FORMAT>:`` followed by the absolute output path.
 
+.. note::
+
+   This guide does not include a screenshot of the ``Export ▾`` menu or of the
+   ``Export circular view`` dialog itself.  The figure below is the **rendered
+   result** of an export; the dialog's fields are described in text and tables
+   in the following sections.
+
 .. figure:: images/export_shot.png
    :alt: Circular View rendered by the export path at publication size
    :width: 62%
 
-   A circular figure produced through the export path.  The export uses the
-   same drawing code as the on-screen panel, so ideogram, data bands, links,
-   heatmap cells, labels and legends all appear in the output.
+   A circular figure produced through the export path: an ideogram with the
+   outside coordinate axis, at publication size.  In general the export uses
+   the same drawing code as the on-screen panel, so any loaded data bands,
+   links, heatmap cells, labels and legends are included — but this particular
+   capture has no data layers loaded.  The identical render is reused for
+   ``shot_svg.png`` below — PNG and SVG differ only in the written file
+   format, not in geometry.
 
 The export dialog
 -----------------
@@ -143,7 +154,8 @@ What differs between the three formats
    :width: 55%
 
    SVG output.  Because the same ``renderTo`` path is used, the vector file has
-   the same geometry as the on-screen view.
+   the same geometry as the on-screen view.  This is the same render reused
+   from ``export_shot.png`` above.
 
 .. figure:: images/shot_pdf.png
    :alt: Circular View exported as PDF vector

@@ -94,7 +94,8 @@ View composition.
    :width: 65%
 
    Heatmap row first: the equal-width heatmap band sits at the outermost
-   position of the band stack.
+   position of the band stack.  The identical render is reused for
+   ``polish_legend_TOP_RIGHT.png`` in :doc:`circular_heatmap`.
 
 .. figure:: images/polish_heat_second.png
    :alt: Same ring after moving the heatmap row one position down

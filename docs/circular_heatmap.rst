@@ -214,7 +214,8 @@ colours therefore stays readable instead of sharing one bar.
    :alt: Heatmap colour-bar legend in the top-right corner outside the ring
    :width: 60%
 
-   ``Legend position → TOP_RIGHT`` (default).
+   ``Legend position → TOP_RIGHT`` (default).  The identical render is reused
+   for ``polish_heat_first.png`` in :doc:`circular_data_tracks`.
 
 .. figure:: images/polish_legend_BOTTOM_LEFT.png
    :alt: Heatmap colour-bar legend in the bottom-left corner outside the ring

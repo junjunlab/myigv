@@ -4,7 +4,13 @@ Screenshot gallery
 Every illustration in this guide is a real render produced by myIGV's headless
 verification harness (``build/check/probe/``), captured into
 ``build/check/exports/`` and copied into ``docs/images/``.  They are not
-mock-ups and not screenshots of a different application.
+mock-ups and not screenshots of a different application.  Most of them are
+driven by the real ``.bw`` / ``.bed`` / ``.hic`` / ``.mcool`` / ``.cool`` /
+``.h5`` files in the workspace directory one level above the
+repository (``igv_mod/``, referenced as ``../``); those files are not
+committed to the repository.  Every Hi-C figure in this guide now shows a
+genuine contact matrix.  See :doc:`real_data_examples` for the full inventory
+of files and the figures they drive.
 
 .. note::
 
@@ -62,8 +68,8 @@ Showcase
 Complete figure index
 ---------------------
 
-The table below lists every figure embedded in this guide, what it demonstrates,
-and the chapter where it appears with its full caption.
+The tables below list every figure embedded in this guide, what it
+demonstrates, and the chapter where it appears with its full caption.
 
 Getting started and desktop features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -80,13 +86,15 @@ Getting started and desktop features
        skipped; transcript models with exon blocks remain.
      - :doc:`search`
    * - ``zoom_tip.png``
-     - Arc geometry before Ctrl+wheel zoom-to-cursor.
+     - A circular ring sector before a single Ctrl+wheel notch.
      - :doc:`view_interactions`
    * - ``zoom_tip_after.png``
-     - The same arcs after zooming; the locus under the pointer stays put.
+     - The same sector after one notch; the difference is deliberately subtle
+       — the locus under the pointer stays put.
      - :doc:`view_interactions`
    * - ``group_scale_axis_zoom.png``
-     - Y-axis ``[min - max]`` range label on a numeric track.
+     - Genome selector and grouped data tracks with a red zoom annotation; no
+       ``[min - max]`` range labels in this capture.
      - :doc:`view_interactions`
    * - ``circular_group_pergene.png``
      - Group autoscale computed separately per gene panel.
@@ -194,8 +202,9 @@ Links, ribbons and arrows
      - The same links as straight chords (``Bezier radius`` at ``0``).
      - :doc:`circular_links`
    * - ``ribbon_single.png``
-     - A single Circos ribbon (two Bézier edges) bowing toward the centre and
-       tapering at the ends.
+     - A single point → band Circos ribbon (two Bézier edges) bowing toward the
+       centre and tapering at the 1 bp end; first row of
+       ``links_demo_line_band.bed``.
      - :doc:`circular_links`
    * - ``circular_links_ribbon_mixed.png``
      - Mixed point and interval endpoints in one links layer.
@@ -234,7 +243,8 @@ Heatmap and legend
      - ``Heatmap outside the ideogram``: outward comb and a shrunken main ring.
      - :doc:`circular_heatmap`
    * - ``polish_legend_TOP_RIGHT.png``
-     - ``Legend position → TOP_RIGHT`` (default).
+     - ``Legend position → TOP_RIGHT`` (default).  Same render reused for
+       ``polish_heat_first.png`` in :doc:`circular_data_tracks`.
      - :doc:`circular_heatmap`
    * - ``polish_legend_BOTTOM_LEFT.png``
      - ``Legend position → BOTTOM_LEFT``.
@@ -246,7 +256,8 @@ Heatmap and legend
      - The legend renders on the normal on-screen path with no Hi-C loaded.
      - :doc:`circular_heatmap`
    * - ``polish_heat_first.png``
-     - Heatmap band at one position in the Data Tracks row order.
+     - Heatmap band at one position in the Data Tracks row order.  Same render
+       reused for ``polish_legend_TOP_RIGHT.png`` in :doc:`circular_heatmap`.
      - :doc:`circular_data_tracks`
    * - ``polish_heat_second.png``
      - The same heatmap after dragging its row — the radial band order follows.
@@ -297,13 +308,16 @@ Hi-C on the ring and export
      - Demonstrates
      - Chapter
    * - ``hic_ring_triangle.png``
-     - Triangle Hi-C matrix warped into a ring band.
+     - Two triangle Hi-C rings warped as concentric bands, with two corner
+       legends (real ``AID_0h_50kb.cool`` / ``AID_48h_50kb.cool``).
      - :doc:`circular_hic`
    * - ``hic_ring_square.png``
-     - Square Hi-C matrix warped into a ring band.
+     - Square Hi-C matrix warped into a ring band, from the same real 50 kb
+       cooler matrices.
      - :doc:`circular_hic`
    * - ``hic_genelist.png``
-     - Hi-C ring in gene-list (faceted) mode.
+     - Hi-C ring in gene-list (faceted) mode, from real
+       ``AID_0h_50kb.cool``.
      - :doc:`circular_hic`
    * - ``tad_overlay_on.png``
      - TAD/domain outlines composited onto the warped Hi-C ring.
@@ -322,10 +336,12 @@ Hi-C on the ring and export
      - PDF export with the Hi-C ring and its legend.
      - :doc:`circular_hic`, :doc:`circular_export`
    * - ``export_shot.png``
-     - A circular figure produced through the export path.
+     - A circular figure produced through the export path.  Same render reused
+       for ``shot_svg.png`` below.
      - :doc:`circular_export`
    * - ``shot_svg.png``
-     - SVG vector output of the same layout.
+     - SVG vector output of the same layout.  Same render reused from
+       ``export_shot.png`` — only the written file format differs.
      - :doc:`circular_export`
    * - ``shot_pdf.png``
      - PDF vector output of the same layout.
@@ -334,10 +350,59 @@ Hi-C on the ring and export
      - Re-rendering at a custom export width/height.
      - :doc:`circular_export`
 
+Real-data example figures
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 52 18
+
+   * - File
+     - Demonstrates
+     - Chapter
+   * - ``bw_signal_ring.png``
+     - A real BigWig signal track rendered as a circular ring: blue Points
+       (``Scr_R1_IP.bw``) + red Lines (``Scr_R1_input.bw``), read with IGV's
+       ``BBFile`` reader.
+     - :doc:`real_data_examples`
+   * - ``real_value_tracks.png``
+     - Points, Lines, Histogram and Rectangles rendered together from the
+       same real ``hg38_val.bed``.
+     - :doc:`circular_import`
+   * - ``hist_rect_outside.png``
+     - Histogram band placed **outside the ideogram**, from the real
+       ``hg38_val.bed`` (previously an unreferenced capture).
+     - :doc:`circular_import`
+   * - ``hic_real_juicer.png``
+     - Real Juicer ``GSE280419_HiC_AID_0h.hic`` matrix, warped / rendered.
+     - :doc:`hic`, :doc:`circular_hic`
+   * - ``hic_real_mcool.png``
+     - Real multi-resolution ``GSM10137692_…10kb.mcool`` matrix.
+     - :doc:`hic`, :doc:`circular_hic`
+   * - ``hic_real_cool.png``
+     - Real gzip-wrapped ``GSM8842576_S1_raw_5000_.cool.gz`` matrix; a bounded
+       chr1 0–10 Mb window of the sparse 5 kb raw matrix.
+     - :doc:`hic`, :doc:`circular_hic`
+   * - ``hic_real_loops.png``
+     - Real ``AID_0h_10kb_loops.bedpe`` (1384 hicDetectLoops rows) drawn as
+       ribbon links on the ring.
+     - :doc:`hic`, :doc:`circular_hic`
+
 .. tip::
 
    To regenerate any figure, run the corresponding probe under
    ``build/check/probe/`` with the project runtime classpath, then copy the
-   PNG from ``build/check/exports/`` into ``docs/images/``.  The probes use
-   real ``.hic``, ``hg38_heatmap.bed``, ``hg38_genes.bed`` and links BEDPE
-   files, so the figures stay reproducible from the source tree.
+   PNG from ``build/check/exports/`` into ``docs/images/``.  Most probes read
+   real ``.hic``, ``hg38_heatmap.bed``, ``hg38_genes.bed``, ``hg38_val.bed``
+   and links BEDPE / ``.bw`` / ``.mcool`` / ``.cool.gz`` / ``.cool`` files, so
+   the figures stay reproducible from the source tree; the triangle / square /
+   gene-list mode demos and the two export captures now read the real 50 kb
+   cooler matrices (see :doc:`real_data_examples`).  The real-data captures
+   above come from
+   the ``RealValueRingProbe`` / ``BwSignalRingProbe`` (value tracks and the
+   real signal ring) and ``RealLoopRingProbe`` / Hi-C real-data probes (Juicer,
+   ``.mcool``, ``.cool.gz`` and the real loop ribbon ring); probe names follow
+   the ``build/check/probe/`` convention of ``<Topic>Probe.java``, so if a
+   class was renamed use the one that writes the matching PNG in
+   ``build/check/exports/``.  All of them read their inputs by ``../``
+   relative path — see :doc:`real_data_examples`.
